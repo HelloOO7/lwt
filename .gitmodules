@@ -1,0 +1,6 @@
+[submodule "lwt-server-esp32/lib/vdv301/xsd/VDV301"]
+	path = lwt-server-esp32/lib/vdv301/xsd/VDV301
+	url = https://github.com/VDVde/VDV301
+[submodule "lwt-server-esp32/lib/vdv301/xsd/VDV301CZ"]
+	path = lwt-server-esp32/lib/vdv301/xsd/VDV301CZ
+	url = https://github.com/prazska-integrovana-doprava/VDV301CZ

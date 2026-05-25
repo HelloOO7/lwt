@@ -1,0 +1,4 @@
+compiler/
+!PLACE_XSDCPP_HERE.txt
+include/*.hpp
+src/*.cpp
