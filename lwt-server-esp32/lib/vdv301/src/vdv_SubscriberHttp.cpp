@@ -17,7 +17,7 @@ namespace vdv301
     SubscriberHttp::SubscriberHttp(ServiceDiscovery& sd, const std::string& serviceClassName, const ServiceDiscovery::Query& serviceQuery, OperationIDType subscribedOps) :
         SubscriberBase(),
         m_SD{ sd },
-        m_EventQueue("SubscriberHttp" + serviceClassName, 5),
+        m_EventQueue("SubscriberHttp" + serviceClassName, 5, 6144),
         m_ServiceClassName{ serviceClassName },
         m_SubscribedOperations{ subscribedOps }
     {
