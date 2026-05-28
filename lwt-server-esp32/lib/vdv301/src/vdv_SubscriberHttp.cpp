@@ -141,6 +141,10 @@ namespace vdv301
         g_SubcriberPushServer.RegisterPushEndpoint(
             endpointPath,
             [=, this](const std::string& body) {
+                if (body.empty()) {
+                    ESP_LOGW(TAG, "Push endpoint %s received empty body", operationName.c_str());
+                    return;
+                }
                 m_EventQueue.Post(
                     [=, this]() {
                         ESP_LOGI(TAG, "Received push for operation %s", operationName.c_str());
@@ -162,7 +166,13 @@ namespace vdv301
 
     esp_err_t SubscriberHttp::SendSubscribeRequest(const std::string& operation)
     {
-        std::string subscribePath = m_HttpPathBase + "Subscribe/" + operation;
+        if (!operation.starts_with("Get")) {
+            ESP_LOGE(TAG, "Operation name %s does not start with 'Get' - can not subscribe", operation.c_str());
+            return ESP_FAIL;
+        }
+
+        // translate "GetXyz" to "SubscribeXyz"
+        std::string subscribePath = m_HttpPathBase + "Subscribe" + operation.substr(std::string("Get").length());
         m_BaseHttpConfig.path = subscribePath.c_str();
 
         esp_http_client_handle_t client = esp_http_client_init(&m_BaseHttpConfig);
@@ -197,7 +207,7 @@ namespace vdv301
         else {
             ESP_LOGE(TAG, "Failed to send subscribe request: %s", esp_err_to_name(err));
         }
-        
+
         return err;
     }
 

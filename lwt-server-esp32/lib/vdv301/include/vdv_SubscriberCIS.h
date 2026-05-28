@@ -26,7 +26,7 @@ namespace vdv301
         IBIS_IP_CustomerInformationService_V2_3CZ1_0::CustomerInformationService_GetAllDataResponseStructure m_LastAllData;
 
     public:
-        SubscriberCIS(ServiceDiscovery& sd, Operation subscribedOps);
+        SubscriberCIS(ServiceDiscovery& sd, Operation subscribedOps = (Operation) 0);
 
     protected:
         void OnOperationResult(const OperationResult& result) override;

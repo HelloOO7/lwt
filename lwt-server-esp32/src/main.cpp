@@ -1,6 +1,7 @@
 #include <iostream>
 #include "vdv_ServiceDiscovery.h"
 #include "vdv_SubscriberCIS.h"
+#include "vdv_SubscriberTVS.h"
 #include "nvs_flash.h"
 #include "wifi_client.h"
 #include "wifi_secrets.h"
@@ -9,13 +10,18 @@ class AppMain {
 private:
     vdv301::ServiceDiscovery m_HttpServiceDiscovery;
     vdv301::SubscriberCIS m_CISSubscriber;
+    vdv301::SubscriberTVS m_TVSSubscriber;
 
 public:
     AppMain() :
         m_HttpServiceDiscovery{ vdv301::HttpServiceDiscovery() },
         m_CISSubscriber(
+            m_HttpServiceDiscovery/*,
+            vdv301::SubscriberCIS::Operation::GetCurrentStopPoint | vdv301::SubscriberCIS::Operation::GetCurrentAnnouncement*/
+        ),
+        m_TVSSubscriber(
             m_HttpServiceDiscovery,
-            vdv301::SubscriberCIS::Operation::GetCurrentStopPoint | vdv301::SubscriberCIS::Operation::GetCurrentAnnouncement
+            vdv301::SubscriberTVS::Operation::GetRazzia | vdv301::SubscriberTVS::Operation::GetCurrentStopPoint
         )
     {
 

@@ -87,3 +87,4 @@ endfunction()
 
 vdv301_add_xsd_schema("VDV301CZ/XSD/IBIS-IP_common_V2.3CZ1.0.xsd")
 vdv301_add_xsd_schema("VDV301CZ/XSD/IBIS-IP_CustomerInformationService_V2.3CZ1.0.xsd" EXTERN "xsdcpp")
+vdv301_add_xsd_schema("VDV301/IBIS-IP_TicketValidationService_V2.2.xsd" EXTERN "xsdcpp")
