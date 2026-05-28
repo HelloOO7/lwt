@@ -12,10 +12,14 @@ namespace vdv301
 
     HttpPushServer g_SubcriberPushServer(SUBSCRIBER_PUSH_SERVER_PORT);
 
-    SubscriberHttp::SubscriberHttp(ServiceDiscovery& sd, const std::string& serviceClassName, const ServiceDiscovery::Query& serviceQuery) :
+    static constexpr EventQueue::EventTag SERVICE_UPDATE_EVENT_TAG = 1;
+
+    SubscriberHttp::SubscriberHttp(ServiceDiscovery& sd, const std::string& serviceClassName, const ServiceDiscovery::Query& serviceQuery, OperationIDType subscribedOps) :
         SubscriberBase(),
-        m_SD(sd),
-        m_ServiceClassName(serviceClassName)
+        m_SD{ sd },
+        m_EventQueue("SubscriberHttp" + serviceClassName, 5),
+        m_ServiceClassName{ serviceClassName },
+        m_SubscribedOperations{ subscribedOps }
     {
         memset(&m_BaseHttpConfig, 0, sizeof(m_BaseHttpConfig));
         std::lock_guard lock(m_CommMutex);
@@ -26,11 +30,11 @@ namespace vdv301
                 const ServiceDiscovery::Result* result = results.GetAnyResult();
                 if (result) {
                     ESP_LOGI(TAG, "Service query matched: instance=%s host=%s port=%u", result->GetInstanceName().c_str(), result->GetHostName().c_str(), result->GetPort());
-                    OnServiceDiscovered(*result);
+                    HandleServiceDiscovered(*result);
                 }
                 else {
                     ESP_LOGI(TAG, "Service query lost");
-                    OnServiceLost();
+                    HandleServiceLost();
                 }
             }
         );
@@ -39,7 +43,7 @@ namespace vdv301
     SubscriberHttp::~SubscriberHttp()
     {
         // must not lock here, otherwise we would deadlock
-        // (subscriber mutex -> SD mutex vs. SD mutex -> subscriber mutex in OnServiceDiscovered)
+        // (subscriber mutex -> SD mutex vs. SD mutex -> subscriber mutex in HandleServiceDiscovered)
         // fortunately we do not need to lock, as destructor/constructor can not be called concurrently
         auto sdh = m_SDHandle.exchange(0);
         m_SD.StopBrowse(sdh);
@@ -55,7 +59,7 @@ namespace vdv301
         }
     }
 
-    void SubscriberHttp::OnServiceDiscovered(const ServiceDiscovery::Result& result)
+    void SubscriberHttp::HandleServiceDiscovered(const ServiceDiscovery::Result& result)
     {
         std::lock_guard lock(m_CommMutex);
         auto sdh = m_SDHandle.load();
@@ -91,27 +95,44 @@ namespace vdv301
         m_BaseHttpConfig.user_agent = "VDV301-SubscriberHttp/1.0";
         m_BaseHttpConfig.timeout_ms = 10000;
 
-        OnSubscribe();
+        UpdateServiceStateAsync();
     }
 
-    void SubscriberHttp::OnServiceLost()
+    void SubscriberHttp::HandleServiceLost()
+    {
+        m_PublisherInstanceName = "";
+
+        UpdateServiceStateAsync();
+    }
+
+    void SubscriberHttp::OnServiceConnected()
+    {
+        // iterate all operation bits
+        for (OperationIDType op = 1; op != 0; op <<= 1) {
+            if (op > m_SubscribedOperations) {
+                break;
+            }
+            if ((m_SubscribedOperations & op) != 0) {
+                SubscribeToOperation(op);
+            }
+        }
+    }
+
+    void SubscriberHttp::OnServiceDisconnected()
     {
 
     }
 
-    void SubscriberHttp::OnSubscribe()
+    void SubscriberHttp::OnOperationResult(const OperationResult& result)
     {
 
     }
 
-    void SubscriberHttp::OnOperationResult(const std::string& operation, const std::string& result)
+    void SubscriberHttp::SubscribeToOperation(OperationIDType operation)
     {
+        auto&& operationName = GetOperationName(operation);
 
-    }
-
-    void SubscriberHttp::SubscribeToOperation(const std::string& operation)
-    {
-        std::string endpointPath = GetOperationPushPath(operation);
+        std::string endpointPath = GetOperationPushPath(operationName);
 
         if (!g_SubcriberPushServer.IsRunning()) {
             g_SubcriberPushServer.Start();
@@ -119,14 +140,19 @@ namespace vdv301
 
         g_SubcriberPushServer.RegisterPushEndpoint(
             endpointPath,
-            [this, operation](const std::string& body) {
-                std::lock_guard lock(m_CommMutex);
-                OnOperationResult(operation, body);
+            [=, this](const std::string& body) {
+                m_EventQueue.Post(
+                    [=, this]() {
+                        ESP_LOGI(TAG, "Received push for operation %s", operationName.c_str());
+                        std::lock_guard lock(m_CommMutex);
+                        OnOperationResult(OperationResult(operation, body));
+                    }
+                );
             }
         );
         m_SubscribedOperationEndpoints.push_back(endpointPath);
 
-        SendSubscribeRequest(operation);
+        SendSubscribeRequest(operationName);
     }
 
     std::string SubscriberHttp::GetOperationPushPath(const std::string& operation) const
@@ -134,9 +160,9 @@ namespace vdv301
         return "/" + m_PublisherInstanceName + "/" + operation;
     }
 
-    void SubscriberHttp::SendSubscribeRequest(const std::string& operation)
+    esp_err_t SubscriberHttp::SendSubscribeRequest(const std::string& operation)
     {
-        std::string subscribePath = m_HttpPathBase + operation;
+        std::string subscribePath = m_HttpPathBase + "Subscribe/" + operation;
         m_BaseHttpConfig.path = subscribePath.c_str();
 
         esp_http_client_handle_t client = esp_http_client_init(&m_BaseHttpConfig);
@@ -161,11 +187,18 @@ namespace vdv301
 
         ESP_ERROR_CHECK(esp_http_client_set_post_field(client, bodyStr.c_str(), bodyStr.size()));
 
-        ESP_ERROR_CHECK(esp_http_client_perform(client));
+        esp_err_t err = esp_http_client_perform(client);
 
         ESP_ERROR_CHECK(esp_http_client_cleanup(client));
 
-        ESP_LOGI(TAG, "Subscribe done");
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "Subscribe request sent successfully");
+        }
+        else {
+            ESP_LOGE(TAG, "Failed to send subscribe request: %s", esp_err_to_name(err));
+        }
+        
+        return err;
     }
 
     esp_err_t SubscriberHttp::HandleHttpEvent(esp_http_client_event_t* evt)
@@ -191,5 +224,35 @@ namespace vdv301
         char ipStr[16];
         snprintf(ipStr, sizeof(ipStr), IPSTR, IP2STR(ip));
         return std::string(ipStr);
+    }
+
+    void SubscriberHttp::UpdateServiceStateAsync()
+    {
+        m_EventQueue.Post([this]() {
+            std::lock_guard lock(m_CommMutex);
+            if (!m_PublisherInstanceName.empty()) {
+                OnServiceConnected();
+            }
+            else {
+                OnServiceDisconnected();
+            }
+            }, SERVICE_UPDATE_EVENT_TAG);
+    }
+
+    SubscriberHttp::OperationResult::OperationResult(OperationIDType operationID, const std::string& result) :
+        m_OperationID{ operationID },
+        m_Result{ result }
+    {
+
+    }
+
+    SubscriberHttp::OperationIDType SubscriberHttp::OperationResult::GetRawOperationID() const
+    {
+        return m_OperationID;
+    }
+
+    const std::string& SubscriberHttp::OperationResult::GetResult() const
+    {
+        return m_Result;
     }
 }

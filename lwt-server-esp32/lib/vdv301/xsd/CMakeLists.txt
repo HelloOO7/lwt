@@ -79,7 +79,10 @@ function(vdv301_add_xsd_schema schema_name)
     endif()
 
     list(APPEND VDV301_XSD_SRCS "${source_cpp}")
-        list(APPEND VDV301_XSD_CLEAN_FILES "${source_cpp}" ${source_headers})
+    list(APPEND VDV301_XSD_CLEAN_FILES "${source_cpp}" ${source_headers})
+    # Export accumulated lists to parent scope so callers can see the results
+    set(VDV301_XSD_SRCS "${VDV301_XSD_SRCS}" PARENT_SCOPE)
+    set(VDV301_XSD_CLEAN_FILES "${VDV301_XSD_CLEAN_FILES}" PARENT_SCOPE)
 endfunction()
 
 vdv301_add_xsd_schema("VDV301CZ/XSD/IBIS-IP_common_V2.3CZ1.0.xsd")

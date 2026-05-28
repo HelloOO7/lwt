@@ -156,12 +156,14 @@ namespace vdv301
         static bool MatchQueryResult(const Query& query, const Result& result);
         bool UpdateBrowseFromCache(QueryBrowseState& browse);
         void HandleBrowseResult(mdns_result_t* result, bool fetchAdditional = false);
+        bool SendSyncQuery(const char* instanceName, uint16_t type, uint32_t timeout, size_t maxResults);
         bool BeginAsyncQuery(const char* instanceName, uint16_t type, uint32_t timeout, size_t maxResults);
         bool IsAsyncQueryActive(const char* instanceName, uint16_t type) const;
         void HandleAsyncQueryResults(mdns_search_once_t* searchHandle);
-        static void GlobalBrowseNotifyCallback(mdns_result_t* result);
+        static void GlobalBrowseNotifyCallback(mdns_result_t* results);
         static void GlobalAsyncResultNotifyCallback(mdns_search_once_t* search);
         const Result* FindAnyResultByHostName(const std::string& hostName);
+        std::string FindInstanceNameForSearchHandle(mdns_search_once_t* searchHandle);
 
         void UpdateBrowseResultsAsync();
     };

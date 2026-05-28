@@ -274,14 +274,19 @@ namespace vdv301
         }
     }
 
-    void ServiceDiscovery::GlobalBrowseNotifyCallback(mdns_result_t* result) {
+    void ServiceDiscovery::GlobalBrowseNotifyCallback(mdns_result_t* results) {
         // notification is sent for each result (though we *could* traverse the whole linked list if we wanted to...)
-        std::string address = BuildMdnsAddress(result->service_type, result->proto);
+        std::string address = BuildMdnsAddress(results->service_type, results->proto);
         std::lock_guard lock(g_GlobalStateMutex);
         auto find = g_AddressToInstanceMap.find(address);
         if (find != g_AddressToInstanceMap.end()) {
             ServiceDiscovery* instance = find->second;
-            instance->HandleBrowseResult(result, true);
+
+            mdns_result_t* result = results;
+            while (result) {
+                instance->HandleBrowseResult(result, true);
+                result = result->next;
+            }
         }
     }
 
@@ -367,16 +372,18 @@ namespace vdv301
                 for (auto&& cacheEntry : m_DNSCache) {
                     if (result->instance_name && cacheEntry.m_InstanceName == result->instance_name) {
                         instanceMatched = true;
-                        cacheEntry.m_HostName = result->hostname;
-                        cacheEntry.m_Port = result->port;
-                        cacheEntry.m_Interface = result->esp_netif;
+                        if (result->hostname) {
+                            cacheEntry.m_HostName = result->hostname;
+                            cacheEntry.m_Port = result->port;
+                            cacheEntry.m_Interface = result->esp_netif;
+                        }
                         if (result->txt_count) {
                             cacheEntry.MergeTxtRecords(result);
                         }
                         hasTxt |= cacheEntry.m_TxtRecords.size() > 0;
                         hasIp |= !cacheEntry.m_IPAddresses.empty();
                     }
-                    if (cacheEntry.m_HostName == result->hostname && result->addr) {
+                    if (result->hostname && cacheEntry.m_HostName == result->hostname && result->addr) {
                         cacheEntry.UpdateAddresses(result);
                     }
                 }
@@ -428,13 +435,54 @@ namespace vdv301
         return find != m_DNSCache.end() ? &(*find) : nullptr;
     }
 
-    bool ServiceDiscovery::BeginAsyncQuery(const char* instanceName, uint16_t type, uint32_t timeout, size_t maxResults) {
+    std::string ServiceDiscovery::FindInstanceNameForSearchHandle(mdns_search_once_t* searchHandle) {
         std::lock_guard lock(m_AdditionalQueryMutex);
-        if (IsAsyncQueryActive(instanceName, type)) {
+        auto find = std::find_if(
+            m_ActiveAdditionalQueries.begin(),
+            m_ActiveAdditionalQueries.end(),
+            [searchHandle](const AdditionalQueryState& query) {
+                return query.m_SearchHandle == searchHandle;
+            }
+        );
+        return find != m_ActiveAdditionalQueries.end() ? find->m_InstanceName : "";
+    }
+
+    bool ServiceDiscovery::SendSyncQuery(const char* instanceName, uint16_t type, uint32_t timeout, size_t maxResults) {
+        ESP_LOGI(TAG, "Sending sync query for instance name %s, type %u", instanceName, type);
+        mdns_result_t* results = nullptr;
+        esp_err_t err = mdns_query(instanceName, m_ServiceType.c_str(), m_ProtocolStr.c_str(), type, timeout, maxResults, &results);
+        if (err == ESP_OK) {
+            if (results) {
+                ESP_LOGI(TAG, "Received results for sync query");
+                mdns_result_t* result = results;
+                while (result) {
+                    HandleBrowseResult(result, false);
+                    result = result->next;
+                }
+                mdns_query_results_free(results);
+                return true;
+            }
+            else {
+                ESP_LOGE(TAG, "Query succeeded, but returned no results");
+                return false;
+            }
+        }
+        else {
+            ESP_LOGE(TAG, "Failed to receive results for sync query: %s", esp_err_to_name(err));
             return false;
         }
+    }
 
-        mdns_search_once_t* searchHandle = mdns_query_async_new(instanceName, m_ServiceType.c_str(), m_ProtocolStr.c_str(), type, timeout, maxResults, GlobalAsyncResultNotifyCallback);
+    bool ServiceDiscovery::BeginAsyncQuery(const char* instanceName, uint16_t type, uint32_t timeout, size_t maxResults) {
+        std::lock_guard lock(m_AdditionalQueryMutex);
+        if (instanceName && IsAsyncQueryActive(instanceName, type)) {
+            return false;
+        }
+        bool isIpQuery = type == MDNS_TYPE_A || type == MDNS_TYPE_AAAA;
+        const char* serviceType = isIpQuery ? nullptr : m_ServiceType.c_str();
+        const char* protocol = isIpQuery ? nullptr : m_ProtocolStr.c_str();
+
+        mdns_search_once_t* searchHandle = mdns_query_async_new(instanceName, serviceType, protocol, type, timeout, maxResults, GlobalAsyncResultNotifyCallback);
         if (searchHandle) {
             m_ActiveAdditionalQueries.push_back({ searchHandle, instanceName, type });
             {
@@ -462,11 +510,23 @@ namespace vdv301
                 mdns_result_t* results = nullptr;
                 uint8_t count;
                 if (mdns_query_async_get_results(searchHandle, 0, &results, &count)) {
+                    auto defaultInstanceName = FindInstanceNameForSearchHandle(searchHandle);
                     ESP_LOGI(TAG, "Received %u results for async query", count);
-                    while (results) {
-                        HandleBrowseResult(results, false);
-                        results = results->next;
+                    mdns_result_t* result = results;
+                    while (result) {
+                        bool injectedInstanceName = false;
+                        if (!result->instance_name) {
+                            result->instance_name = const_cast<char*>(defaultInstanceName.c_str());
+                            injectedInstanceName = true;
+                        }
+                        HandleBrowseResult(result, false);
+                        if (injectedInstanceName) {
+                            // prevent double free
+                            result->instance_name = nullptr;
+                        }
+                        result = result->next;
                     }
+                    mdns_query_results_free(results);
                 }
                 else {
                     ESP_LOGE(TAG, "Unexpected state - search results should be available after notification.");

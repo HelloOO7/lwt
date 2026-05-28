@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <iostream>
 #include "vdv_ServiceDiscovery.h"
 #include "vdv_SubscriberCIS.h"
@@ -14,7 +13,10 @@ private:
 public:
     AppMain() :
         m_HttpServiceDiscovery{ vdv301::HttpServiceDiscovery() },
-        m_CISSubscriber(m_HttpServiceDiscovery)
+        m_CISSubscriber(
+            m_HttpServiceDiscovery,
+            vdv301::SubscriberCIS::Operation::GetCurrentStopPoint | vdv301::SubscriberCIS::Operation::GetCurrentAnnouncement
+        )
     {
 
     }
