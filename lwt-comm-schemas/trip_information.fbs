@@ -1,0 +1,70 @@
+namespace lwt;
+
+table StopReference {
+    /// Sequence number of the stop within the route. This matches StopInformationStructure.StopIndex in VDV 301.
+    sequence_id: ushort;
+    /// Unique and stable stop identifier as transmitted by VDV 301 services.
+    /// In V2.3CZ1.0, this is the numeric ID from the Ministry of Transport's CIS JŘ station register,
+    /// which, as we all know, is an open and freely accessible state information system,
+    /// operated in the public interest by our friendly and very non-corrupt authorities ;)
+    global_ref_id: uint;
+    /// Name of the stop as seen in vehicle information systems. This should match what is seen on
+    /// interior LCD screens for maximum passenger convenience.
+    name: string;
+}
+
+table LineInfo {
+    /// Line license number, such as 100394. For trains, this can be the train number, similarly as in the name.
+    global_ref_id: uint;
+    /// User-friendly line number. Is a string to support substitute transport (X26) and trains (Os 8854).
+    /// It may contain more arbitrarily separated numbers if a line number change is going to take place.
+    /// It can also be styled using basic inline HTML.
+    name: string;
+    /// Headsign aka the stop name shown in big caps on interior displays. The stop name inside may be adjusted
+    /// and enriched with icons/pictograms.
+    headsign: StopReference;
+}
+
+table TicketValidationInfo {
+    /// Line info.
+    line: LineInfo;
+    /// Stop at which the vehicle is currently stationed, is about to depart from or has recently departed from.
+    current_departure_stop: StopReference;
+    /// The time at which a ticket should be activated to be valid for departure from the given stop.
+    /// This can sometimes be in the past, such as when activation is started in the grace period after entry.
+    /// This time includes delay.
+    scheduled_activation_time: long;
+    /// Delay of the trip in minutes.
+    trip_delay: short;
+    /// Tariff zones where the vehicle is currently located, i.e. from which a ticket can be activated.
+    tariff_zones: string;
+    /// Tariff zones where the vehicle will travel in the future. There is no guarantee as to the order thereof,
+    /// given that the particular zone chosen for a given stop may vary depending on subscription tickets owned.
+    next_tariff_zones: string;
+}
+
+table TripStopInfo {
+    /// ID and name of the stop.
+    stop_ref: StopReference;
+    /// Time of arrival at the stop (scheduled, absolute).
+    arr_time: long;
+    /// Time of departure from the stop (scheduled, absolute).
+    dep_time: long;
+    /// List of tariff zones at the stop. These only contain the zones valid for the current
+    /// line and the transport authority operating the LWT module. String is comma separated for
+    /// memory efficiency (avoid 32bit flatbuffer pointers).
+    tariff_zones: string;
+    /// Number of kilometers travelled here from the first stop.
+    tariff_kilometers: float;
+}
+
+table TripRouteInfo {
+    /// Trip license number, as in a printed timetable (CIS JŘ).
+    global_ref_id: uint;
+    /// Line info.
+    line: LineInfo;
+    /// Delay of the trip in minutes.
+    delay: int;
+    /// All stops of the trip, including already passed.
+    stops: [TripStopInfo];
+}

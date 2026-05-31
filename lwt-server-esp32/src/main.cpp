@@ -1,10 +1,12 @@
 #include <iostream>
+#include "lwt_schemas.h"
 #include "vdv_ServiceDiscovery.h"
 #include "vdv_SubscriberCIS.h"
 #include "vdv_SubscriberTVS.h"
 #include "nvs_flash.h"
 #include "wifi_client.h"
 #include "wifi_secrets.h"
+#include "esp_nimble_hci.h"
 
 class AppMain {
 private:
@@ -24,7 +26,7 @@ public:
             vdv301::SubscriberTVS::Operation::GetRazzia | vdv301::SubscriberTVS::Operation::GetCurrentStopPoint
         )
     {
-
+        lwt::ensure_generated_types_linked();
     }
 };
 
@@ -39,6 +41,7 @@ void init_nvs() {
 
 extern "C" void app_main() {
     init_nvs();
+    ESP_ERROR_CHECK(esp_nimble_hci_init());
     std::cout << "Hello, VDV301!" << std::endl;
     wifi_init_sta(WIFI_SSID, WIFI_PASSWORD, 1);
 

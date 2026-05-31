@@ -1,0 +1,55 @@
+namespace lwt;
+
+table PreauthorizationTokenRequest {
+    /// CRC-32 checksums of the activation tokens which the client
+    /// promises to send, should they choose to redeem the preauthorization token.
+    /// These are limited to a small amount of elements so as to prevent abuse.
+    /// The client will not be able to activate a ticket whose token was not provided
+    /// as part of this request, as the preauthorization token will not contain a
+    /// digital signature for such tokens.
+    activation_token_hashes: [int] (required);
+}
+
+table PreauthorizationToken {
+    /// CRC-32 checksum of the activation token for which this preauthorization token
+    /// was generated.
+    activation_token_hash: int;
+    /// The actual preauthorization token. The data within is implementation-dependent
+    /// and contains information such as the expiry timestamp.
+    preauthorization_token: [ubyte] (required);
+    /// Signature of the preauthorization_token field. The client needn't worry about the details thereof,
+    /// as their only responsibility is to simply send this unmodified token with an activation request.
+    preauthorization_signature: [ubyte] (required);
+}
+
+table PreauthorizationTokenResponse {
+    /// Timestamp when the server has issued these tokens. The client may measure the request RTT
+    /// and use this to calculate an estimate of their local expiry time.
+    issued_at: long;
+    /// Timestamp (in server time) when the preauthorization tokens become invalid.
+    expires_at: long;
+    /// Preauthorization tokens for the individual activation tokens requested.
+    tokens: [PreauthorizationToken];
+}
+
+table TicketActivationRequest {
+    /// The activation token, which will produce the signed ticket data.
+    activation_token: [ubyte] (required);
+    /// Timestamp when the client requests the ticket to be activated. The server may or may not respect
+    /// this, but it can be used for example for deferred activation when a passenger has a subscription ticket.
+    activation_time: long;
+    /// Comma-separated list of tariff zones for activation. May be omitted in special cases such as Prague-only tickets.
+    activation_zones: string;
+    /// Optional preauthorization token that permits immediate activation.
+    /// If not given, tampered with or expired, the ticket may be activated with a security delay.
+    preauthorization_token: PreauthorizationToken;
+}
+
+table TicketActivationResponse {
+    /// Signed ticket QR data that is valid for inspection.
+    signed_etd: string (required);
+    /// Final start of validity time.
+    valid_since_time: long;
+    /// Final end of validity time.
+    valid_until_time: long;
+}

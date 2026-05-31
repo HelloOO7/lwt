@@ -1,0 +1,11 @@
+namespace lwt;
+
+table RequestPacket {
+    operation_id: uint;
+    data: [ubyte];
+}
+
+table ResponsePacket {
+    status_code: int;
+    data: [ubyte];
+}
