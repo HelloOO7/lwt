@@ -9,6 +9,7 @@
 #include "EventQueue.h"
 #include "esp_http_client.h"
 #include "esp_netif_types.h"
+#include "vdv_HttpPushServer.h"
 
 namespace vdv301 {
 
@@ -20,13 +21,13 @@ namespace vdv301 {
         class OperationResult {
         private:
             OperationIDType m_OperationID;
-            const std::string& m_Result;
+            const HttpPushServer::PushBody& m_Result;
         public:
-            OperationResult(OperationIDType operationID, const std::string& result);
+            OperationResult(OperationIDType operationID, const HttpPushServer::PushBody& result);
             template<typename T>
             T GetOperationID() const { return (T)GetRawOperationID(); }
             OperationIDType GetRawOperationID() const;
-            const std::string& GetResult() const;
+            const HttpPushServer::PushBody& GetResult() const;
         };
     private:
         ServiceDiscovery& m_SD;

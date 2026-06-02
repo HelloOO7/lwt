@@ -78,10 +78,13 @@ namespace vdv301 {
         }
 
         std::string body;
-        char buf[128];
+        if (req->content_len) {
+            body.reserve(req->content_len);
+        }
+        psram_vector<char> buf(128);
         int received;
-        while ((received = httpd_req_recv(req, buf, sizeof(buf))) > 0) {
-            body.append(buf, received);
+        while ((received = httpd_req_recv(req, buf.data(), buf.size())) > 0) {
+            body.append(buf.data(), received);
         }
 
         it->second(body);

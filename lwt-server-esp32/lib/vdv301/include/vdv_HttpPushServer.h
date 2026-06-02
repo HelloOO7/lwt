@@ -6,13 +6,15 @@
 #include <unordered_map>
 #include <mutex>
 #include "esp_http_server.h"
+#include "PSRAMContainers.h"
 
 namespace vdv301 {
 
     class HttpPushServer
     {
     public:
-        using PushConsumer = std::function<void(const std::string& body)>;
+        using PushBody = std::string;
+        using PushConsumer = std::function<void(const PushBody& body)>;
 
     private:
         uint16_t m_Port;

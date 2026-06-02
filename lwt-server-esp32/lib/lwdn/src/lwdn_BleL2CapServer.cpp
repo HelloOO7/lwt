@@ -2,17 +2,24 @@
 
 #include "errno.h"
 #include "esp_err.h"
+#include "esp_log.h"
 #include "host/ble_hs.h"
 #include "host/ble_l2cap.h"
 #include <cassert>
+#include "PSRAMAllocator.h"
+// for bugfix (micropython)
+#include "nimble/host/src/ble_l2cap_priv.h"
 
 namespace lwdn {
+
+    static constexpr const char* TAG = "BleL2CapServer";
 
     BleL2CapServer::BleL2CapServer(uint16_t psm, uint16_t mtu) :
         m_Psm{ psm },
         m_Mtu{ mtu }
     {
-        ble_l2cap_create_server(psm, mtu, L2CapEventCallback, this);
+        int err = ble_l2cap_create_server(psm, mtu, L2CapEventCallback, this);
+        assert(err == 0);
     }
 
     BleL2CapServer::~BleL2CapServer()
@@ -33,16 +40,17 @@ namespace lwdn {
         m_ChunkSize{ chunkSize },
         m_ChunkSizeWithOverhead{ (uint16_t)(chunkSize + sizeof(os_mbuf) + sizeof(os_mbuf_pkthdr)) },
         m_ChunkCountPerMbuf{ static_cast<uint16_t>((mtu + chunkSize - 1) / chunkSize) },
-        m_MbufSetCount{ 3 /* tx, rx1, rx2 */ },
+        m_MbufSetCount{ 3 /* tx, rx1, rx2 (bug workaround) */ },
         m_ChunkCount{ (uint16_t)(m_MbufSetCount * m_ChunkCountPerMbuf) },
-        m_MemBufData{ std::make_unique<os_membuf_t[]>(OS_MEMPOOL_SIZE(m_ChunkCount, m_ChunkSizeWithOverhead)) }
+        m_MemBufData(OS_MEMPOOL_SIZE(m_ChunkCount, m_ChunkSizeWithOverhead))
     {
-        if (os_mempool_init(&m_MemPool, m_ChunkCount, m_ChunkSizeWithOverhead, m_MemBufData.get(), "L2CAPChanMemPool")) {
+        if (os_mempool_init(&m_MemPool, m_ChunkCount, m_ChunkSizeWithOverhead, m_MemBufData.data(), "L2CAPChanMemPool")) {
             ESP_ERROR_CHECK(ESP_ERR_NO_MEM);
         }
         if (os_mbuf_pool_init(&m_MbufPool, &m_MemPool, m_ChunkSizeWithOverhead, m_ChunkCount)) {
             ESP_ERROR_CHECK(ESP_ERR_NO_MEM);
         }
+        m_MainRxBuf = os_mbuf_get_pkthdr(&m_MbufPool, 0);
     }
 
     uint16_t BleL2CapServer::GetPsm() const
@@ -64,6 +72,7 @@ namespace lwdn {
         while (true) {
             auto it = std::find_if(m_Channels.begin(), m_Channels.end(), [handle](auto&& channel) { return channel->m_SocketHandle >= handle; });
             if (it != m_Channels.end()) {
+                handle = (*it)->m_SocketHandle;
                 break;
             }
             else {
@@ -77,60 +86,58 @@ namespace lwdn {
         }
         m_NextAcceptedSocketHandle = handle + 1;
 
-        return std::unique_ptr<BleL2CapSocket>(new BleL2CapSocket(this, handle)); // use new here to access private constructor
+        return std::unique_ptr<BleL2CapSocket>(new BleL2CapSocket(this, m_Channels.back())); // use new here to access private constructor
     }
 
-    int BleL2CapServer::ReadChannel(SocketHandle socketHandle, void* buffer, size_t len, size_t* receivedLen, size_t timeout)
+    int BleL2CapServer::ReadChannel(Channel* channel, void* buffer, size_t len, size_t* receivedLen, size_t timeout)
     {
         std::unique_lock lock(m_GlobalEventLock);
 
-        Channel* channel = FindChannelBySocket(socketHandle);
-        if (!channel) {
-            return ECONNRESET;
-        }
-
-        if (!channel->m_CurRxBuf) {
+        if (OS_MBUF_PKTLEN(channel->m_MainRxBuf) == 0) {
+            if (channel->m_Closed) {
+                return ECONNRESET;
+            }
             if (timeout == 0) {
                 return EWOULDBLOCK;
             }
             else {
                 if (timeout == SIZE_MAX) {
-                    channel->m_RxBufAvailable.wait(lock, [channel] { return channel->m_CurRxBuf != nullptr; });
+                    channel->m_RxBufAvailable.wait(lock, [channel] { return OS_MBUF_PKTLEN(channel->m_MainRxBuf) > 0; });
                 }
                 else {
-                    channel->m_RxBufAvailable.wait_for(lock, std::chrono::milliseconds(timeout), [channel] { return channel->m_CurRxBuf != nullptr; });
+                    channel->m_RxBufAvailable.wait_for(lock, std::chrono::milliseconds(timeout), [channel] { return OS_MBUF_PKTLEN(channel->m_MainRxBuf) > 0; });
                 }
-                if (!channel->m_CurRxBuf) {
+                if (OS_MBUF_PKTLEN(channel->m_MainRxBuf) == 0) {
                     return ETIMEDOUT;
                 }
             }
         }
 
-        size_t toCopy = std::min(len, channel->m_CurRxLen - channel->m_CurRxOffset);
-        os_mbuf_copydata(channel->m_CurRxBuf, channel->m_CurRxOffset, toCopy, buffer);
-        channel->m_CurRxOffset += toCopy;
+        size_t toCopy = std::min<size_t>(len, OS_MBUF_PKTLEN(channel->m_MainRxBuf));
+        assert(os_mbuf_copydata(channel->m_MainRxBuf, 0, toCopy, buffer) == 0);
+        os_mbuf_adj(channel->m_MainRxBuf, toCopy);
         if (receivedLen) {
             *receivedLen = toCopy;
         }
 
-        if (channel->m_CurRxOffset >= channel->m_CurRxLen) {
-            ble_l2cap_recv_ready(channel->m_Chan, channel->m_CurRxBuf);
-            channel->m_CurRxBuf = nullptr;
+        if (OS_MBUF_PKTLEN(channel->m_MainRxBuf) == 0 && channel->m_TempRxBuf && !channel->m_Closed) {
+            // replenish credits
+            assert(ble_l2cap_recv_ready(channel->m_Chan, channel->m_TempRxBuf) == 0);
         }
 
         return 0;
     }
 
-    int BleL2CapServer::WriteChannel(SocketHandle socketHandle, const void* data, size_t len, size_t* sentLen)
+    int BleL2CapServer::WriteChannel(Channel* channel, const void* data, size_t len, size_t* sentLen)
     {
         std::unique_lock lock(m_GlobalEventLock);
 
-        Channel* channel = FindChannelBySocket(socketHandle);
-        if (!channel) {
+        if (channel->m_Closed) {
             return ECONNRESET;
         }
 
         if (len > m_Mtu) {
+            ESP_LOGE(TAG, "WriteChannel: data size %d exceeds MTU %d", len, m_Mtu);
             return EMSGSIZE;
         }
 
@@ -139,10 +146,15 @@ namespace lwdn {
             return ENOMEM;
         }
         os_mbuf_copyinto(mbuf, 0, data, len);
+        channel->m_TxIssued = true;
 
         int err;
 
         while (true) {
+            if (channel->m_Closed) {
+                err = ECONNRESET;
+                break;
+            }
             err = ble_l2cap_send(channel->m_Chan, mbuf);
             if (err == BLE_HS_ESTALLED) {
                 channel->m_TxUnstalled.wait(lock);
@@ -170,58 +182,88 @@ namespace lwdn {
         switch (event->type) {
         case BLE_L2CAP_EVENT_COC_CONNECTED:
         {
-            Channel* channel = FindChannel(event->connect.conn_handle, true);
+            ESP_LOGI(TAG, "Channel connected: conn_handle=%d, status=%d", event->connect.conn_handle, event->connect.status);
+            Channel* channel = FindChannel(event->connect.conn_handle, false);
             if (!channel) {
-                return BLE_HS_ENOMEM_EVT;
+                return BLE_HS_ENOENT;
             }
             else {
                 channel->m_Chan = event->connect.chan;
-                m_SocketAvailable.notify_one();
             }
             break;
         }
         case BLE_L2CAP_EVENT_COC_DISCONNECTED:
         {
+            ESP_LOGI(TAG, "Channel disconnected: conn_handle=%d", event->disconnect.conn_handle);
+            auto* channel = FindChannel(event->disconnect.conn_handle, false);
+            if (channel) {
+                channel->m_Closed = true;
+                channel->m_RxBufAvailable.notify_all();
+                channel->m_TxUnstalled.notify_all();
+            }
+            // this erases the channel from the list. sockets may still hold it via shared ptr.
             OnChannelClosed(event->disconnect.conn_handle);
             break;
         }
         case BLE_L2CAP_EVENT_COC_ACCEPT:
         {
-            Channel* channel = FindChannel(event->accept.conn_handle, false);
+            ESP_LOGI(TAG, "Channel accept: conn_handle=%d, peer sdu size=%d", event->accept.conn_handle, event->accept.peer_sdu_size);
+            Channel* channel = FindChannel(event->accept.conn_handle, true);
             if (!channel) {
-                return BLE_HS_ENOENT;
+                return BLE_HS_ENOMEM_EVT;
             }
             else {
+                m_SocketAvailable.notify_one();
                 channel->m_Chan = event->accept.chan;
                 os_mbuf* rxbuf = os_mbuf_get_pkthdr(&channel->m_MbufPool, 0);
+                channel->m_TempRxBuf = rxbuf;
                 return ble_l2cap_recv_ready(event->accept.chan, rxbuf);
             }
             break;
         }
         case BLE_L2CAP_EVENT_COC_DATA_RECEIVED:
         {
+            ESP_LOGI(TAG, "Data received: conn_handle=%d, len=%d", event->receive.conn_handle, OS_MBUF_PKTLEN(event->receive.sdu_rx));
             Channel* channel = FindChannel(event->receive.conn_handle, false);
             if (!channel) {
+                ESP_LOGE(TAG, "Channel not registered: conn_handle=%d", event->receive.conn_handle);
                 return BLE_HS_ENOENT;
             }
             else {
                 channel->m_Chan = event->receive.chan;
-                if (channel->m_CurRxBuf) {
-                    // https://github.com/micropython/micropython/blob/44a569b637b56764582c3b652e7bc51b53c0df1d/extmod/nimble/modbluetooth_nimble.c#L1610
-                    throw std::runtime_error("Received data while previous data has not been read yet");
+
+                assert(event->receive.sdu_rx == channel->m_TempRxBuf);
+
+                // https://github.com/micropython/micropython/blob/44a569b637b56764582c3b652e7bc51b53c0df1d/extmod/nimble/modbluetooth_nimble.c#L1610
+                os_mbuf_concat(channel->m_MainRxBuf, event->receive.sdu_rx);
+                char test;
+                assert(os_mbuf_copydata(channel->m_MainRxBuf, 0, 1, &test) == 0);
+
+                // bugfix: nimble sets this to null, so we need to insert a dummy buffer here to prevent NPEs (see micropython)
+                // by disabling credit update, we will drain all the credits into these mini-SDUs. credits will then be replenished
+                // once the main rx. buf is completely drained
+                channel->m_Chan->disable_auto_credit_update = true;
+                // we can allocate a new mbuf here as concat has destroyed the previous one
+                auto rxbuf = os_mbuf_get_pkthdr(&channel->m_MbufPool, 0);
+                assert(rxbuf);
+                channel->m_TempRxBuf = rxbuf;
+                int err = ble_l2cap_recv_ready(channel->m_Chan, rxbuf);
+                channel->m_Chan->disable_auto_credit_update = false;
+
+                channel->m_RxBufAvailable.notify_one();
+
+                if (err) {
+                    ESP_LOGE(TAG, "recv_ready failed: conn_handle=%d, err=%d", event->receive.conn_handle, err);
                 }
-                else {
-                    channel->m_CurRxBuf = event->receive.sdu_rx;
-                    channel->m_CurRxOffset = 0;
-                    channel->m_CurRxLen = OS_MBUF_PKTLEN(event->receive.sdu_rx);
-                    channel->m_RxBufAvailable.notify_one();
-                }
+
+                return err;
             }
             break;
         }
         case BLE_L2CAP_EVENT_COC_PEER_RECONFIGURED:
         case BLE_L2CAP_EVENT_COC_RECONFIG_COMPLETED:
         {
+            ESP_LOGI(TAG, "Channel reconfigured: conn_handle=%d", event->reconfigured.conn_handle);
             Channel* channel = FindChannel(event->reconfigured.conn_handle, false);
             if (!channel) {
                 return BLE_HS_ENOENT;
@@ -232,6 +274,7 @@ namespace lwdn {
         }
         case BLE_L2CAP_EVENT_COC_TX_UNSTALLED:
         {
+            ESP_LOGI(TAG, "Channel tx unstalled: conn_handle=%d", event->tx_unstalled.conn_handle);
             Channel* channel = FindChannel(event->tx_unstalled.conn_handle, false);
             if (channel) {
                 channel->m_TxUnstalled.notify_one();
@@ -287,37 +330,45 @@ namespace lwdn {
         std::erase_if(m_Channels, [connHandle](auto&& channel) { return channel->m_ConnHandle == connHandle; });
     }
 
-    int BleL2CapServer::CloseChannel(uint16_t connHandle)
+    int BleL2CapServer::CloseChannel(Channel* channel)
     {
         std::lock_guard lock(m_GlobalEventLock);
 
-        Channel* channel = FindChannel(connHandle, false);
-        if (!channel) {
-            return BLE_HS_ENOENT;
+        if (channel->m_Closed) {
+            return EALREADY;
         }
-        else {
-            // OnChannelClosed will be called asynchonously in event callback later
+        channel->m_Closed = true;
+
+        //ESP_LOGI(TAG, "Closing channel from socket dtor: conn_handle=%d", channel->m_ConnHandle);
+
+        // OnChannelClosed will be called asynchonously in event callback later
+
+        // bug: can not actually called disconnect, as it causes race conditions within nimBLE when a TX has not yet finished.
+        // we will have to wait for the client to disconnect on their end.
+        if (!channel->m_TxIssued) {
             return ble_l2cap_disconnect(channel->m_Chan);
         }
+
+        return 0;
     }
 
-    BleL2CapSocket::BleL2CapSocket(BleL2CapServer* server, BleL2CapServer::SocketHandle socketHandle) :
+    BleL2CapSocket::BleL2CapSocket(BleL2CapServer* server, std::shared_ptr<BleL2CapServer::Channel> channel) :
         m_Server{ server },
-        m_SocketHandle{ socketHandle }
+        m_Channel{ channel }
     {
     }
 
     BleL2CapSocket::~BleL2CapSocket() {
-        m_Server->CloseChannel(m_SocketHandle);
+        m_Server->CloseChannel(m_Channel.get());
     }
 
     int BleL2CapSocket::Write(const void* data, size_t len, size_t* sentLen)
     {
-        return m_Server->WriteChannel(m_SocketHandle, data, len, sentLen);
+        return m_Server->WriteChannel(m_Channel.get(), data, len, sentLen);
     }
 
     int BleL2CapSocket::Read(void* buffer, size_t len, size_t* receivedLen, size_t timeout)
     {
-        return m_Server->ReadChannel(m_SocketHandle, buffer, len, receivedLen, timeout);
+        return m_Server->ReadChannel(m_Channel.get(), buffer, len, receivedLen, timeout);
     }
 }

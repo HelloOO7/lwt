@@ -1,0 +1,72 @@
+plugins {
+    alias(libs.plugins.android.library)
+}
+
+android {
+    namespace = 'cz.spojenka.lwt.client.android'
+    compileSdk {
+        version = release(36) {
+            minorApiLevel = 1
+        }
+    }
+
+    defaultConfig {
+        minSdk 29
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        consumerProguardFiles "consumer-rules.pro"
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+
+    sourceSets {
+        main {
+            java.srcDirs += "${layout.buildDirectory.get().asFile}/generated/source/flatbuffers/main/java"
+        }
+    }
+
+}
+
+dependencies {
+    implementation libs.appcompat
+    implementation libs.material
+    implementation libs.flatbuffers.java
+    testImplementation libs.junit
+    androidTestImplementation libs.espresso.core
+    androidTestImplementation libs.ext.junit
+}
+
+tasks.register('generateFlatBuffers', Exec) {
+    group = 'generation'
+    description = 'Generate Java classes from FlatBuffer schemas'
+
+    def schemaDir = file("${projectDir}/../../lwt-comm-schemas")
+    def compilerDir = file("${schemaDir}/compiler")
+    def outputDir = file("${layout.buildDirectory.get().asFile}/generated/source/flatbuffers/main/java")
+    def isWindows = System.getProperty("os.name").toLowerCase().contains("windows")
+    def flatcPath = new File(compilerDir, isWindows ? "flatc.exe" : "flatc").absolutePath
+
+    inputs.dir(schemaDir)
+    outputs.dir(outputDir)
+
+    doFirst {
+        if (!outputDir.exists()) {
+            outputDir.mkdirs()
+        }
+    }
+
+    def schemaFiles = fileTree(schemaDir).matching {
+        include "*.fbs"
+    }.files
+
+    commandLine = [flatcPath, '--java', '-o', outputDir.absolutePath] + schemaFiles.collect { it.absolutePath }
+}
+
+// Ensure the task runs before compilation and handles incremental builds
+afterEvaluate {
+    tasks.named("preBuild").configure {
+        dependsOn(tasks.named("generateFlatBuffers"))
+    }
+}

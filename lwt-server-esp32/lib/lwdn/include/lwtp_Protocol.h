@@ -9,6 +9,8 @@ namespace lwtp {
         FIRST_NOT_SUPPORTED
     };
 
+    static constexpr size_t MAX_PACKET_SIZE = 8192;
+
     struct PacketHeader {
         static constexpr const char* MAGIC = "LWTP";
 

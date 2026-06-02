@@ -1,0 +1,6 @@
+namespace lwt;
+
+table PingResponse {
+    device_id: string;
+    device_time: long;
+}

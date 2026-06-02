@@ -9,6 +9,7 @@
 #include <vector>
 #include <mutex>
 #include <condition_variable>
+#include "PSRAMContainers.h"
 
 namespace lwdn {
 
@@ -25,6 +26,8 @@ namespace lwdn {
             SocketHandle m_SocketHandle;
             uint16_t m_ConnHandle;
             ble_l2cap_chan* m_Chan{ nullptr };
+            bool m_TxIssued{ false };
+            bool m_Closed{ false };
 
             uint16_t m_Mtu;
             uint16_t m_ChunkSize;
@@ -32,13 +35,12 @@ namespace lwdn {
             uint16_t m_ChunkCountPerMbuf;
             uint16_t m_MbufSetCount;
             uint16_t m_ChunkCount;
-            std::unique_ptr<os_membuf_t[]> m_MemBufData;
+            psram_vector<os_membuf_t> m_MemBufData;
             os_mempool m_MemPool;
             os_mbuf_pool m_MbufPool;
 
-            os_mbuf* m_CurRxBuf{ nullptr };
-            size_t m_CurRxOffset{ 0 };
-            size_t m_CurRxLen{ 0 };
+            os_mbuf* m_MainRxBuf{ nullptr };
+            os_mbuf* m_TempRxBuf{ nullptr };
             std::condition_variable m_RxBufAvailable;
 
             std::condition_variable m_TxUnstalled;
@@ -50,7 +52,7 @@ namespace lwdn {
         uint16_t m_Mtu;
 
         std::mutex m_GlobalEventLock;
-        std::vector<std::unique_ptr<Channel>> m_Channels;
+        std::vector<std::shared_ptr<Channel>> m_Channels;
 
         SocketHandle m_NextSocketHandle{ 1 };
         SocketHandle m_NextAcceptedSocketHandle{ 1 };
@@ -70,9 +72,9 @@ namespace lwdn {
         Channel* FindChannelBySocket(SocketHandle socketHandle);
         void OnChannelClosed(uint16_t connHandle);
 
-        int CloseChannel(uint16_t connHandle);
-        int ReadChannel(SocketHandle socketHandle, void* buffer, size_t len, size_t* receivedLen = nullptr, size_t timeout = SIZE_MAX);
-        int WriteChannel(SocketHandle socketHandle, const void* data, size_t len, size_t* sentLen = nullptr);
+        int CloseChannel(Channel* channel);
+        int ReadChannel(Channel* channel, void* buffer, size_t len, size_t* receivedLen = nullptr, size_t timeout = SIZE_MAX);
+        int WriteChannel(Channel* channel, const void* data, size_t len, size_t* sentLen = nullptr);
 
         int HandleL2CapEvent(ble_l2cap_event* event);
         static int L2CapEventCallback(ble_l2cap_event* event, void* arg);
@@ -82,10 +84,10 @@ namespace lwdn {
         friend class BleL2CapServer;
     private:
         BleL2CapServer* m_Server;
-        BleL2CapServer::SocketHandle m_SocketHandle;
+        std::shared_ptr<BleL2CapServer::Channel> m_Channel;
 
     private:
-        BleL2CapSocket(BleL2CapServer* server, BleL2CapServer::SocketHandle socketHandle);
+        BleL2CapSocket(BleL2CapServer* server, std::shared_ptr<BleL2CapServer::Channel> channel);
     public:
         virtual ~BleL2CapSocket();
 

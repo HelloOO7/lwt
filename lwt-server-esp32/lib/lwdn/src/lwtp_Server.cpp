@@ -1,6 +1,7 @@
 #include "lwtp_Server.h"
 #include "lwtp_Protocol.h"
 #include "esp_log.h"
+#include <cstring>
 
 namespace lwtp {
 
@@ -30,6 +31,11 @@ namespace lwtp {
             return;
         }
         SwapByteOrder(header);
+
+        if (memcmp(header.m_Magic, PacketHeader::MAGIC, sizeof(header.m_Magic)) != 0) {
+            ESP_LOGE(TAG, "Invalid packet magic: %02x %02x %02x %02x", header.m_Magic[0], header.m_Magic[1], header.m_Magic[2], header.m_Magic[3]);
+            return;
+        }
 
         if (!header.m_Version) {
             ESP_LOGE(TAG, "Protocol version not set.");

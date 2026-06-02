@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include "esp_log.h"
 #include <cstring>
+#include "esp_event.h"
 
 namespace vdv301
 {
@@ -252,10 +253,18 @@ namespace vdv301
             ESP_ERROR_CHECK(mdns_init());
         }
         g_AddressToInstanceMap[m_Address] = this;
+
+        ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &ServiceDiscovery::EventGotIPCallback, this));
+        ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &ServiceDiscovery::EventGotIPCallback, this));
+        ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_GOT_IP6, &ServiceDiscovery::EventGotIPCallback, this));
     }
 
     ServiceDiscovery::~ServiceDiscovery()
     {
+        ESP_ERROR_CHECK(esp_event_handler_unregister(IP_EVENT, IP_EVENT_ETH_GOT_IP, &ServiceDiscovery::EventGotIPCallback));
+        ESP_ERROR_CHECK(esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &ServiceDiscovery::EventGotIPCallback));
+        ESP_ERROR_CHECK(esp_event_handler_unregister(IP_EVENT, IP_EVENT_GOT_IP6, &ServiceDiscovery::EventGotIPCallback));
+
         {
             std::scoped_lock lock(m_AdditionalQueryMutex, g_GlobalAsyncQueryMutex);
             for (auto&& query : m_ActiveAdditionalQueries) {
@@ -308,12 +317,19 @@ namespace vdv301
         std::lock_guard lock(m_BrowseStateMutex);
         BrowseHandle handle = m_NextBrowseHandle++;
         m_ActiveBrowses.push_back({ handle, query, {}, callback });
+        // only start browse if we have an IP
+        if (DeviceHasAnyIPAddress()) {
+            SdkStartBrowse();
+        }
+        return handle;
+    }
+
+    void ServiceDiscovery::SdkStartBrowse() {
         if (m_SdkBrowseHandle == nullptr) {
             ESP_LOGI(TAG, "Starting mDNS browse for service type %s and protocol %s", m_ServiceType.c_str(), m_ProtocolStr.c_str());
             m_SdkBrowseHandle = mdns_browse_new(m_ServiceType.c_str(), m_ProtocolStr.c_str(), ServiceDiscovery::GlobalBrowseNotifyCallback);
             ESP_ERROR_CHECK(m_SdkBrowseHandle != nullptr ? ESP_OK : ESP_FAIL);
         }
-        return handle;
     }
 
     void ServiceDiscovery::StopBrowse(BrowseHandle handle)
@@ -329,12 +345,28 @@ namespace vdv301
         if (find != m_ActiveBrowses.end()) {
             m_ActiveBrowses.erase(find);
 
-            if (m_ActiveBrowses.empty() && m_SdkBrowseHandle != nullptr) {
-                ESP_LOGI(TAG, "Stopping mDNS browse for service type %s and protocol %s", m_ServiceType.c_str(), m_ProtocolStr.c_str());
-                mdns_browse_delete(m_ServiceType.c_str(), m_ProtocolStr.c_str());
-                m_SdkBrowseHandle = nullptr;
+            if (m_ActiveBrowses.empty()) {
+                SdkStopBrowse();
             }
         }
+    }
+
+    void ServiceDiscovery::SdkStopBrowse() {
+        if (m_SdkBrowseHandle != nullptr) {
+            ESP_LOGI(TAG, "Stopping mDNS browse for service type %s and protocol %s", m_ServiceType.c_str(), m_ProtocolStr.c_str());
+            mdns_browse_delete(m_ServiceType.c_str(), m_ProtocolStr.c_str());
+            m_SdkBrowseHandle = nullptr;
+        }
+    }
+
+    void ServiceDiscovery::RestartAllBrowses()
+    {
+        std::scoped_lock lock(m_BrowseStateMutex, m_DNSCacheMutex);
+
+        m_DNSCache.clear(); //invalidate entire cache
+
+        SdkStopBrowse();
+        SdkStartBrowse();
     }
 
     void ServiceDiscovery::HandleBrowseResult(mdns_result_t* result, bool fetchAdditional) {
@@ -676,6 +708,49 @@ namespace vdv301
             }
         }
         return true;
+    }
+
+    void ServiceDiscovery::OnIPAddressAssigned(ip_event_got_ip_t* eventData) {
+        ESP_LOGI(TAG, "IP address assigned: " IPSTR, IP2STR(&eventData->ip_info.ip));
+        RestartAllBrowses();
+    }
+
+    void ServiceDiscovery::OnIPAddressAssigned(ip_event_got_ip6_t* eventData) {
+        ESP_LOGI(TAG, "IPv6 address assigned: " IPV6STR, IPV62STR(eventData->ip6_info.ip));
+        RestartAllBrowses();
+    }
+
+    bool ServiceDiscovery::DeviceHasAnyIPAddress() {
+        // IPv4 only for now
+        esp_netif_ip_info_t ipInfo;
+        const char* ifaces[] = { "ETH", "WIFI_STA", "WIFI_AP" };
+        for (const char* iface : ifaces) {
+            esp_netif_t* netif = esp_netif_get_handle_from_ifkey(iface);
+            if (netif) {
+                if (esp_netif_get_ip_info(netif, &ipInfo) == ESP_OK) {
+                    if (ipInfo.ip.addr) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    void ServiceDiscovery::EventGotIPCallback(void* arg, esp_event_base_t eventBase, int32_t eventId, void* eventData) {
+        ServiceDiscovery* instance = static_cast<ServiceDiscovery*>(arg);
+        switch (eventId) {
+        case IP_EVENT_ETH_GOT_IP:
+        case IP_EVENT_STA_GOT_IP:
+            instance->OnIPAddressAssigned(static_cast<ip_event_got_ip_t*>(eventData));
+            break;
+        case IP_EVENT_GOT_IP6:
+            instance->OnIPAddressAssigned(static_cast<ip_event_got_ip6_t*>(eventData));
+            break;
+        default:
+            ESP_LOGW(TAG, "Unexpected event ID %d in IP event callback", eventId);
+            break;
+        }
     }
 
     const char* ServiceDiscovery::ProtocolToAddressString(Protocol protocol)

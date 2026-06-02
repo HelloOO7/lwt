@@ -1,11 +1,15 @@
 #include "lwdn_Socket.h"
 
+#include "esp_log.h"
 #include <cerrno>
 
 namespace lwdn {
 
     int Socket::ReadFully(void* buffer, size_t len, size_t timeout)
     {
+        if (len == 0) {
+            return 0;
+        }
         uint8_t* buf = static_cast<uint8_t*>(buffer);
         size_t totalReceived = 0;
         while (totalReceived < len) {

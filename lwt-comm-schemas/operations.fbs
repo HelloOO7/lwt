@@ -4,6 +4,7 @@ include "trip_information.fbs";
 namespace lwt;
 
 enum Operation : ushort {
+    Ping,
     GetTicketValidationInfo,
     GetTripRouteInfo,
     CreatePreauthorizationToken    

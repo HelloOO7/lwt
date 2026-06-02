@@ -140,7 +140,7 @@ namespace vdv301
 
         g_SubcriberPushServer.RegisterPushEndpoint(
             endpointPath,
-            [=, this](const std::string& body) {
+            [=, this](const HttpPushServer::PushBody& body) {
                 if (body.empty()) {
                     ESP_LOGW(TAG, "Push endpoint %s received empty body", operationName.c_str());
                     return;
@@ -249,7 +249,7 @@ namespace vdv301
             }, SERVICE_UPDATE_EVENT_TAG);
     }
 
-    SubscriberHttp::OperationResult::OperationResult(OperationIDType operationID, const std::string& result) :
+    SubscriberHttp::OperationResult::OperationResult(OperationIDType operationID, const HttpPushServer::PushBody& result) :
         m_OperationID{ operationID },
         m_Result{ result }
     {
@@ -261,7 +261,7 @@ namespace vdv301
         return m_OperationID;
     }
 
-    const std::string& SubscriberHttp::OperationResult::GetResult() const
+    const HttpPushServer::PushBody& SubscriberHttp::OperationResult::GetResult() const
     {
         return m_Result;
     }

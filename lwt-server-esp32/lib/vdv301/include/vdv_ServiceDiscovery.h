@@ -147,12 +147,16 @@ namespace vdv301
 
         BrowseHandle StartBrowse(const Query& query, BrowseCallback callback);
         void StopBrowse(BrowseHandle handle);
+        void RestartAllBrowses();
 
         static const char* ProtocolToAddressString(Protocol protocol);
         static std::string BuildMdnsAddress(const std::string& serviceType, Protocol protocol);
         static std::string BuildMdnsAddress(const std::string& serviceType, const std::string& protocolStr);
 
     private:
+        void SdkStartBrowse();
+        void SdkStopBrowse();
+
         static bool MatchQueryResult(const Query& query, const Result& result);
         bool UpdateBrowseFromCache(QueryBrowseState& browse);
         void HandleBrowseResult(mdns_result_t* result, bool fetchAdditional = false);
@@ -164,6 +168,10 @@ namespace vdv301
         static void GlobalAsyncResultNotifyCallback(mdns_search_once_t* search);
         const Result* FindAnyResultByHostName(const std::string& hostName);
         std::string FindInstanceNameForSearchHandle(mdns_search_once_t* searchHandle);
+        void OnIPAddressAssigned(ip_event_got_ip_t* data);
+        void OnIPAddressAssigned(ip_event_got_ip6_t* data);
+        static bool DeviceHasAnyIPAddress();
+        static void EventGotIPCallback(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
 
         void UpdateBrowseResultsAsync();
     };

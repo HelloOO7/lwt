@@ -2,10 +2,23 @@
 
 set(LWT_SCHEMAS_ROOT "${CMAKE_CURRENT_LIST_DIR}")
 set(LWT_SCHEMAS_REPO_ROOT "${LWT_SCHEMAS_ROOT}/../../../lwt-comm-schemas")
-set(LWT_SCHEMAS_FLATC "${LWT_SCHEMAS_REPO_ROOT}/compiler/flatc.exe")
 set(LWT_SCHEMAS_SCHEMA_DIR "${LWT_SCHEMAS_REPO_ROOT}")
 set(LWT_SCHEMAS_GENERATED_DIR "${LWT_SCHEMAS_ROOT}/generated")
 set(LWT_SCHEMAS_GENERATED_INCLUDE_DIR "${LWT_SCHEMAS_GENERATED_DIR}/include")
+
+set(LWT_SCHEMAS_FLATC_CANDIDATES
+    "${LWT_SCHEMAS_REPO_ROOT}/compiler/flatc${CMAKE_EXECUTABLE_SUFFIX}"
+    "${LWT_SCHEMAS_REPO_ROOT}/compiler/flatc.exe"
+    "${LWT_SCHEMAS_REPO_ROOT}/compiler/flatc"
+)
+
+set(LWT_SCHEMAS_FLATC)
+foreach(flatc_candidate IN LISTS LWT_SCHEMAS_FLATC_CANDIDATES)
+    if(EXISTS "${flatc_candidate}")
+        set(LWT_SCHEMAS_FLATC "${flatc_candidate}")
+        break()
+    endif()
+endforeach()
 
 file(MAKE_DIRECTORY "${LWT_SCHEMAS_GENERATED_INCLUDE_DIR}")
 
@@ -13,7 +26,8 @@ if(NOT EXISTS "${LWT_SCHEMAS_FLATC}")
     message(FATAL_ERROR "flatc generator not found: ${LWT_SCHEMAS_FLATC}")
 endif()
 
-file(GLOB LWT_SCHEMAS_FBS_DEPENDENCIES
+file(GLOB_RECURSE LWT_SCHEMAS_FBS_DEPENDENCIES
+    LIST_DIRECTORIES FALSE
     "${LWT_SCHEMAS_SCHEMA_DIR}/*.fbs"
 )
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${LWT_SCHEMAS_FBS_DEPENDENCIES})
@@ -57,7 +71,7 @@ function(lwt_schemas_generate_flatbuffer schema_name)
     endif()
 endfunction()
 
-lwt_schemas_generate_flatbuffer("operations.fbs")
-lwt_schemas_generate_flatbuffer("packet.fbs")
-lwt_schemas_generate_flatbuffer("ticket_validation.fbs")
-lwt_schemas_generate_flatbuffer("trip_information.fbs")
+foreach(schema_path IN LISTS LWT_SCHEMAS_FBS_DEPENDENCIES)
+    file(RELATIVE_PATH schema_name "${LWT_SCHEMAS_SCHEMA_DIR}" "${schema_path}")
+    lwt_schemas_generate_flatbuffer("${schema_name}")
+endforeach()
