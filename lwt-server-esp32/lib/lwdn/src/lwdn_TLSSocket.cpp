@@ -50,6 +50,20 @@ namespace lwdn {
         }
     }
 
+    int TranslateErrorToStd(int mbedError) {
+        if (mbedError == 0) {
+            return 0;
+        }
+        switch (mbedError) {
+        case MBEDTLS_ERR_NET_CONN_RESET:
+            return ECONNRESET;
+        case MBEDTLS_ERR_SSL_TIMEOUT:
+            return ETIMEDOUT;
+        default:
+            return mbedError;
+        }
+    }
+
     int TLSSocket::Write(const void* data, size_t len, size_t* sentLen)
     {
         if (m_LastError) {
@@ -57,7 +71,7 @@ namespace lwdn {
         }
         int ret = StartTLS();
         if (ret != 0) {
-            return ret;
+            return TranslateErrorToStd(ret);
         }
         const unsigned char* buf = static_cast<const unsigned char*>(data);
         size_t totalSent = 0;
@@ -79,7 +93,7 @@ namespace lwdn {
             }
             else if (!IsAsyncReturnCode(ret)) {
                 mbedtls_ssl_session_reset(&m_SSLContext);
-                return SignalError(ret);
+                return TranslateErrorToStd(SignalError(ret));
             }
         }
     }
@@ -92,7 +106,7 @@ namespace lwdn {
 
         int ret = StartTLS();
         if (ret != 0) {
-            return ret;
+            return TranslateErrorToStd(ret);
         }
         unsigned char* buf = static_cast<unsigned char*>(buffer);
         size_t totalReceived = 0;
@@ -108,7 +122,7 @@ namespace lwdn {
                 }
             }
             else if (!IsAsyncReturnCode(ret)) {
-                return SignalError(ret);
+                return TranslateErrorToStd(SignalError(ret));
             }
         }
     }
@@ -127,6 +141,8 @@ namespace lwdn {
         switch (err) {
         case ECONNRESET:
             return MBEDTLS_ERR_NET_CONN_RESET;
+        case ETIMEDOUT:
+            return MBEDTLS_ERR_SSL_TIMEOUT;
         case EWOULDBLOCK:
             return wouldBlockCode;
         }

@@ -1,0 +1,11 @@
+include "trip_information.fbs";
+
+namespace lwt;
+
+/// Service-specific information broadcasted when searching for services
+/// through GAP or NAN. This provides basic information to allow the user
+/// to choose a device in case multiple are available.
+table PublisherSsi {
+    /// Trip information and state.
+    trip: TripStateInfo;
+}

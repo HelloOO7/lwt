@@ -17,8 +17,8 @@ android {
         consumerProguardFiles "consumer-rules.pro"
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     sourceSets {
@@ -61,7 +61,7 @@ tasks.register('generateFlatBuffers', Exec) {
         include "*.fbs"
     }.files
 
-    commandLine = [flatcPath, '--java', '-o', outputDir.absolutePath] + schemaFiles.collect { it.absolutePath }
+    commandLine = [flatcPath, '--java', '--java-package-prefix', 'cz.spojenka', '-o', outputDir.absolutePath] + schemaFiles.collect { it.absolutePath }
 }
 
 // Ensure the task runs before compilation and handles incremental builds

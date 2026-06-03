@@ -1,5 +1,28 @@
 namespace lwt;
 
+enum LineType : ubyte {
+    Metro,
+    Tram,
+    NTram,
+    CityBus,
+    NCityBus,
+    RegBus,
+    NRegBus,
+    SchoolBus,
+    AirportBus,
+    DemandBus,
+    GenericBus,
+    Trolleybus,
+    ReplacementBus,
+    Funicular,
+    Ferry,
+    GenericTrain,
+    OsTrain,
+    RTrain,
+    SpTrain,
+    ExTrain
+}
+
 table StopReference {
     /// Sequence number of the stop within the route. This matches StopInformationStructure.StopIndex in VDV 301.
     sequence_id: ushort;
@@ -16,6 +39,8 @@ table StopReference {
 table LineInfo {
     /// Line license number, such as 100394. For trains, this can be the train number, similarly as in the name.
     global_ref_id: uint;
+    /// Line type, which can be used f.e. for styling.
+    type: LineType;
     /// User-friendly line number. Is a string to support substitute transport (X26) and trains (Os 8854).
     /// It may contain more arbitrarily separated numbers if a line number change is going to take place.
     /// It can also be styled using basic inline HTML.
@@ -25,17 +50,29 @@ table LineInfo {
     headsign: StopReference;
 }
 
-table TicketValidationInfo {
+table TripInfo {
+    /// Trip license number, as in a printed timetable (CIS JŘ).
+    global_ref_id: uint;
     /// Line info.
-    line: LineInfo;
+    line: LineInfo (required);
+}
+
+table TripStateInfo {
+    /// Trip info.
+    trip: TripInfo (required);
+    /// Delay of the trip in minutes.
+    delay: int;
     /// Stop at which the vehicle is currently stationed, is about to depart from or has recently departed from.
     current_departure_stop: StopReference;
+}
+
+table TicketValidationInfo {
+    /// Trip state.
+    trip: TripStateInfo;
     /// The time at which a ticket should be activated to be valid for departure from the given stop.
     /// This can sometimes be in the past, such as when activation is started in the grace period after entry.
     /// This time includes delay.
     scheduled_activation_time: long;
-    /// Delay of the trip in minutes.
-    trip_delay: short;
     /// Tariff zones where the vehicle is currently located, i.e. from which a ticket can be activated.
     tariff_zones: string;
     /// Tariff zones where the vehicle will travel in the future. There is no guarantee as to the order thereof,
@@ -59,12 +96,8 @@ table TripStopInfo {
 }
 
 table TripRouteInfo {
-    /// Trip license number, as in a printed timetable (CIS JŘ).
-    global_ref_id: uint;
-    /// Line info.
-    line: LineInfo;
-    /// Delay of the trip in minutes.
-    delay: int;
+    /// Trip info and state.
+    trip: TripStateInfo (required);    
     /// All stops of the trip, including already passed.
     stops: [TripStopInfo];
 }

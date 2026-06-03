@@ -22,73 +22,83 @@ namespace lwtp {
 
     void Server::Serve(lwdn::Socket& socket)
     {
-        int err;
+        int numServed = 0;
 
-        PacketHeader header;
-        err = socket.ReadFully(&header, sizeof(header), m_RequestTimeout);
-        if (err != 0) {
-            ESP_LOGE(TAG, "Failed to read packet header: %d", err);
-            return;
-        }
-        SwapByteOrder(header);
+        do {
+            int err;
 
-        if (memcmp(header.m_Magic, PacketHeader::MAGIC, sizeof(header.m_Magic)) != 0) {
-            ESP_LOGE(TAG, "Invalid packet magic: %02x %02x %02x %02x", header.m_Magic[0], header.m_Magic[1], header.m_Magic[2], header.m_Magic[3]);
-            return;
-        }
-
-        if (!header.m_Version) {
-            ESP_LOGE(TAG, "Protocol version not set.");
-            return;
-        }
-        ProtocolVersion ver = (ProtocolVersion)header.m_Version;
-        if (ver >= ProtocolVersion::FIRST_NOT_SUPPORTED) {
-            ESP_LOGE(TAG, "Unsupported protocol version: %d", header.m_Version);
-            return;
-        }
-
-        uint16_t bufferSize = std::max<uint16_t>(header.m_HeaderSize, header.m_PayloadSize);
-
-        PacketData payload(bufferSize);
-
-        // exhaust header first
-        if (header.m_HeaderSize > sizeof(header)) {
-            err = socket.ReadFully(payload.data(), header.m_HeaderSize - sizeof(header), m_RequestTimeout);
-            if (err != 0) {
-                ESP_LOGE(TAG, "Failed to read packet header extension: %d", err);
+            PacketHeader header;
+            err = socket.ReadFully(&header, sizeof(header), m_RequestTimeout);
+            if (err == ECONNRESET && numServed > 0) {
+                ESP_LOGI(TAG, "Client disconnected after having served %d request(s)", numServed);
                 return;
             }
-        }
+            if (err != 0) {
+                ESP_LOGE(TAG, "Failed to read packet header: %d", err);
+                return;
+            }
+            SwapByteOrder(header);
 
-        err = socket.ReadFully(payload.data(), header.m_PayloadSize, m_RequestTimeout);
-        if (err != 0) {
-            ESP_LOGE(TAG, "Failed to read packet payload: %d", err);
-            return;
-        }
+            if (memcmp(header.m_Magic, PacketHeader::MAGIC, sizeof(header.m_Magic)) != 0) {
+                ESP_LOGE(TAG, "Invalid packet magic: %02x %02x %02x %02x", header.m_Magic[0], header.m_Magic[1], header.m_Magic[2], header.m_Magic[3]);
+                return;
+            }
 
-        payload.resize(header.m_PayloadSize);
+            if (!header.m_Version) {
+                ESP_LOGE(TAG, "Protocol version not set.");
+                return;
+            }
+            ProtocolVersion ver = (ProtocolVersion)header.m_Version;
+            if (ver >= ProtocolVersion::FIRST_NOT_SUPPORTED) {
+                ESP_LOGE(TAG, "Unsupported protocol version: %d", header.m_Version);
+                return;
+            }
 
-        auto response = ServeRequest(payload);
+            uint16_t bufferSize = std::max<uint16_t>(header.m_HeaderSize, header.m_PayloadSize);
 
-        PacketHeader responseHeader;
-        memcpy(responseHeader.m_Magic, PacketHeader::MAGIC, sizeof(responseHeader.m_Magic));
-        responseHeader.m_Version = header.m_Version;
-        responseHeader.m_Flags = 0;
-        responseHeader.m_HeaderSize = sizeof(responseHeader);
-        responseHeader.m_PayloadSize = response.size();
+            PacketData payload(bufferSize);
 
-        SwapByteOrder(responseHeader);
+            // exhaust header first
+            if (header.m_HeaderSize > sizeof(header)) {
+                err = socket.ReadFully(payload.data(), header.m_HeaderSize - sizeof(header), m_RequestTimeout);
+                if (err != 0) {
+                    ESP_LOGE(TAG, "Failed to read packet header extension: %d", err);
+                    return;
+                }
+            }
 
-        err = socket.Write(&responseHeader, sizeof(responseHeader));
-        if (err != 0) {
-            ESP_LOGE(TAG, "Failed to write response header: %d", err);
-            return;
-        }
-        err = socket.Write(response.data(), response.size());
-        if (err != 0) {
-            ESP_LOGE(TAG, "Failed to write response payload: %d", err);
-            return;
-        }
+            err = socket.ReadFully(payload.data(), header.m_PayloadSize, m_RequestTimeout);
+            if (err != 0) {
+                ESP_LOGE(TAG, "Failed to read packet payload: %d", err);
+                return;
+            }
+
+            payload.resize(header.m_PayloadSize);
+
+            auto response = ServeRequest(payload);
+
+            PacketHeader responseHeader;
+            memcpy(responseHeader.m_Magic, PacketHeader::MAGIC, sizeof(responseHeader.m_Magic));
+            responseHeader.m_Version = header.m_Version;
+            responseHeader.m_Flags = 0;
+            responseHeader.m_HeaderSize = sizeof(responseHeader);
+            responseHeader.m_PayloadSize = response.size();
+
+            SwapByteOrder(responseHeader);
+
+            err = socket.Write(&responseHeader, sizeof(responseHeader));
+            if (err != 0) {
+                ESP_LOGE(TAG, "Failed to write response header: %d", err);
+                return;
+            }
+            err = socket.Write(response.data(), response.size());
+            if (err != 0) {
+                ESP_LOGE(TAG, "Failed to write response payload: %d", err);
+                return;
+            }
+
+            numServed++;
+        } while (true);
     }
 
     void Server::SocketTaskFunc(void* param) {

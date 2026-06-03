@@ -7,8 +7,6 @@
 #include "host/ble_l2cap.h"
 #include <cassert>
 #include "PSRAMAllocator.h"
-// for bugfix (micropython)
-#include "nimble/host/src/ble_l2cap_priv.h"
 
 namespace lwdn {
 
@@ -101,14 +99,15 @@ namespace lwdn {
                 return EWOULDBLOCK;
             }
             else {
+                auto wakeupCond = [&channel] { return OS_MBUF_PKTLEN(channel->m_MainRxBuf) > 0 || channel->m_Closed; };
                 if (timeout == SIZE_MAX) {
-                    channel->m_RxBufAvailable.wait(lock, [channel] { return OS_MBUF_PKTLEN(channel->m_MainRxBuf) > 0; });
+                    channel->m_RxBufAvailable.wait(lock, wakeupCond);
                 }
                 else {
-                    channel->m_RxBufAvailable.wait_for(lock, std::chrono::milliseconds(timeout), [channel] { return OS_MBUF_PKTLEN(channel->m_MainRxBuf) > 0; });
+                    channel->m_RxBufAvailable.wait_for(lock, std::chrono::milliseconds(timeout), wakeupCond);
                 }
                 if (OS_MBUF_PKTLEN(channel->m_MainRxBuf) == 0) {
-                    return ETIMEDOUT;
+                    return channel->m_Closed ? ECONNRESET : ETIMEDOUT;
                 }
             }
         }
@@ -116,13 +115,9 @@ namespace lwdn {
         size_t toCopy = std::min<size_t>(len, OS_MBUF_PKTLEN(channel->m_MainRxBuf));
         assert(os_mbuf_copydata(channel->m_MainRxBuf, 0, toCopy, buffer) == 0);
         os_mbuf_adj(channel->m_MainRxBuf, toCopy);
+        channel->m_MainRxBuf = os_mbuf_trim_front(channel->m_MainRxBuf);
         if (receivedLen) {
             *receivedLen = toCopy;
-        }
-
-        if (OS_MBUF_PKTLEN(channel->m_MainRxBuf) == 0 && channel->m_TempRxBuf && !channel->m_Closed) {
-            // replenish credits
-            assert(ble_l2cap_recv_ready(channel->m_Chan, channel->m_TempRxBuf) == 0);
         }
 
         return 0;
@@ -234,21 +229,16 @@ namespace lwdn {
 
                 assert(event->receive.sdu_rx == channel->m_TempRxBuf);
 
-                // https://github.com/micropython/micropython/blob/44a569b637b56764582c3b652e7bc51b53c0df1d/extmod/nimble/modbluetooth_nimble.c#L1610
-                os_mbuf_concat(channel->m_MainRxBuf, event->receive.sdu_rx);
-                char test;
-                assert(os_mbuf_copydata(channel->m_MainRxBuf, 0, 1, &test) == 0);
+                int err = os_mbuf_appendfrom(channel->m_MainRxBuf, event->receive.sdu_rx, 0, OS_MBUF_PKTLEN(event->receive.sdu_rx));
+                if (err) {
+                    ESP_LOGE(TAG, "Failed to append received data to main RX buffer: conn_handle=%d, err=%d", event->receive.conn_handle, err);
+                    return err;
+                }
+                
+                // clear the entire TempRxBuf
+                os_mbuf_adj(channel->m_TempRxBuf, -OS_MBUF_PKTLEN(channel->m_TempRxBuf));
 
-                // bugfix: nimble sets this to null, so we need to insert a dummy buffer here to prevent NPEs (see micropython)
-                // by disabling credit update, we will drain all the credits into these mini-SDUs. credits will then be replenished
-                // once the main rx. buf is completely drained
-                channel->m_Chan->disable_auto_credit_update = true;
-                // we can allocate a new mbuf here as concat has destroyed the previous one
-                auto rxbuf = os_mbuf_get_pkthdr(&channel->m_MbufPool, 0);
-                assert(rxbuf);
-                channel->m_TempRxBuf = rxbuf;
-                int err = ble_l2cap_recv_ready(channel->m_Chan, rxbuf);
-                channel->m_Chan->disable_auto_credit_update = false;
+                err = ble_l2cap_recv_ready(channel->m_Chan, channel->m_TempRxBuf);
 
                 channel->m_RxBufAvailable.notify_one();
 
