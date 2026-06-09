@@ -8,7 +8,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
+import cz.spojenka.lwdn.BluetoothLwdnAddress;
 import cz.spojenka.lwdn.BluetoothLwdnSocketFactory;
+import cz.spojenka.lwdn.LwdnAddress;
 import cz.spojenka.lwdn.LwdnSocketFactory;
 
 public class LwtAPIClient extends LwtClient {
@@ -22,8 +24,13 @@ public class LwtAPIClient extends LwtClient {
         api = bind(LwtAPI.class);
     }
 
-    public static BluetoothLwdnSocketFactory bluetoothSocketFactory(BluetoothDevice device) {
-        return new BluetoothLwdnSocketFactory(device, BLUETOOTH_PSM);
+    public LwtAPIClient(LwdnAddress address) {
+        super(address);
+        api = bind(LwtAPI.class);
+    }
+
+    public static BluetoothLwdnAddress bluetoothAddress(BluetoothDevice device) {
+        return new BluetoothLwdnAddress(device, BLUETOOTH_PSM);
     }
 
     /**

@@ -16,13 +16,18 @@
 #include "lwt_ServiceRegistry.h"
 #include "lwt_ApplicationServer.h"
 #include "lwt_PingService.h"
+#include "lwtp_StartTLSInterceptor.h"
 #include "operations_generated.h"
 #include "esp_event.h"
+#include "tls_setup.h"
+#include "tls_certs.h"
 
 static constexpr uint16_t BLE_PSM = 0xD7; // 0x80 + 'W'
 
 class AppMain {
 private:
+    TlsEnvironment m_TlsCredentials;
+    mbedtls_ssl_config m_MbedTlsConfig;
     vdv301::ServiceDiscovery m_HttpServiceDiscovery;
     vdv301::SubscriberCIS m_CISSubscriber;
     vdv301::SubscriberTVS m_TVSSubscriber;
@@ -33,6 +38,7 @@ private:
 
 public:
     AppMain() :
+        m_TlsCredentials(TLS_DEVICE_CRT_START, TLS_DEVICE_CRT_END, TLS_LWT_SERVER_KEY_DEBUG_START, TLS_LWT_SERVER_KEY_DEBUG_END),
         m_HttpServiceDiscovery{ vdv301::HttpServiceDiscovery() },
         m_CISSubscriber(
             m_HttpServiceDiscovery/*,
@@ -48,8 +54,11 @@ public:
     {
         lwt::ensure_generated_types_linked();
 
+        setup_tls_config(m_TlsCredentials, m_MbedTlsConfig);
+
         m_ServiceRegistry.RegisterServices(m_PingService);
 
+        m_AppServer.AddInterceptor(std::make_unique<lwtp::StartTLSInterceptor>(m_MbedTlsConfig));
         m_AppServer.AddSocket(&m_BLEServer);
     }
 };
@@ -194,9 +203,9 @@ extern "C" void app_main() {
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     init_nimble();
     std::cout << "Hello, VDV301!" << std::endl;
+    esp_netif_init();
     //wifi_init_sta(WIFI_SSID, WIFI_PASSWORD, 1);
     ethernet_init();
-    esp_netif_init();
     ethernet_init_netif();
 
     AppMain* app = new AppMain();

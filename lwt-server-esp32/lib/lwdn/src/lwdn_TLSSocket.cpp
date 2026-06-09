@@ -6,17 +6,21 @@
 #include <cerrno>
 #include <cassert>
 #include "mbedtls/net_sockets.h"
+#include "esp_err.h"
+#include "esp_log.h"
 
 namespace lwdn {
 
-    TLSSocket::TLSSocket(Socket& base, mbedtls_ssl_config& sslConfig) :
-        m_Base{ base }
+    static constexpr const char* TAG = "TLSSocket";
+
+    TLSSocket::TLSSocket(std::unique_ptr<Socket> base, mbedtls_ssl_config& sslConfig) :
+        m_Base{ std::move(base) }
     {
         mbedtls_ssl_init(&m_SSLContext);
         int err = mbedtls_ssl_setup(&m_SSLContext, &sslConfig);
         if (err != 0) {
-            assert(err == PSA_ERROR_INSUFFICIENT_MEMORY);
-            throw std::bad_alloc();
+            mbedtls_ssl_free(&m_SSLContext);
+            ESP_ERROR_CHECK(err);
         }
         mbedtls_ssl_set_bio(&m_SSLContext, this, SSLFnSend, SSLFnRecv, SSLFnRecvTimeout);
     }
@@ -24,6 +28,21 @@ namespace lwdn {
     TLSSocket::~TLSSocket()
     {
         mbedtls_ssl_free(&m_SSLContext);
+    }
+
+    Socket& TLSSocket::GetBaseSocket()
+    {
+        return *m_Base;
+    }
+
+    std::unique_ptr<Socket> TLSSocket::ExtractBaseSocket()
+    {
+        return std::move(m_Base);
+    }
+
+    bool TLSSocket::IsCloseNotifyReceived() const
+    {
+        return m_ReceivedCloseNotify;
     }
 
     bool IsAsyncReturnCode(int code) {
@@ -44,6 +63,7 @@ namespace lwdn {
                 return 0;
             }
             else if (!IsAsyncReturnCode(ret)) {
+                ESP_LOGE(TAG, "TLS handshake failed with error: -0x%X", -ret);
                 mbedtls_ssl_session_reset(&m_SSLContext);
                 return SignalError(ret);
             }
@@ -56,11 +76,12 @@ namespace lwdn {
         }
         switch (mbedError) {
         case MBEDTLS_ERR_NET_CONN_RESET:
+        case MBEDTLS_ERR_SSL_CONN_EOF:
             return ECONNRESET;
         case MBEDTLS_ERR_SSL_TIMEOUT:
             return ETIMEDOUT;
         default:
-            return mbedError;
+            return EIO;
         }
     }
 
@@ -91,8 +112,14 @@ namespace lwdn {
                     return 0;
                 }
             }
+            else if (ret == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY) {
+                ESP_LOGI(TAG, "Peer sent TLS close notify");
+                mbedtls_ssl_close_notify(&m_SSLContext);
+                return ECONNRESET;
+            }
             else if (!IsAsyncReturnCode(ret)) {
                 mbedtls_ssl_session_reset(&m_SSLContext);
+                ESP_LOGE(TAG, "TLS write failed with error: -0x%X", -ret);
                 return TranslateErrorToStd(SignalError(ret));
             }
         }
@@ -121,7 +148,17 @@ namespace lwdn {
                     return 0;
                 }
             }
+            else if (ret == 0) {
+                ESP_LOGI(TAG, "TLS connection closed by peer without close notify");
+                return ECONNRESET;
+            }
+            else if (ret == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY) {
+                ESP_LOGI(TAG, "Peer sent TLS close notify");
+                mbedtls_ssl_close_notify(&m_SSLContext);
+                return ECONNRESET;
+            }
             else if (!IsAsyncReturnCode(ret)) {
+                ESP_LOGE(TAG, "TLS read failed with error: -0x%X", -ret);
                 return TranslateErrorToStd(SignalError(ret));
             }
         }
@@ -153,7 +190,7 @@ namespace lwdn {
     {
         TLSSocket* socket = static_cast<TLSSocket*>(ctx);
         size_t sentLen;
-        if (socket->m_Base.Write(buf, len, &sentLen) == 0) {
+        if (socket->m_Base->Write(buf, len, &sentLen) == 0) {
             return (int)sentLen;
         }
         else {
@@ -165,7 +202,7 @@ namespace lwdn {
     {
         TLSSocket* socket = static_cast<TLSSocket*>(ctx);
         size_t receivedLen;
-        if (socket->m_Base.Read(buf, len, &receivedLen) == 0) {
+        if (socket->m_Base->Read(buf, len, &receivedLen) == 0) {
             return (int)receivedLen;
         }
         else {
@@ -177,7 +214,8 @@ namespace lwdn {
     {
         TLSSocket* socket = static_cast<TLSSocket*>(ctx);
         size_t receivedLen;
-        if (socket->m_Base.Read(buf, len, &receivedLen, timeout) == 0) {
+        size_t realTimeout = timeout == 0 ? SIZE_MAX : timeout; //mbed 0 = no timeout, but our API uses SIZE_MAX for that, so convert it back
+        if (socket->m_Base->Read(buf, len, &receivedLen, realTimeout) == 0) {
             return (int)receivedLen;
         }
         else {

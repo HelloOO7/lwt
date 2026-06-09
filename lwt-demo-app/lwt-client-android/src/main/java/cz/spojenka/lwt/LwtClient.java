@@ -10,19 +10,40 @@ import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 
+import cz.spojenka.lwdn.LwdnAddress;
 import cz.spojenka.lwdn.LwdnSocketFactory;
+import cz.spojenka.lwdn.TLSLwdnSocketFactory;
 import cz.spojenka.lwtp.LwtpPacket;
 import cz.spojenka.lwtp.LwtpSession;
+import cz.spojenka.lwtp.LwtpTLSConfig;
+import cz.spojenka.lwtp.LwtpTLSPolicy;
+import cz.spojenka.lwtp.TLSLwtpSession;
 
 public class LwtClient {
 
     private static final Object[] EMPTY_ARGS = new Object[]{ByteBuffer.allocate(0)};
 
-    private final LwtpSession lwtpSession = new LwtpSession();
-    private final LwdnSocketFactory socketFactory;
+    private LwtpSession lwtpSession = new LwtpSession();
+    private LwdnSocketFactory socketFactory;
 
     public LwtClient(LwdnSocketFactory socketFactory) {
         this.socketFactory = socketFactory;
+    }
+
+    public LwtClient(LwdnAddress address) {
+        this.socketFactory = LwdnSocketFactory.create(address);
+    }
+
+    public void useTLS(LwtpTLSConfig tlsConfig) {
+        if (tlsConfig.getTlsPolicy() == LwtpTLSPolicy.IMPLICIT) {
+            // wrap the socket factory with a TLS layer here.
+            // we could delegate this to TLSLwtpSession, but it is better to do it here,
+            // as it transfers control of close notification to us
+            if (!(socketFactory instanceof TLSLwdnSocketFactory)) {
+                socketFactory = new TLSLwdnSocketFactory(socketFactory, tlsConfig.getSslContext(), tlsConfig.getPeerAddress());
+            }
+        }
+        lwtpSession = new TLSLwtpSession(tlsConfig);
     }
 
     @SuppressWarnings("unchecked")

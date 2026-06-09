@@ -31,8 +31,8 @@ android {
 
 dependencies {
     implementation libs.appcompat
-    implementation libs.material
     implementation libs.flatbuffers.java
+    implementation libs.tlsChannel
     testImplementation libs.junit
     androidTestImplementation libs.espresso.core
     androidTestImplementation libs.ext.junit

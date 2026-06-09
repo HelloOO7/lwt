@@ -41,6 +41,11 @@ public class BluetoothLwdnSocket implements LwdnSocket {
     }
 
     @Override
+    public boolean isOpen() {
+        return socket.isConnected();
+    }
+
+    @Override
     public void close() throws IOException {
         socket.close();
     }

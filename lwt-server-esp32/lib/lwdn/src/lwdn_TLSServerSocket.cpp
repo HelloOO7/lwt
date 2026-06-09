@@ -14,6 +14,6 @@ namespace lwdn {
         if (!baseSocket) {
             return nullptr;
         }
-        return std::make_unique<TLSSocket>(*baseSocket, m_SSLConfig);
+        return std::make_unique<TLSSocket>(std::move(baseSocket), m_SSLConfig);
     }
 }

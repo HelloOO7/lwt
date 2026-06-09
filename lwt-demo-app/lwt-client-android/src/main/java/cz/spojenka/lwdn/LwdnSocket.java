@@ -9,4 +9,6 @@ public interface LwdnSocket extends Closeable {
 
     public InputStream getInputStream() throws IOException;
     public OutputStream getOutputStream() throws IOException;
+
+    public boolean isOpen();
 }

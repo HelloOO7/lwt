@@ -12,7 +12,7 @@ public class LwtpSession {
 
     private final List<PendingRequest> pendingRequests = new ArrayList<>();
 
-    private LwtpPacket sendRequest(LwdnSocket socket, LwtpPacket request) throws IOException {
+    protected static LwtpPacket sendRequest(LwdnSocket socket, LwtpPacket request) throws IOException {
         request.write(socket.getOutputStream());
         return new LwtpPacket(socket.getInputStream());
     }
@@ -49,6 +49,15 @@ public class LwtpSession {
         pendingRequests.clear();
     }
 
+    protected void finishRemainingWithException(IOException ex) {
+        for (PendingRequest pendingRequest : pendingRequests) {
+            if (!pendingRequest.future.isDone() && !pendingRequest.future.isCancelled()) {
+                pendingRequest.future.completeExceptionally(ex);
+            }
+        }
+        pendingRequests.clear();
+    }
+
     /**
      * Convenience method to obtain a socket, execute the session transaction and close
      * the socket immediately after.
@@ -60,11 +69,7 @@ public class LwtpSession {
             execute(socket);
         } catch (IOException ex) {
             // socket exception
-            for (PendingRequest pendingRequest : pendingRequests) {
-                if (!pendingRequest.future.isDone() && !pendingRequest.future.isCancelled()) {
-                    pendingRequest.future.completeExceptionally(ex);
-                }
-            }
+            finishRemainingWithException(ex);
         }
     }
 

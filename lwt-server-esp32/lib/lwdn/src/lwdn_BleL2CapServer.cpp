@@ -5,6 +5,7 @@
 #include "esp_log.h"
 #include "host/ble_hs.h"
 #include "host/ble_l2cap.h"
+#include "esp_bt.h"
 #include <cassert>
 #include "PSRAMAllocator.h"
 
@@ -91,6 +92,8 @@ namespace lwdn {
     {
         std::unique_lock lock(m_GlobalEventLock);
 
+        ESP_LOGI(TAG, "ReadChannel: conn_handle=%d, requested_len=%d, timeout=%d", channel->m_ConnHandle, len, timeout);
+
         if (OS_MBUF_PKTLEN(channel->m_MainRxBuf) == 0) {
             if (channel->m_Closed) {
                 return ECONNRESET;
@@ -127,6 +130,8 @@ namespace lwdn {
     {
         std::unique_lock lock(m_GlobalEventLock);
 
+        ESP_LOGI(TAG, "WriteChannel: conn_handle=%d, data_len=%d", channel->m_ConnHandle, len);
+
         if (channel->m_Closed) {
             return ECONNRESET;
         }
@@ -140,10 +145,12 @@ namespace lwdn {
         if (!mbuf) {
             return ENOMEM;
         }
-        os_mbuf_copyinto(mbuf, 0, data, len);
+        int err = os_mbuf_copyinto(mbuf, 0, data, len);
+        if (err) {
+            os_mbuf_free(mbuf);
+            return err;
+        }
         channel->m_TxIssued = true;
-
-        int err;
 
         while (true) {
             if (channel->m_Closed) {
@@ -164,8 +171,10 @@ namespace lwdn {
                 *sentLen = len;
             }
         }
-
-        os_mbuf_free_chain(mbuf);
+        else {
+            // if an error occured, free the mbuf. otherwise, ownership of mbuf is transferred to nimble stack, which will free it when done.
+            os_mbuf_free_chain(mbuf);
+        }
 
         return err;
     }
@@ -210,6 +219,12 @@ namespace lwdn {
             else {
                 m_SocketAvailable.notify_one();
                 channel->m_Chan = event->accept.chan;
+                ble_l2cap_chan_info channelInfo;
+                if (ble_l2cap_get_chan_info(channel->m_Chan, &channelInfo) == 0) {
+                    ESP_LOGI(TAG, "Channel info: scid=%d, dcid=%d, our_l2cap_mtu=%d, peer_l2cap_mtu=%d, psm=%d, our_coc_mtu=%d, peer_coc_mtu=%d",
+                        channelInfo.scid, channelInfo.dcid, channelInfo.our_l2cap_mtu, channelInfo.peer_l2cap_mtu,
+                        channelInfo.psm, channelInfo.our_coc_mtu, channelInfo.peer_coc_mtu);
+                }
                 os_mbuf* rxbuf = os_mbuf_get_pkthdr(&channel->m_MbufPool, 0);
                 channel->m_TempRxBuf = rxbuf;
                 return ble_l2cap_recv_ready(event->accept.chan, rxbuf);
@@ -229,16 +244,16 @@ namespace lwdn {
 
                 assert(event->receive.sdu_rx == channel->m_TempRxBuf);
 
-                int err = os_mbuf_appendfrom(channel->m_MainRxBuf, event->receive.sdu_rx, 0, OS_MBUF_PKTLEN(event->receive.sdu_rx));
-                if (err) {
-                    ESP_LOGE(TAG, "Failed to append received data to main RX buffer: conn_handle=%d, err=%d", event->receive.conn_handle, err);
-                    return err;
-                }
-                
-                // clear the entire TempRxBuf
-                os_mbuf_adj(channel->m_TempRxBuf, -OS_MBUF_PKTLEN(channel->m_TempRxBuf));
+                channel->m_MainRxBuf = os_mbuf_pack_chains(channel->m_MainRxBuf, channel->m_TempRxBuf);
 
-                err = ble_l2cap_recv_ready(channel->m_Chan, channel->m_TempRxBuf);
+                channel->m_TempRxBuf = os_mbuf_get_pkthdr(&channel->m_MbufPool, 0);
+                if (!channel->m_TempRxBuf) {
+                    ESP_LOGE(TAG, "Failed to allocate new mbuf for receiving: conn_handle=%d", event->receive.conn_handle);
+                    CloseChannelNoLock(channel);
+                    return ENOMEM;
+                }
+
+                int err = ble_l2cap_recv_ready(channel->m_Chan, channel->m_TempRxBuf);
 
                 channel->m_RxBufAvailable.notify_one();
 
@@ -320,10 +335,14 @@ namespace lwdn {
         std::erase_if(m_Channels, [connHandle](auto&& channel) { return channel->m_ConnHandle == connHandle; });
     }
 
-    int BleL2CapServer::CloseChannel(Channel* channel)
-    {
+    int BleL2CapServer::CloseChannel(Channel* channel) {
         std::lock_guard lock(m_GlobalEventLock);
 
+        return CloseChannelNoLock(channel);
+    }
+
+    int BleL2CapServer::CloseChannelNoLock(Channel* channel)
+    {
         if (channel->m_Closed) {
             return EALREADY;
         }
@@ -335,11 +354,11 @@ namespace lwdn {
 
         // bug: can not actually called disconnect, as it causes race conditions within nimBLE when a TX has not yet finished.
         // we will have to wait for the client to disconnect on their end.
-        if (!channel->m_TxIssued) {
-            return ble_l2cap_disconnect(channel->m_Chan);
-        }
+        //if (!channel->m_TxIssued) {
+        return ble_l2cap_disconnect(channel->m_Chan);
+        //}
 
-        return 0;
+        //return 0;
     }
 
     BleL2CapSocket::BleL2CapSocket(BleL2CapServer* server, std::shared_ptr<BleL2CapServer::Channel> channel) :

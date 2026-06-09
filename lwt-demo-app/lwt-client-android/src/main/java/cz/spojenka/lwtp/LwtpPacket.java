@@ -47,6 +47,42 @@ public class LwtpPacket {
         this.payload = payload;
     }
 
+    public static LwtpPacket createControlMessage(ByteBuffer payload) {
+        LwtpPacket packet = new LwtpPacket(payload);
+        packet.header.flags |= Header.FLAG_CONTROL_MESSAGE;
+        return packet;
+    }
+
+    public static LwtpPacket createSimpleControlMessage(int command) {
+        ByteBuffer commandData;
+        if (command <= 0xFF) {
+            commandData = ByteBuffer.allocate(1).put((byte) command);
+        } else if (command <= 0xFFFF) {
+            commandData = ByteBuffer.allocate(2).putShort((short) command);
+        } else {
+            commandData = ByteBuffer.allocate(4).putInt(command);
+        }
+        commandData.flip();
+        return createControlMessage(commandData);
+    }
+
+    public static int decodeSimpleControlCommand(LwtpPacket packet) throws IOException {
+        if (!packet.isControlMessage()) {
+            throw new IOException("Packet is not a control message");
+        }
+        ByteBuffer payload = packet.getPayload();
+        int result = 0;
+        while (payload.hasRemaining()) {
+            result <<= 8;
+            result |= (payload.get() & 0xFF);
+        }
+        return result;
+    }
+
+    public boolean isControlMessage() {
+        return (header.flags & Header.FLAG_CONTROL_MESSAGE) != 0;
+    }
+
     public ByteBuffer getPayload() {
         return payload;
     }
@@ -58,9 +94,11 @@ public class LwtpPacket {
             header.write(headerDos);
             out.write(headerOs.toByteArray());
         }
-        WritableByteChannel outChannel = Channels.newChannel(out);
-        while (payload.hasRemaining()) {
-            outChannel.write(payload);
+        if (payload != null && payload.hasRemaining()) {
+            WritableByteChannel outChannel = Channels.newChannel(out);
+            while (payload.hasRemaining()) {
+                outChannel.write(payload);
+            }
         }
     }
 
@@ -68,6 +106,8 @@ public class LwtpPacket {
 
         public static final int MINIMUM_SIZE = 10;
         public static final String MAGIC = "LWTP";
+
+        public static final int FLAG_CONTROL_MESSAGE = 1;
 
         public String magic = MAGIC;
         public int version = 1;

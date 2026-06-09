@@ -73,6 +73,7 @@ namespace lwdn {
         void OnChannelClosed(uint16_t connHandle);
 
         int CloseChannel(Channel* channel);
+        int CloseChannelNoLock(Channel* channel);
         int ReadChannel(Channel* channel, void* buffer, size_t len, size_t* receivedLen = nullptr, size_t timeout = SIZE_MAX);
         int WriteChannel(Channel* channel, const void* data, size_t len, size_t* sentLen = nullptr);
 

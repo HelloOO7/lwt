@@ -9,9 +9,9 @@ public class BluetoothLwdnSocketFactory implements LwdnSocketFactory {
     private final BluetoothDevice device;
     private final int psm;
 
-    public BluetoothLwdnSocketFactory(BluetoothDevice device, int psm) {
-        this.device = device;
-        this.psm = psm;
+    public BluetoothLwdnSocketFactory(BluetoothLwdnAddress address) {
+        this.device = address.getDevice();
+        this.psm = address.getPsm();
     }
 
     @Override
