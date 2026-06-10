@@ -10,4 +10,7 @@ public interface LwtAPI {
 
     @LwtOperation(Operation.GetTicketValidationInfo)
     public CompletableFuture<TicketValidationInfo> getTicketValidationInfo(ByteBuffer request);
+
+    @LwtOperation(Operation.AuthenticateServer)
+    public CompletableFuture<ServerAuthenticationResponse> authenticateServer(ByteBuffer request);
 }

@@ -1,23 +1,33 @@
 package cz.spojenka.lwt;
 
 import android.bluetooth.BluetoothDevice;
+import android.util.Log;
+
+import com.google.flatbuffers.FlatBufferBuilder;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.security.GeneralSecurityException;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import cz.spojenka.lwdn.BluetoothLwdnAddress;
-import cz.spojenka.lwdn.BluetoothLwdnSocketFactory;
 import cz.spojenka.lwdn.LwdnAddress;
 import cz.spojenka.lwdn.LwdnSocketFactory;
+import cz.spojenka.lwt.util.ByteBufferUtils;
+import cz.spojenka.lwt.util.TLSTrustManager;
 
 public class LwtAPIClient extends LwtClient {
+
+    private static final String TAG = "LwtAPIClient";
 
     private static final int BLUETOOTH_PSM = 0xD7;
 
     private final LwtAPI api;
+    private final SecureRandom random = new SecureRandom();
 
     public LwtAPIClient(LwdnSocketFactory socketFactory) {
         super(socketFactory);
@@ -88,4 +98,54 @@ public class LwtAPIClient extends LwtClient {
         execute();
         return future;
     }
+
+    private <T> CompletableFuture<T> enqueueOrCall(Function<LwtAPI, CompletableFuture<T>> operation, CommType comm) {
+        if (comm == CommType.ENQUEUE) {
+            return enqueue(operation);
+        } else {
+            return call(operation);
+        }
+    }
+
+    private <T> CompletableFuture<T> enqueueOrCall(BiFunction<LwtAPI, ByteBuffer, CompletableFuture<T>> operation, ByteBuffer request, CommType comm) {
+        if (comm == CommType.ENQUEUE) {
+            return enqueue(operation, request);
+        } else {
+            return call(operation, request);
+        }
+    }
+
+    public CompletableFuture<PingResponse> ping(CommType comm) {
+        return enqueueOrCall(LwtAPI::ping, comm);
+    }
+
+    public CompletableFuture<Boolean> authenticateServer(TLSTrustManager trustManager, CommType comm) {
+        byte[] challenge = new byte[32];
+        random.nextBytes(challenge);
+        FlatBufferBuilder builder = new FlatBufferBuilder();
+        builder.finish(
+                ServerAuthenticationRequest.createServerAuthenticationRequest(
+                        builder,
+                        ServerAuthenticationRequest.createChallengeVector(builder, challenge)
+                )
+        );
+        CompletableFuture<ServerAuthenticationResponse> responseFuture = enqueueOrCall(LwtAPI::authenticateServer, builder.dataBuffer(), comm);
+        return responseFuture.thenApply(authResponse -> {
+            try {
+                X509Certificate[] certChain = trustManager.loadCertificates(authResponse.certificateAsByteBuffer());
+                if (trustManager.isCertificateChainTrusted(certChain)) {
+                    byte[] challengeResponse = ByteBufferUtils.toByteArray(authResponse.responseAsByteBuffer());
+                    for (X509Certificate cert : certChain) {
+                        if (trustManager.verifySignature(challenge, challengeResponse, "NONE", cert)) {
+                            return true;
+                        }
+                    }
+                }
+            } catch (GeneralSecurityException | IOException e) {
+                Log.e(TAG, "Server authentication failed", e);
+            }
+            return false;
+        });
+    }
+
 }

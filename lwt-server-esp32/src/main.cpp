@@ -16,6 +16,7 @@
 #include "lwt_ServiceRegistry.h"
 #include "lwt_ApplicationServer.h"
 #include "lwt_PingService.h"
+#include "lwt_ServerAuthenticationService.h"
 #include "lwtp_StartTLSInterceptor.h"
 #include "operations_generated.h"
 #include "esp_event.h"
@@ -35,6 +36,7 @@ private:
     lwt::ServiceRegistry m_ServiceRegistry;
     lwt::ApplicationServer m_AppServer;
     lwt::PingService m_PingService;
+    lwt::ServerAuthenticationService m_ServerAuthService;
 
 public:
     AppMain() :
@@ -50,13 +52,14 @@ public:
         ),
         m_BLEServer(BLE_PSM, lwtp::MAX_PACKET_SIZE),
         m_ServiceRegistry(lwt::Operation_MIN, lwt::Operation_MAX),
-        m_AppServer(m_ServiceRegistry)
+        m_AppServer(m_ServiceRegistry),
+        m_ServerAuthService(TLS_DEVICE_CRT_START, m_TlsCredentials.device_key, m_TlsCredentials.ctr_drbg)
     {
         lwt::ensure_generated_types_linked();
 
         setup_tls_config(m_TlsCredentials, m_MbedTlsConfig);
 
-        m_ServiceRegistry.RegisterServices(m_PingService);
+        m_ServiceRegistry.RegisterServices(m_PingService, m_ServerAuthService);
 
         m_AppServer.AddInterceptor(std::make_unique<lwtp::StartTLSInterceptor>(m_MbedTlsConfig));
         m_AppServer.AddSocket(&m_BLEServer);

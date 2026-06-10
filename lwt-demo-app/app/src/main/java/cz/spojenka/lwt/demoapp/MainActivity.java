@@ -18,7 +18,6 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 import javax.net.ssl.SSLContext;
 
@@ -36,9 +35,11 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "LWTDemoApp";
 
     private BluetoothAdapter bluetoothAdapter;
+    private TLSTrustManager trustManager;
     private SSLContext sslContext;
 
     private Button btnRunTest;
+    private Button btnRunTlsTest;
 
     private LwdnAddress foundDevAddress;
 
@@ -47,7 +48,8 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         btnRunTest = findViewById(R.id.btnTest);
-        btnRunTest.setEnabled(false);
+        btnRunTlsTest = findViewById(R.id.btnTestTls);
+        setButtonsEnabled(false);
         /*if (getPackageManager().hasSystemFeature(PackageManager.FEATURE_WIFI_AWARE) && getSystemService(WifiAwareManager.class).isAvailable()) {
             Toast.makeText(this, "Wi-Fi Aware is supported and available on this device.", Toast.LENGTH_LONG).show();
         } else {
@@ -67,12 +69,29 @@ public class MainActivity extends AppCompatActivity {
         } else {
             Toast.makeText(this, "Bluetooth scan permission not granted.", Toast.LENGTH_LONG).show();
         }
-        btnRunTest.setOnClickListener(v -> testLwdnComm());
+        btnRunTest.setOnClickListener(v -> checkTrustAndRunTest());
+        btnRunTlsTest.setOnClickListener(v -> runTestOverTLS());
     }
 
-    private void testLwdnComm() {
-        btnRunTest.setEnabled(false);
-        Log.i(TAG, "Testing bluetooth communication with device: " + foundDevAddress);
+    private void checkTrustAndRunTest() {
+        initTest();
+        LwtAPIClient client = new LwtAPIClient(foundDevAddress);
+        client.setSocketWatchdogTimeout(Duration.ofSeconds(5));
+        client.disableTLS();
+        client.authenticateServer(trustManager, CommType.ENQUEUE).whenCompleteAsync((trusted, error) -> {
+            if (error != null) {
+                Log.e(TAG, "Server auth operation error", error);
+                btnRunTest.setEnabled(true);
+            } else {
+                Log.i(TAG, "Server authentication result: " + trusted);
+            }
+        }, getMainExecutor());
+        enqueueTestOperations(client);
+        executeOps(client);
+    }
+
+    private void runTestOverTLS() {
+        initTest();
         LwtAPIClient client = new LwtAPIClient(foundDevAddress);
         client.setSocketWatchdogTimeout(Duration.ofSeconds(5));
         client.useTLS(
@@ -81,33 +100,50 @@ public class MainActivity extends AppCompatActivity {
                         .setSSLContext(sslContext)
                         .build()
         );
+        enqueueTestOperations(client);
+        executeOps(client);
+    }
+
+    private void initTest() {
+        setButtonsEnabled(false);
+        Log.i(TAG, "Testing bluetooth communication with device: " + foundDevAddress);
+    }
+
+    private void enqueueTestOperations(LwtAPIClient client) {
         for (int i = 0; i < 1; i++) {
-            client.enqueue(LwtAPI::ping).thenAccept(pingResponse -> {
+            client.ping(CommType.ENQUEUE).thenAccept(pingResponse -> {
                 Log.i(TAG, "Ping response received: dev=" + pingResponse.deviceId() + ", time=" + pingResponse.deviceTime());
             }).exceptionally(ex -> {
                 Log.e(TAG, "LWT operation failed", ex);
                 return null;
             });
         }
-        CompletableFuture.runAsync(client::execute).whenCompleteAsync((unused, throwable) -> {
-            btnRunTest.setEnabled(true);
+    }
+
+    private void executeOps(LwtAPIClient client) {
+        client.executeAsync().whenCompleteAsync((unused, throwable) -> {
+            setButtonsEnabled(true);
         }, getMainExecutor());
     }
 
-    private ScanCallback scanCallback = new ScanCallback() {
+    private final ScanCallback scanCallback = new ScanCallback() {
         @SuppressLint("MissingPermission")
         @Override
         public void onScanResult(int callbackType, ScanResult result) {
-            btnRunTest.setEnabled(true);
+            setButtonsEnabled(true);
             foundDevAddress = LwtAPIClient.bluetoothAddress(result.getDevice());
-            testLwdnComm();
             bluetoothAdapter.getBluetoothLeScanner().stopScan(scanCallback);
         }
     };
 
+    private void setButtonsEnabled(boolean enabled) {
+        btnRunTest.setEnabled(enabled);
+        btnRunTlsTest.setEnabled(enabled);
+    }
+
     private SSLContext createSSLContext() {
         try {
-            TLSTrustManager trustManager = new TLSTrustManager();
+            trustManager = new TLSTrustManager();
             trustManager.addCertificate(getAssets(), "ROPID_Root_CA_Certificate_[DEBUG].crt", "Root CA");
             return trustManager.createSSLContext();
         } catch (GeneralSecurityException | IOException e) {

@@ -44,16 +44,28 @@ public class LwtClient {
     }
 
     public void useTLS(LwtpTLSConfig tlsConfig) {
-        if (tlsConfig.getTlsPolicy() == LwtpTLSPolicy.IMPLICIT) {
-            // wrap the socket factory with a TLS layer here.
-            // we could delegate this to TLSLwtpSession, but it is better to do it here,
-            // as it transfers control of close notification to us
-            if (!(socketFactory instanceof TLSLwdnSocketFactory)) {
-                socketFactory = new TLSLwdnSocketFactory(socketFactory, tlsConfig.getSslContext(), tlsConfig.getPeerAddress());
+        if (tlsConfig == null || tlsConfig.getTlsPolicy() == LwtpTLSPolicy.UNSECURED) {
+            changeSession(new LwtpSession());
+        } else {
+            if (tlsConfig.getTlsPolicy() == LwtpTLSPolicy.IMPLICIT) {
+                // wrap the socket factory with a TLS layer here.
+                // we could delegate this to TLSLwtpSession, but it is better to do it here,
+                // as it transfers control of close notification to us
+                if (!(socketFactory instanceof TLSLwdnSocketFactory)) {
+                    socketFactory = new TLSLwdnSocketFactory(socketFactory, tlsConfig.getSslContext(), tlsConfig.getPeerAddress());
+                }
             }
+            changeSession(new TLSLwtpSession(tlsConfig));
         }
+    }
+
+    public void disableTLS() {
+        useTLS(null);
+    }
+
+    private void changeSession(LwtpSession newSession) {
         Duration wdTimeout = lwtpSession.getWatchdogTimeout();
-        lwtpSession = new TLSLwtpSession(tlsConfig);
+        lwtpSession = newSession;
         lwtpSession.setWatchdogTimeout(wdTimeout);
     }
 
@@ -88,6 +100,10 @@ public class LwtClient {
 
     public void execute() {
         lwtpSession.execute(socketFactory);
+    }
+
+    public CompletableFuture<Void> executeAsync() {
+        return CompletableFuture.runAsync(this::execute);
     }
 
     private <T> CompletableFuture<T> createResponseFuture(CompletableFuture<LwtpPacket> baseFuture, Class<T> responseType) {

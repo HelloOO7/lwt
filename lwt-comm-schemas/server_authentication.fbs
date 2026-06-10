@@ -1,0 +1,40 @@
+namespace lwt;
+
+/*
+These are very rudimentary methods that allow validating that a remote
+device is who the client expect them to be. They are
+by no means a serious security measure! For actual security, you MUST
+use TLS.
+
+The reason why these exist is to provide a lightweight way of proving that
+a given MAC address belongs to a device that has a valid TLS certificate, without
+actually using TLS. On Bluetooth LE connections, the TLS handshake takes a very
+long time (100s of ms up to 1 second) and results in a rather unpleasant user experience
+upon initial device discovery.
+
+Operations that do not require high security and do not care at all
+about confidentiality can use this watered down handshake to validate a remote
+peer once upon connection and then cache the result for its MAC address for
+some time after and use unsecured connection the rest of the way.
+This is obviously vulnerable to MAC spoofing attacks, however,
+Bluetooth does not have any conflict resolution for when multiple devices with
+the same MAC appear together, effectively jamming the signal,
+so in this case the system is physically unusable anyway and the attacker can't
+really be defeated by means other than a baseball bat.
+*/
+
+table ServerAuthenticationRequest {
+    /// Random 32-byte string used by the client to authenticate that the server
+    /// is able to sign using the key pair used in the certificate.
+    /// The 32-byte requirement stems from the fact that it is assumed to be a
+    /// SHA-256 message digest internally.
+    challenge: [ubyte] (required);
+}
+
+table ServerAuthenticationResponse {
+    /// Signature of the client's challenge by the server private key.
+    /// Use the certificate to detect whether it is RSA or ECDSA.
+    response: [ubyte] (required);
+    /// X.509 data of the server's certificate chain in PEM format.
+    certificate: [ubyte] (required);
+}
