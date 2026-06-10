@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include "esp_err.h"
+#include "mbedtls/debug.h"
 
 TlsEnvironment::TlsEnvironment(const uint8_t* cert_start, const uint8_t* cert_end, const uint8_t* key_start, const uint8_t* key_end) {
     mbedtls_x509_crt_init(&device_cert);

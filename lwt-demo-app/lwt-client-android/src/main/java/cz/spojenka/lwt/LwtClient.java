@@ -8,6 +8,7 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Proxy;
 import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 
 import cz.spojenka.lwdn.LwdnAddress;
@@ -34,6 +35,14 @@ public class LwtClient {
         this.socketFactory = LwdnSocketFactory.create(address);
     }
 
+    /**
+     * @param timeout timeout
+     * @see LwtpSession#setWatchdogTimeout(Duration)
+     */
+    public void setSocketWatchdogTimeout(Duration timeout) {
+        lwtpSession.setWatchdogTimeout(timeout);
+    }
+
     public void useTLS(LwtpTLSConfig tlsConfig) {
         if (tlsConfig.getTlsPolicy() == LwtpTLSPolicy.IMPLICIT) {
             // wrap the socket factory with a TLS layer here.
@@ -43,7 +52,9 @@ public class LwtClient {
                 socketFactory = new TLSLwdnSocketFactory(socketFactory, tlsConfig.getSslContext(), tlsConfig.getPeerAddress());
             }
         }
+        Duration wdTimeout = lwtpSession.getWatchdogTimeout();
         lwtpSession = new TLSLwtpSession(tlsConfig);
+        lwtpSession.setWatchdogTimeout(wdTimeout);
     }
 
     @SuppressWarnings("unchecked")

@@ -1,20 +1,53 @@
 package cz.spojenka.lwtp;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import cz.spojenka.lwdn.LwdnSocket;
 import cz.spojenka.lwdn.LwdnSocketFactory;
+import cz.spojenka.lwdn.SocketWatchdog;
 
 public class LwtpSession {
 
     private final List<PendingRequest> pendingRequests = new ArrayList<>();
+    private Duration watchdogTimeout = null;
 
-    protected static LwtpPacket sendRequest(LwdnSocket socket, LwtpPacket request) throws IOException {
+    protected LwtpPacket sendRequest(LwdnSocket socket, LwtpPacket request) throws IOException {
+        SocketWatchdog watchdog = null;
+        if (watchdogTimeout != null) {
+            watchdog = new SocketWatchdog(socket, watchdogTimeout);
+            watchdog.start();
+        }
+
         request.write(socket.getOutputStream());
-        return new LwtpPacket(socket.getInputStream());
+        if (watchdog != null) {
+            watchdog.resetWatchdog();
+        }
+        LwtpPacket response = new LwtpPacket(socket.getInputStream());
+        if (watchdog != null) {
+            watchdog.stopWatchdog();
+        }
+        return response;
+    }
+
+    /**
+     * Set a timeout for a watchdog that will force close a socket if it does not respond for too long.
+     * This is a workaround for the fact that the NimBLE server library is extremely broken and has race
+     * conditions that prevent us from sending a disconnect signal by the server in case of an error.
+     * Therefore, we can establish a timeout for the client to detect unresponsive connections and close them, which will trigger
+     * a read/write error and return from blocking methods.
+     *
+     * @param watchdogTimeout the timeout duration for the watchdog, or null to disable the watchdog
+     */
+    public void setWatchdogTimeout(Duration watchdogTimeout) {
+        this.watchdogTimeout = watchdogTimeout;
+    }
+
+    public Duration getWatchdogTimeout() {
+        return watchdogTimeout;
     }
 
     /**

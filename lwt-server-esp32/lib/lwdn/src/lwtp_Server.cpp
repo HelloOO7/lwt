@@ -116,21 +116,24 @@ namespace lwtp {
         do {
             // set current socket at start of one request/response transaction.
             // this is so that replies are delivered over the same transport as requests even if the actual socket
-            // changes during the transaction (e.g. due to START_TLS)
+            // changes during the transaction (e.g. due to START_TLS).
+            // the pointer to the currentSocket must remain valid - the interceptor is not allowed to delete it.
+            // this is usually satisfied by the fact that the interceptor wraps the socket into another, where it
+            // is referenced again by an unique_ptr.
             lwdn::Socket& currentSocket = session.GetSocket();
             int err;
 
             PacketHeader header;
-            while (true) {
-                err = OpenPacket(currentSocket, header);
-                if (err != 0) {
-                    err = interceptors.Proceed(session, err);
-                    if (err == EAGAIN) {
-                        // interceptor handled the error, so try again
-                        continue;
-                    }
+            err = OpenPacket(currentSocket, header);
+            if (err != 0) {
+                err = interceptors.Traverse(session, err);
+                if (err == EAGAIN) {
+                    ESP_LOGI(TAG, "Error was intercepted, retry OpenPacket");
+                    // interceptor handled the error, so try again.
+                    // we MUST retry the whole loop again so that currentSocket is updated
+                    // in case that the interceptor changed it
+                    continue;
                 }
-                break;
             }
             if (err == ECONNRESET && numServed > 0) {
                 ESP_LOGI(TAG, "Client disconnected after having served %d request(s)", numServed);
@@ -148,7 +151,7 @@ namespace lwtp {
 
             Packet packet(std::move(header), std::move(payload));
 
-            auto response = interceptors.Proceed(session, packet);
+            auto response = interceptors.Traverse(session, packet);
 
             err = SendResponse(currentSocket, response.GetHeader(), response.GetPayload());
             if (err != 0) {
@@ -295,6 +298,18 @@ namespace lwtp {
             m_SessionFlagOffsets[i] = currentFlagOffset;
             currentFlagOffset += interceptors[i]->GetUsedFlagCount();
         }
+    }
+
+    Packet SocketInterceptor::Chain::Traverse(Server::SocketSession& session, const Packet& request)
+    {
+        m_CurrentIndex = 0;
+        return Proceed(session, request);
+    }
+
+    int SocketInterceptor::Chain::Traverse(Server::SocketSession& session, int error)
+    {
+        m_CurrentIndex = 0;
+        return Proceed(session, error);
     }
 
     Packet SocketInterceptor::Chain::Proceed(Server::SocketSession& session, const Packet& request)

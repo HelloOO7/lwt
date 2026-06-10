@@ -108,6 +108,8 @@ namespace lwtp {
         private:
             Chain(Server& server, std::vector<std::unique_ptr<SocketInterceptor>>& interceptors);
         public:
+            Packet Traverse(Server::SocketSession& session, const Packet& request);
+            int Traverse(Server::SocketSession& session, int error);
             Packet Proceed(Server::SocketSession& session, const Packet& request);
             int Proceed(Server::SocketSession& session, int error);
         };

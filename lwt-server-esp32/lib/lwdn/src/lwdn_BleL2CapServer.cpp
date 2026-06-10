@@ -249,8 +249,8 @@ namespace lwdn {
                 channel->m_TempRxBuf = os_mbuf_get_pkthdr(&channel->m_MbufPool, 0);
                 if (!channel->m_TempRxBuf) {
                     ESP_LOGE(TAG, "Failed to allocate new mbuf for receiving: conn_handle=%d", event->receive.conn_handle);
-                    CloseChannelNoLock(channel);
-                    return ENOMEM;
+                    CloseChannelNoLock(channel, true);
+                    return BLE_HS_ENOMEM_EVT;
                 }
 
                 int err = ble_l2cap_recv_ready(channel->m_Chan, channel->m_TempRxBuf);
@@ -341,7 +341,7 @@ namespace lwdn {
         return CloseChannelNoLock(channel);
     }
 
-    int BleL2CapServer::CloseChannelNoLock(Channel* channel)
+    int BleL2CapServer::CloseChannelNoLock(Channel* channel, bool force)
     {
         if (channel->m_Closed) {
             return EALREADY;
@@ -354,11 +354,11 @@ namespace lwdn {
 
         // bug: can not actually called disconnect, as it causes race conditions within nimBLE when a TX has not yet finished.
         // we will have to wait for the client to disconnect on their end.
-        //if (!channel->m_TxIssued) {
-        return ble_l2cap_disconnect(channel->m_Chan);
-        //}
+        if (!channel->m_TxIssued || force) {
+            return ble_l2cap_disconnect(channel->m_Chan);
+        }
 
-        //return 0;
+        return 0;
     }
 
     BleL2CapSocket::BleL2CapSocket(BleL2CapServer* server, std::shared_ptr<BleL2CapServer::Channel> channel) :

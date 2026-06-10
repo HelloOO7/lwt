@@ -45,6 +45,7 @@ namespace lwdn {
     private:
         int StartTLS();
         int SignalError(int err);
+        void HandleCloseNotify();
 
         static int SSLFnSend(void* ctx, const unsigned char* buf, size_t len);
         static int SSLFnRecv(void* ctx, unsigned char* buf, size_t len);

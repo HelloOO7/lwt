@@ -3,7 +3,6 @@ package cz.spojenka.lwt.demoapp;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanFilter;
@@ -12,13 +11,14 @@ import android.bluetooth.le.ScanSettings;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.util.Log;
+import android.widget.Button;
 import android.widget.Toast;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.logging.Logger;
 
 import javax.net.ssl.SSLContext;
 
@@ -26,7 +26,6 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import cz.spojenka.lwdn.LwdnAddress;
-import cz.spojenka.lwdn.LwdnSocketFactory;
 import cz.spojenka.lwt.*;
 import cz.spojenka.lwt.util.TLSTrustManager;
 import cz.spojenka.lwtp.LwtpTLSConfig;
@@ -39,9 +38,16 @@ public class MainActivity extends AppCompatActivity {
     private BluetoothAdapter bluetoothAdapter;
     private SSLContext sslContext;
 
+    private Button btnRunTest;
+
+    private LwdnAddress foundDevAddress;
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        btnRunTest = findViewById(R.id.btnTest);
+        btnRunTest.setEnabled(false);
         /*if (getPackageManager().hasSystemFeature(PackageManager.FEATURE_WIFI_AWARE) && getSystemService(WifiAwareManager.class).isAvailable()) {
             Toast.makeText(this, "Wi-Fi Aware is supported and available on this device.", Toast.LENGTH_LONG).show();
         } else {
@@ -61,19 +67,21 @@ public class MainActivity extends AppCompatActivity {
         } else {
             Toast.makeText(this, "Bluetooth scan permission not granted.", Toast.LENGTH_LONG).show();
         }
+        btnRunTest.setOnClickListener(v -> testLwdnComm());
     }
 
-    private void testBluetoothComm(BluetoothDevice dev) {
-        Log.i(TAG, "Testing bluetooth communication with device: " + dev.getAddress());
-        LwdnAddress address = LwtAPIClient.bluetoothAddress(dev);
-        LwtAPIClient client = new LwtAPIClient(address);
+    private void testLwdnComm() {
+        btnRunTest.setEnabled(false);
+        Log.i(TAG, "Testing bluetooth communication with device: " + foundDevAddress);
+        LwtAPIClient client = new LwtAPIClient(foundDevAddress);
+        client.setSocketWatchdogTimeout(Duration.ofSeconds(5));
         client.useTLS(
-                new LwtpTLSConfig.Builder(address)
+                new LwtpTLSConfig.Builder(foundDevAddress)
                         .setTLSPolicy(LwtpTLSPolicy.EXPLICIT_OPPORTUNISTIC)
                         .setSSLContext(sslContext)
                         .build()
         );
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 1; i++) {
             client.enqueue(LwtAPI::ping).thenAccept(pingResponse -> {
                 Log.i(TAG, "Ping response received: dev=" + pingResponse.deviceId() + ", time=" + pingResponse.deviceTime());
             }).exceptionally(ex -> {
@@ -81,14 +89,18 @@ public class MainActivity extends AppCompatActivity {
                 return null;
             });
         }
-        CompletableFuture.runAsync(client::execute);
+        CompletableFuture.runAsync(client::execute).whenCompleteAsync((unused, throwable) -> {
+            btnRunTest.setEnabled(true);
+        }, getMainExecutor());
     }
 
     private ScanCallback scanCallback = new ScanCallback() {
         @SuppressLint("MissingPermission")
         @Override
         public void onScanResult(int callbackType, ScanResult result) {
-            testBluetoothComm(result.getDevice());
+            btnRunTest.setEnabled(true);
+            foundDevAddress = LwtAPIClient.bluetoothAddress(result.getDevice());
+            testLwdnComm();
             bluetoothAdapter.getBluetoothLeScanner().stopScan(scanCallback);
         }
     };

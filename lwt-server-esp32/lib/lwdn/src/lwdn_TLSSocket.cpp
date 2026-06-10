@@ -113,8 +113,7 @@ namespace lwdn {
                 }
             }
             else if (ret == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY) {
-                ESP_LOGI(TAG, "Peer sent TLS close notify");
-                mbedtls_ssl_close_notify(&m_SSLContext);
+                HandleCloseNotify();
                 return ECONNRESET;
             }
             else if (!IsAsyncReturnCode(ret)) {
@@ -153,8 +152,7 @@ namespace lwdn {
                 return ECONNRESET;
             }
             else if (ret == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY) {
-                ESP_LOGI(TAG, "Peer sent TLS close notify");
-                mbedtls_ssl_close_notify(&m_SSLContext);
+                HandleCloseNotify();
                 return ECONNRESET;
             }
             else if (!IsAsyncReturnCode(ret)) {
@@ -162,6 +160,13 @@ namespace lwdn {
                 return TranslateErrorToStd(SignalError(ret));
             }
         }
+    }
+
+    void TLSSocket::HandleCloseNotify()
+    {
+        ESP_LOGI(TAG, "Peer sent TLS close notify");
+        m_ReceivedCloseNotify = true;
+        mbedtls_ssl_close_notify(&m_SSLContext);
     }
 
     int TLSSocket::SignalError(int err)
