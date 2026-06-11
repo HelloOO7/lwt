@@ -27,17 +27,18 @@ public class SocketWatchdog extends Thread {
     @Override
     public void run() {
         while (true) {
-            if (stopped || !socket.isOpen()) {
-                break;
-            }
             try {
                 Thread.sleep(timeout.toMillis());
                 if (socket.isOpen()) {
+                    System.out.println("Closing socket due to watchdog timeout");
                     socket.close();
                 }
             } catch (InterruptedException e) {
                 continue;
             } catch (IOException e) {
+                break;
+            }
+            if (stopped || !socket.isOpen()) {
                 break;
             }
         }

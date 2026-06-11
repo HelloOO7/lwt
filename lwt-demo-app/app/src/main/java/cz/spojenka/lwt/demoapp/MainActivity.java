@@ -9,7 +9,12 @@ import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
 import android.content.pm.PackageManager;
+import android.net.wifi.aware.AttachCallback;
+import android.net.wifi.aware.WifiAwareManager;
+import android.net.wifi.aware.WifiAwareSession;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
 import android.widget.Button;
 import android.widget.Toast;
@@ -43,6 +48,7 @@ public class MainActivity extends AppCompatActivity {
 
     private LwdnAddress foundDevAddress;
 
+    @SuppressLint("MissingPermission")
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -50,11 +56,6 @@ public class MainActivity extends AppCompatActivity {
         btnRunTest = findViewById(R.id.btnTest);
         btnRunTlsTest = findViewById(R.id.btnTestTls);
         setButtonsEnabled(false);
-        /*if (getPackageManager().hasSystemFeature(PackageManager.FEATURE_WIFI_AWARE) && getSystemService(WifiAwareManager.class).isAvailable()) {
-            Toast.makeText(this, "Wi-Fi Aware is supported and available on this device.", Toast.LENGTH_LONG).show();
-        } else {
-            Toast.makeText(this, "Wi-Fi Aware is not supported or not available on this device.", Toast.LENGTH_LONG).show();
-        }*/
         sslContext = createSSLContext();
         bluetoothAdapter = getSystemService(BluetoothManager.class).getAdapter();
         ScanFilter filter = new ScanFilter.Builder()
@@ -64,13 +65,45 @@ public class MainActivity extends AppCompatActivity {
                 .setCallbackType(ScanSettings.CALLBACK_TYPE_FIRST_MATCH)
                 .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
                 .build();
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
+        if (hasBluetoothScanPermission()) {
             bluetoothAdapter.getBluetoothLeScanner().startScan(List.of(filter), settings, scanCallback);
         } else {
             Toast.makeText(this, "Bluetooth scan permission not granted.", Toast.LENGTH_LONG).show();
         }
         btnRunTest.setOnClickListener(v -> checkTrustAndRunTest());
         btnRunTlsTest.setOnClickListener(v -> runTestOverTLS());
+        testWifiAware();
+    }
+
+    private boolean hasBluetoothScanPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            return ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED;
+        } else {
+            return ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_ADMIN) == PackageManager.PERMISSION_GRANTED;
+        }
+    }
+
+    private void testWifiAware() {
+        if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_WIFI_AWARE)) {
+            return;
+        }
+        WifiAwareManager awareManager = getSystemService(WifiAwareManager.class);
+        awareManager.attach(new AttachCallback() {
+            @Override
+            public void onAttached(WifiAwareSession session) {
+                Log.i(TAG, "Wi-Fi Aware attached: " + session);
+            }
+
+            @Override
+            public void onAttachFailed() {
+                Log.e(TAG, "Wi-Fi Aware attach failed");
+            }
+
+            @Override
+            public void onAwareSessionTerminated() {
+                Log.w(TAG, "Wi-Fi Aware session terminated");
+            }
+        }, new Handler(getMainLooper()));
     }
 
     private void checkTrustAndRunTest() {

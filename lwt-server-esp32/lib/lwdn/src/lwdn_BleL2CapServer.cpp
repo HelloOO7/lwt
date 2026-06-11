@@ -66,12 +66,14 @@ namespace lwdn {
     {
         std::unique_lock lock(m_GlobalEventLock);
 
-        SocketHandle handle = m_NextAcceptedSocketHandle;
+        SocketHandle minHandle = m_NextAcceptedSocketHandle;
+        std::shared_ptr<Channel> channel;
+        ESP_LOGI(TAG, "Accepting socket: next handle=%d", minHandle);
 
         while (true) {
-            auto it = std::find_if(m_Channels.begin(), m_Channels.end(), [handle](auto&& channel) { return channel->m_SocketHandle >= handle; });
+            auto it = std::find_if(m_Channels.begin(), m_Channels.end(), [minHandle](auto&& channel) { return channel->m_SocketHandle >= minHandle; });
             if (it != m_Channels.end()) {
-                handle = (*it)->m_SocketHandle;
+                channel = *it;
                 break;
             }
             else {
@@ -81,11 +83,13 @@ namespace lwdn {
                     return nullptr;
                 }
             }
-            handle = m_NextAcceptedSocketHandle;
+            minHandle = m_NextAcceptedSocketHandle;
         }
-        m_NextAcceptedSocketHandle = handle + 1;
+        m_NextAcceptedSocketHandle = channel->m_SocketHandle + 1;
 
-        return std::unique_ptr<BleL2CapSocket>(new BleL2CapSocket(this, m_Channels.back())); // use new here to access private constructor
+        ESP_LOGI(TAG, "Accepted socket: conn_handle=%d, socket_handle=%d", channel->m_ConnHandle, channel->m_SocketHandle);
+
+        return std::unique_ptr<BleL2CapSocket>(new BleL2CapSocket(this, channel)); // use new here to access private constructor
     }
 
     int BleL2CapServer::ReadChannel(Channel* channel, void* buffer, size_t len, size_t* receivedLen, size_t timeout)
@@ -310,10 +314,12 @@ namespace lwdn {
         }
         if (createIfNotFound) {
             try {
+                ESP_LOGI(TAG, "Allocate channel data for conn_handle=%d, new socket handle=%d", connHandle, m_NextSocketHandle);
                 m_Channels.emplace_back(std::unique_ptr<Channel>(new Channel(m_NextSocketHandle++, connHandle, m_Mtu, 256)));
                 return m_Channels.back().get();
             }
             catch (const std::bad_alloc&) {
+                ESP_LOGI(TAG, "Could not create channel: out of memory for conn_handle=%d", connHandle);
                 return nullptr;
             }
         }
