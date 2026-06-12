@@ -18,12 +18,16 @@
 #include "lwt_PingService.h"
 #include "lwt_ServerAuthenticationService.h"
 #include "lwtp_StartTLSInterceptor.h"
+#include "lwt_AdvDataLegacy.h"
+#include "BitConverter.h"
 #include "operations_generated.h"
 #include "esp_event.h"
 #include "tls_setup.h"
 #include "tls_certs.h"
 
 static constexpr uint16_t BLE_PSM = 0xD7; // 0x80 + 'W'
+static constexpr uint32_t BLE_SERVICE_UUID_VEHICLE = 0x4C575456; // 'LWTV'
+static constexpr uint32_t BLE_SERVICE_UUID_STOP = 0x4C575453; // 'LWTS'
 
 class AppMain {
 private:
@@ -120,44 +124,63 @@ static int bleprph_gap_event(struct ble_gap_event* event, void* arg)
 
 static void bleprph_advertise(void)
 {
-    struct ble_gap_adv_params adv_params;
+    struct ble_gap_ext_adv_params adv_params;
     struct ble_hs_adv_fields fields;
     const char* name;
     int rc;
 
-    /**
-     *  Set the advertisement data included in our advertisements:
-     *     o Flags (indicates advertisement type and other general info).
-     *     o Advertising tx power.
-     *     o Device name.
-     *     o 16-bit service UUIDs (alert notifications).
-     */
+    uint8_t gap_instance = 0;
 
-    memset(&fields, 0, sizeof fields);
+    memset(&adv_params, 0, sizeof(adv_params));
 
-    /* Advertise two flags:
-     *     o Discoverability in forthcoming advertisement (general)
-     *     o BLE-only (BR/EDR unsupported).
-     */
-    fields.flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP;
+    adv_params.connectable = true;
+    adv_params.scannable = true;
+    adv_params.legacy_pdu = true;
+    adv_params.anonymous = false;
+    adv_params.own_addr_type = BLE_OWN_ADDR_PUBLIC;
 
-    /* Indicate that the TX power level field should be included; have the
-     * stack fill this value automatically.  This is done by assigning the
-     * special value BLE_HS_ADV_TX_PWR_LVL_AUTO.
-     */
-    fields.tx_pwr_lvl_is_present = 1;
-    fields.tx_pwr_lvl = BLE_HS_ADV_TX_PWR_LVL_AUTO;
+    rc = ble_gap_ext_adv_configure(gap_instance, &adv_params, 0, bleprph_gap_event, 0);
+    if (rc != 0) {
+        MODLOG_DFLT(ERROR, "error configuring advertisement; rc=%d\n", rc);
+        return;
+    }
 
+    memset(&fields, 0, sizeof(fields));
+    // normally it is not mandatory to provide a device name and we could in theory just read the raw scan data
+    // and match the service UUID.
+    // however, in order to allow background scans on Android 8+, we need to use a ScanFilter, which
+    // does not work reliably over service data on a lot of devices, thereby mandating the use of the
+    // less bug-prone name field. This also limits our advertisement size to 20 bytes on BLE 4.x.
     name = ble_svc_gap_device_name();
     fields.name = (uint8_t*)name;
     fields.name_len = strlen(name);
     fields.name_is_complete = 1;
+    uint8_t svc_data[sizeof(uint32_t) + lwt::AdvDataLegacy::PACKED_SIZE];
+    BitConverter<LITTLE_ENDIAN>::FromUInt32(BLE_SERVICE_UUID_VEHICLE, svc_data);
+    lwt::AdvDataLegacy test_adv_data{
+        .line_type = lwt::LineType::LineType_GenericBus,
+        .line_license_number = 100394,
+        .trip_number = 1001,
+        .direction_cis_number = 27882,
+        .stop_cis_number = 1054,
+        .stop_arrival_time = 9 * 60 + 10,
+        .stop_departure_time = 9 * 60 + 11,
+        .delay = -1,
+        .flags = lwt::AdvDataLegacy::FLAG_IS_AT_STOP
+    };
+    test_adv_data.pack(svc_data + sizeof(uint32_t));
+    fields.svc_data_uuid32 = svc_data;
+    fields.svc_data_uuid32_len = sizeof(svc_data);
 
-    /*fields.uuids16 = (ble_uuid16_t[]){ BLE_UUID16_INIT(GATT_SVR_SVC_ALERT_UUID) };
-    fields.num_uuids16 = 1;
-    fields.uuids16_is_complete = 1;*/
+    os_mbuf* adv_data = os_msys_get_pkthdr(BLE_HS_ADV_MAX_FIELD_SZ, 0);
+    assert(adv_data);
+    rc = ble_hs_adv_set_fields_mbuf(&fields, adv_data);
+    if (rc != 0) {
+        MODLOG_DFLT(ERROR, "error encoding advertisement data; rc=%d\n", rc);
+        return;
+    }
 
-    rc = ble_gap_adv_set_fields(&fields);
+    rc = ble_gap_ext_adv_set_data(gap_instance, adv_data);
     if (rc != 0)
     {
         MODLOG_DFLT(ERROR, "error setting advertisement data; rc=%d\n", rc);
@@ -165,10 +188,7 @@ static void bleprph_advertise(void)
     }
 
     /* Begin advertising. */
-    memset(&adv_params, 0, sizeof adv_params);
-    adv_params.conn_mode = BLE_GAP_CONN_MODE_UND;
-    adv_params.disc_mode = BLE_GAP_DISC_MODE_GEN;
-    rc = ble_gap_adv_start(BLE_OWN_ADDR_PUBLIC, NULL, BLE_HS_FOREVER, &adv_params, bleprph_gap_event, NULL);
+    rc = ble_gap_ext_adv_start(gap_instance, 0, 0);
     if (rc != 0)
     {
         MODLOG_DFLT(ERROR, "error enabling advertisement; rc=%d\n", rc);
@@ -178,13 +198,18 @@ static void bleprph_advertise(void)
 
 static void bleprph_readvertise(void) {
     if (!ble_gap_adv_active()) {
-        bleprph_advertise();
+        int rc = ble_gap_ext_adv_start(0, 0, 0);
+        if (rc != 0)
+        {
+            MODLOG_DFLT(ERROR, "error re-enabling advertisement; rc=%d\n", rc);
+            return;
+        }
     }
 }
 
 static void bleprph_on_sync(void)
 {
-    bleprph_readvertise();
+    bleprph_advertise();
 }
 
 void init_nimble() {
@@ -193,7 +218,7 @@ void init_nimble() {
     ble_hs_cfg.sync_cb = bleprph_on_sync;
 
     ble_svc_gap_init();
-    ble_svc_gap_device_name_set("LWT ESP32");
+    ble_svc_gap_device_name_set("LWT");
     ble_svc_gap_device_appearance_set(0x08CB); // Bus
 
     ble_store_config_init();

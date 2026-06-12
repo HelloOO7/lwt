@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalTime;
 
+import androidx.annotation.NonNull;
+
 public class TripAdvertisementDataLegacy {
 
     private static final int FLAG_IS_AT_STOP = 1;
@@ -62,8 +64,14 @@ public class TripAdvertisementDataLegacy {
             int lic = getLineLicenseNumber();
             StringBuilder sb = new StringBuilder();
             // first two 7-bit ASCII bytes as string
-            sb.append((char) ((lic >> 17) & 0x7F));
-            sb.append((char) ((lic >> 10) & 0x7F));
+            char ch1 = (char) ((lic >> 17) & 0x7F);
+            char ch2 = (char) ((lic >> 10) & 0x7F);
+            if (ch1 != 0) {
+                sb.append(ch1);
+            }
+            if (ch2 != 0) {
+                sb.append(ch2);
+            }
             // remainder as a number
             sb.append(lic & 0x3FF);
             return sb.toString();
@@ -100,7 +108,7 @@ public class TripAdvertisementDataLegacy {
         return (flags & FLAG_IS_AT_STOP) != 0;
     }
 
-    public TripAdvertisementDataLegacy unwrap(byte[] serviceData) throws IOException {
+    public static TripAdvertisementDataLegacy unwrap(byte[] serviceData) throws IOException {
         try (InputStream in = new ByteArrayInputStream(serviceData)) {
             return new TripAdvertisementDataLegacy(in);
         }
@@ -115,5 +123,21 @@ public class TripAdvertisementDataLegacy {
         int b2 = dis.readUnsignedByte();
         int b3 = dis.readUnsignedByte();
         return (b1 << 16) | (b2 << 8) | b3;
+    }
+
+    @NonNull
+    @Override
+    public String toString() {
+        return "TripAdvertisementDataLegacy{" +
+                "lineType=" + lineType +
+                ", lineLicenseNumber=" + lineLicenseNumber +
+                ", tripNumber=" + tripNumber +
+                ", directionCisNumber=" + directionCisNumber +
+                ", stopCisNumber=" + stopCisNumber +
+                ", stopArrTime=" + stopArrTime +
+                ", stopDepTime=" + stopDepTime +
+                ", delay=" + delay +
+                ", flags=" + flags +
+                '}';
     }
 }

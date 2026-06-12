@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.util.List;
+import java.util.UUID;
 
 import javax.net.ssl.SSLContext;
 
@@ -31,6 +32,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import cz.spojenka.lwdn.LwdnAddress;
 import cz.spojenka.lwt.*;
+import cz.spojenka.lwt.util.BLEScanRecordUtil;
 import cz.spojenka.lwt.util.TLSTrustManager;
 import cz.spojenka.lwtp.LwtpTLSConfig;
 import cz.spojenka.lwtp.LwtpTLSPolicy;
@@ -59,7 +61,10 @@ public class MainActivity extends AppCompatActivity {
         sslContext = createSSLContext();
         bluetoothAdapter = getSystemService(BluetoothManager.class).getAdapter();
         ScanFilter filter = new ScanFilter.Builder()
-                .setDeviceName("LWT ESP32")
+                // mask is needed otherwise the filter does not work properly for our 32bit UUID.
+                // furthermore, the service UUID filter MUST be used instead of service data filter (which would be more space efficient),
+                // as the service data filter just plain does not work on some devices (is completely ignored, most likely due to HW offloading)
+                .setDeviceName("LWT")
                 .build();
         ScanSettings settings = new ScanSettings.Builder()
                 .setCallbackType(ScanSettings.CALLBACK_TYPE_FIRST_MATCH)
@@ -73,6 +78,10 @@ public class MainActivity extends AppCompatActivity {
         btnRunTest.setOnClickListener(v -> checkTrustAndRunTest());
         btnRunTlsTest.setOnClickListener(v -> runTestOverTLS());
         testWifiAware();
+    }
+
+    private UUID make32BitUUID(int value) {
+        return new UUID(Integer.toUnsignedLong(value) << 32, 0);
     }
 
     private boolean hasBluetoothScanPermission() {
@@ -163,6 +172,18 @@ public class MainActivity extends AppCompatActivity {
         @SuppressLint("MissingPermission")
         @Override
         public void onScanResult(int callbackType, ScanResult result) {
+            Log.i(TAG, "Found device: " + result.getDevice());
+            if (result.getScanRecord() != null) {
+                byte[] data = BLEScanRecordUtil.getField(result.getScanRecord(), 32);
+                if (data != null && BLEScanRecordUtil.getServiceUUID32(data) == 0x4C575456) {
+                    try {
+                        TripAdvertisementDataLegacy advData = TripAdvertisementDataLegacy.unwrap(BLEScanRecordUtil.getServiceDataPayload(data, Integer.BYTES));
+                        Log.i(TAG, advData.toString());
+                    } catch (IOException e) {
+                        Log.e(TAG, "Failed to parse advertisement data", e);
+                    }
+                }
+            }
             setButtonsEnabled(true);
             foundDevAddress = LwtAPIClient.bluetoothAddress(result.getDevice());
             bluetoothAdapter.getBluetoothLeScanner().stopScan(scanCallback);
