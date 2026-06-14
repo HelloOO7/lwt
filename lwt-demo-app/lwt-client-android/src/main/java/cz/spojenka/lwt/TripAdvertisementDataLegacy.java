@@ -10,6 +10,8 @@ import androidx.annotation.NonNull;
 
 public class TripAdvertisementDataLegacy {
 
+    public static final int BYTES = 20;
+
     private static final int FLAG_IS_AT_STOP = 1;
 
     private final int lineType;

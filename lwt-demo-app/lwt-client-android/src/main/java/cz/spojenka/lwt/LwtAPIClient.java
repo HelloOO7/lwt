@@ -24,7 +24,7 @@ public class LwtAPIClient extends LwtClient {
 
     private static final String TAG = "LwtAPIClient";
 
-    private static final int BLUETOOTH_PSM = 0xD7;
+    private static final int BLUETOOTH_PSM = LwtServiceConstants.BLE_API_PSM;
 
     private final LwtAPI api;
     private final SecureRandom random = new SecureRandom();

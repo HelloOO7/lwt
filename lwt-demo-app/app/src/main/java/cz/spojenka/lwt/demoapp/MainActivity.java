@@ -15,6 +15,7 @@ import android.net.wifi.aware.WifiAwareSession;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.ParcelUuid;
 import android.util.Log;
 import android.widget.Button;
 import android.widget.Toast;
@@ -61,10 +62,9 @@ public class MainActivity extends AppCompatActivity {
         sslContext = createSSLContext();
         bluetoothAdapter = getSystemService(BluetoothManager.class).getAdapter();
         ScanFilter filter = new ScanFilter.Builder()
-                // mask is needed otherwise the filter does not work properly for our 32bit UUID.
-                // furthermore, the service UUID filter MUST be used instead of service data filter (which would be more space efficient),
-                // as the service data filter just plain does not work on some devices (is completely ignored, most likely due to HW offloading)
-                .setDeviceName("LWT")
+                // data+mask is needed (even though frontend allows a null value), because otherwise
+                // the filter is ignored further down the BT stack
+                .setServiceData(new ParcelUuid(make32BitUUID(LwtServiceConstants.BLE_SERVICE_UUID_VEHICLE)), new byte[TripAdvertisementDataLegacy.BYTES], new byte[TripAdvertisementDataLegacy.BYTES])
                 .build();
         ScanSettings settings = new ScanSettings.Builder()
                 .setCallbackType(ScanSettings.CALLBACK_TYPE_FIRST_MATCH)
@@ -81,7 +81,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private UUID make32BitUUID(int value) {
-        return new UUID(Integer.toUnsignedLong(value) << 32, 0);
+        // https://stackoverflow.com/questions/13964342/android-how-do-bluetooth-uuids-work
+        return new UUID((Integer.toUnsignedLong(value) << 32) | 0x1000, 0x800000805f9b34fbL);
     }
 
     private boolean hasBluetoothScanPermission() {
@@ -175,7 +176,7 @@ public class MainActivity extends AppCompatActivity {
             Log.i(TAG, "Found device: " + result.getDevice());
             if (result.getScanRecord() != null) {
                 byte[] data = BLEScanRecordUtil.getField(result.getScanRecord(), 32);
-                if (data != null && BLEScanRecordUtil.getServiceUUID32(data) == 0x4C575456) {
+                if (data != null && BLEScanRecordUtil.getServiceUUID32(data) == LwtServiceConstants.BLE_SERVICE_UUID_VEHICLE) {
                     try {
                         TripAdvertisementDataLegacy advData = TripAdvertisementDataLegacy.unwrap(BLEScanRecordUtil.getServiceDataPayload(data, Integer.BYTES));
                         Log.i(TAG, advData.toString());
