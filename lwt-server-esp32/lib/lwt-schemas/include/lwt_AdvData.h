@@ -2,11 +2,12 @@
 
 #include <cstdint>
 #include <cstring>
-#include "publisher_ssi_generated.h"
+#include <string>
+#include "trip_information_generated.h"
 
 namespace lwt {
 
-    struct AdvDataLegacy {
+    struct AdvDataBasic {
         static constexpr uint8_t PACKED_SIZE = 20;
 
         static constexpr uint8_t FLAG_IS_AT_STOP = 0x1;
@@ -26,6 +27,20 @@ namespace lwt {
 
         void set_train_line_number(const std::string& prefix, uint16_t number);
 
-        void pack(uint8_t* pDst);
+        void pack(uint8_t* pDst) const;
+    };
+
+    struct AdvDataExtended : public AdvDataBasic {
+        static constexpr uint16_t DATA_MARK = 0x4544; // 'ED'
+
+        std::string cur_stop_name;
+        std::string line_name;
+        std::string headsign;
+
+        AdvDataExtended(const AdvDataBasic& basicData);
+
+        size_t calc_size() const;
+
+        void pack(uint8_t* pDst) const;
     };
 }

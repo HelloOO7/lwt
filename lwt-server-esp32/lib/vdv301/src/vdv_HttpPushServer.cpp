@@ -9,7 +9,7 @@ namespace vdv301 {
 
     void HttpPushServer::Start() {
         std::lock_guard lock(m_Mutex);
-        
+
         if (m_Httpd) {
             return; // already started
         }
@@ -71,20 +71,31 @@ namespace vdv301 {
 
     esp_err_t HttpPushServer::HandleHttpRequest(httpd_req_t* req) {
         std::lock_guard lock(m_Mutex);
-        
+
         auto it = m_PushEndpoints.find(req->uri);
         if (it == m_PushEndpoints.end()) {
             return ESP_FAIL; // no handler for this path
         }
 
-        std::string body;
-        if (req->content_len) {
-            body.reserve(req->content_len);
-        }
-        psram_vector<char> buf(128);
+        psram_string body;
+
         int received;
-        while ((received = httpd_req_recv(req, buf.data(), buf.size())) > 0) {
-            body.append(buf.data(), received);
+        if (req->content_len) {
+            body.resize(req->content_len);
+            char* bodyPtr = body.data();
+            size_t remaining = req->content_len;
+            int received;
+            while ((received = httpd_req_recv(req, bodyPtr, remaining)) > 0) {
+                bodyPtr += received;
+                remaining -= received;
+            }
+        }
+        else {
+            psram_vector<char> buf(128);
+            int received;
+            while ((received = httpd_req_recv(req, buf.data(), buf.size())) > 0) {
+                body.append(buf.data(), received);
+            }
         }
 
         it->second(body);

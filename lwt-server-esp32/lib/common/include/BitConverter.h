@@ -1,6 +1,7 @@
 #pragma once
 
 #include "machine/endian.h"
+#include <cstring>
 
 template<int TOrder>
 class BitConverter {

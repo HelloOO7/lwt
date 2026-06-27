@@ -21,8 +21,10 @@ import android.widget.Button;
 import android.widget.Toast;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,6 +34,8 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import cz.spojenka.lwdn.LwdnAddress;
+import cz.spojenka.lwdn.LwdnScanConfig;
+import cz.spojenka.lwdn.LwdnScanException;
 import cz.spojenka.lwt.*;
 import cz.spojenka.lwt.util.BLEScanRecordUtil;
 import cz.spojenka.lwt.util.TLSTrustManager;
@@ -42,14 +46,15 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "LWTDemoApp";
 
-    private BluetoothAdapter bluetoothAdapter;
+    private LwtDeviceScanner lwtScanner;
+
     private TLSTrustManager trustManager;
     private SSLContext sslContext;
 
     private Button btnRunTest;
     private Button btnRunTlsTest;
 
-    private LwdnAddress foundDevAddress;
+    private LwtDevice foundDevice;
 
     @SuppressLint("MissingPermission")
     @Override
@@ -60,29 +65,32 @@ public class MainActivity extends AppCompatActivity {
         btnRunTlsTest = findViewById(R.id.btnTestTls);
         setButtonsEnabled(false);
         sslContext = createSSLContext();
-        bluetoothAdapter = getSystemService(BluetoothManager.class).getAdapter();
-        ScanFilter filter = new ScanFilter.Builder()
-                // data+mask is needed (even though frontend allows a null value), because otherwise
-                // the filter is ignored further down the BT stack
-                .setServiceData(new ParcelUuid(make32BitUUID(LwtServiceConstants.BLE_SERVICE_UUID_VEHICLE)), new byte[TripAdvertisementDataLegacy.BYTES], new byte[TripAdvertisementDataLegacy.BYTES])
-                .build();
-        ScanSettings settings = new ScanSettings.Builder()
-                .setCallbackType(ScanSettings.CALLBACK_TYPE_FIRST_MATCH)
-                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-                .build();
+        lwtScanner = new LwtDeviceScanner(this);
         if (hasBluetoothScanPermission()) {
-            bluetoothAdapter.getBluetoothLeScanner().startScan(List.of(filter), settings, scanCallback);
+            lwtScanner.startScan(
+                    new LwdnScanConfig.Builder()
+                            .setMaxDevices(1)
+                            .setTimeout(Duration.ofSeconds(5))
+                            .build()
+            ).addOnResultListener(new LwtScan.OnResultListener() {
+                @Override
+                public void onResult(LwtScan scan, LwtDevice result) {
+                    Log.i(TAG, "Found device: " + result);
+                    foundDevice = result;
+                    setButtonsEnabled(true);
+                }
+
+                @Override
+                public void onFailure(LwtScan scan, LwdnScanException e) {
+                    Log.e(TAG, "Scan failed", e);
+                }
+            });
         } else {
             Toast.makeText(this, "Bluetooth scan permission not granted.", Toast.LENGTH_LONG).show();
         }
         btnRunTest.setOnClickListener(v -> checkTrustAndRunTest());
         btnRunTlsTest.setOnClickListener(v -> runTestOverTLS());
         testWifiAware();
-    }
-
-    private UUID make32BitUUID(int value) {
-        // https://stackoverflow.com/questions/13964342/android-how-do-bluetooth-uuids-work
-        return new UUID((Integer.toUnsignedLong(value) << 32) | 0x1000, 0x800000805f9b34fbL);
     }
 
     private boolean hasBluetoothScanPermission() {
@@ -118,13 +126,13 @@ public class MainActivity extends AppCompatActivity {
 
     private void checkTrustAndRunTest() {
         initTest();
-        LwtAPIClient client = new LwtAPIClient(foundDevAddress);
+        LwtAPIClient client = new LwtAPIClient(foundDevice.getAddress());
         client.setSocketWatchdogTimeout(Duration.ofSeconds(5));
         client.disableTLS();
         client.authenticateServer(trustManager, CommType.ENQUEUE).whenCompleteAsync((trusted, error) -> {
             if (error != null) {
                 Log.e(TAG, "Server auth operation error", error);
-                btnRunTest.setEnabled(true);
+                setButtonsEnabled(true);
             } else {
                 Log.i(TAG, "Server authentication result: " + trusted);
             }
@@ -135,10 +143,10 @@ public class MainActivity extends AppCompatActivity {
 
     private void runTestOverTLS() {
         initTest();
-        LwtAPIClient client = new LwtAPIClient(foundDevAddress);
+        LwtAPIClient client = new LwtAPIClient(foundDevice.getAddress());
         client.setSocketWatchdogTimeout(Duration.ofSeconds(5));
         client.useTLS(
-                new LwtpTLSConfig.Builder(foundDevAddress)
+                new LwtpTLSConfig.Builder(foundDevice.getAddress())
                         .setTLSPolicy(LwtpTLSPolicy.EXPLICIT_OPPORTUNISTIC)
                         .setSSLContext(sslContext)
                         .build()
@@ -149,7 +157,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void initTest() {
         setButtonsEnabled(false);
-        Log.i(TAG, "Testing bluetooth communication with device: " + foundDevAddress);
+        Log.i(TAG, "Testing bluetooth communication with device: " + foundDevice.getAddress());
     }
 
     private void enqueueTestOperations(LwtAPIClient client) {
@@ -168,28 +176,6 @@ public class MainActivity extends AppCompatActivity {
             setButtonsEnabled(true);
         }, getMainExecutor());
     }
-
-    private final ScanCallback scanCallback = new ScanCallback() {
-        @SuppressLint("MissingPermission")
-        @Override
-        public void onScanResult(int callbackType, ScanResult result) {
-            Log.i(TAG, "Found device: " + result.getDevice());
-            if (result.getScanRecord() != null) {
-                byte[] data = BLEScanRecordUtil.getField(result.getScanRecord(), 32);
-                if (data != null && BLEScanRecordUtil.getServiceUUID32(data) == LwtServiceConstants.BLE_SERVICE_UUID_VEHICLE) {
-                    try {
-                        TripAdvertisementDataLegacy advData = TripAdvertisementDataLegacy.unwrap(BLEScanRecordUtil.getServiceDataPayload(data, Integer.BYTES));
-                        Log.i(TAG, advData.toString());
-                    } catch (IOException e) {
-                        Log.e(TAG, "Failed to parse advertisement data", e);
-                    }
-                }
-            }
-            setButtonsEnabled(true);
-            foundDevAddress = LwtAPIClient.bluetoothAddress(result.getDevice());
-            bluetoothAdapter.getBluetoothLeScanner().stopScan(scanCallback);
-        }
-    };
 
     private void setButtonsEnabled(boolean enabled) {
         btnRunTest.setEnabled(enabled);

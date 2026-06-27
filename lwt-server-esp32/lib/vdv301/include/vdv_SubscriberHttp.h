@@ -50,7 +50,7 @@ namespace vdv301 {
         std::vector<std::string> m_SubscribedOperationEndpoints;
 
     public:
-        SubscriberHttp(ServiceDiscovery& sd, const std::string& serviceClassName, const ServiceDiscovery::Query& serviceQuery, OperationIDType subscribedOps);
+        SubscriberHttp(ServiceDiscovery& sd, const std::string& serviceClassName, const ServiceDiscovery::Query& serviceQuery, OperationIDType subscribedOps, size_t taskStackSize);
         ~SubscriberHttp();
 
         // forbid copy/assignment

@@ -18,16 +18,21 @@
 #include "lwt_PingService.h"
 #include "lwt_ServerAuthenticationService.h"
 #include "lwtp_StartTLSInterceptor.h"
-#include "lwt_AdvDataLegacy.h"
+#include "lwt_AdvData.h"
+#include "lwdn_BleAdvertiser.h"
+#include "lwt_TripInfoAdvertiser.h"
 #include "BitConverter.h"
 #include "operations_generated.h"
 #include "esp_event.h"
 #include "tls_setup.h"
 #include "tls_certs.h"
+#include <atomic>
 
 static constexpr uint16_t BLE_PSM = 0xD7; // 0x80 + 'W'
-static constexpr uint32_t BLE_SERVICE_UUID_VEHICLE = 0x4C575456; // 'LWTV'
-static constexpr uint32_t BLE_SERVICE_UUID_STOP = 0x4C575453; // 'LWTS'
+static constexpr lwdn::BleAdvertiser::UUID32 BLE_SERVICE_UUID_VEHICLE = 0x4C575456; // 'LWTV'
+static constexpr lwdn::BleAdvertiser::UUID32 BLE_SERVICE_UUID_STOP = 0x4C575453; // 'LWTS'
+static constexpr lwdn::BleAdvertiser::UUID32 BLE_SERVICE_UUID_VEHICLE_EXTENDED = BLE_SERVICE_UUID_VEHICLE + 'E';
+static constexpr lwdn::BleAdvertiser::UUID32 BLE_SERVICE_UUID_STOP_EXTENDED = BLE_SERVICE_UUID_STOP + 'E';
 
 class AppMain {
 private:
@@ -42,13 +47,17 @@ private:
     lwt::PingService m_PingService;
     lwt::ServerAuthenticationService m_ServerAuthService;
 
+    lwdn::BleAdvertiser m_BLETripAdvertiserLegacy;
+    lwdn::BleAdvertiser m_BLETripAdvertiserExt;
+    lwt::TripInfoAdvertiser m_TripInfoAdvertiser;
+
 public:
     AppMain() :
         m_TlsCredentials(TLS_DEVICE_CRT_START, TLS_DEVICE_CRT_END, TLS_LWT_SERVER_KEY_DEBUG_START, TLS_LWT_SERVER_KEY_DEBUG_END),
         m_HttpServiceDiscovery{ vdv301::HttpServiceDiscovery() },
         m_CISSubscriber(
-            m_HttpServiceDiscovery/*,
-            vdv301::SubscriberCIS::Operation::GetCurrentStopPoint | vdv301::SubscriberCIS::Operation::GetCurrentAnnouncement*/
+            m_HttpServiceDiscovery,
+            vdv301::SubscriberCIS::Operation::GetAllData
         ),
         m_TVSSubscriber(
             m_HttpServiceDiscovery/*,
@@ -57,7 +66,10 @@ public:
         m_BLEServer(BLE_PSM, lwtp::MAX_PACKET_SIZE),
         m_ServiceRegistry(lwt::Operation_MIN, lwt::Operation_MAX),
         m_AppServer(m_ServiceRegistry),
-        m_ServerAuthService(TLS_DEVICE_CRT_START, m_TlsCredentials.device_key, m_TlsCredentials.ctr_drbg)
+        m_ServerAuthService(TLS_DEVICE_CRT_START, m_TlsCredentials.device_key, m_TlsCredentials.ctr_drbg),
+        m_BLETripAdvertiserLegacy(0, BLE_SERVICE_UUID_VEHICLE, lwdn::BleAdvertiser::Flags::INCLUDE_DEVICE_NAME | lwdn::BleAdvertiser::Flags::USE_LEGACY_ADVERTISING),
+        m_BLETripAdvertiserExt(1, BLE_SERVICE_UUID_VEHICLE_EXTENDED, lwdn::BleAdvertiser::Flags::INCLUDE_DEVICE_NAME),
+        m_TripInfoAdvertiser(m_CISSubscriber, { &m_BLETripAdvertiserLegacy, &m_BLETripAdvertiserExt })
     {
         lwt::ensure_generated_types_linked();
 
@@ -68,7 +80,14 @@ public:
         m_AppServer.AddInterceptor(std::make_unique<lwtp::StartTLSInterceptor>(m_MbedTlsConfig));
         m_AppServer.AddSocket(&m_BLEServer);
     }
+
+    void StartAdvertising() {
+        m_BLETripAdvertiserLegacy.Start();
+        m_BLETripAdvertiserExt.Start();
+    }
 };
+
+AppMain* g_AppMain = nullptr;
 
 void init_nvs() {
     esp_err_t ret = nvs_flash_init();
@@ -155,9 +174,9 @@ static void bleprph_advertise(void)
     fields.name = (uint8_t*)name;
     fields.name_len = strlen(name);
     fields.name_is_complete = 1;
-    uint8_t svc_data[sizeof(uint32_t) + lwt::AdvDataLegacy::PACKED_SIZE];
+    uint8_t svc_data[sizeof(uint32_t) + lwt::AdvDataBasic::PACKED_SIZE];
     BitConverter<LITTLE_ENDIAN>::FromUInt32(BLE_SERVICE_UUID_VEHICLE, svc_data);
-    lwt::AdvDataLegacy test_adv_data{
+    lwt::AdvDataBasic test_adv_data{
         .line_type = lwt::LineType::LineType_GenericBus,
         .line_license_number = 100394,
         .trip_number = 1001,
@@ -166,13 +185,13 @@ static void bleprph_advertise(void)
         .stop_arrival_time = 9 * 60 + 10,
         .stop_departure_time = 9 * 60 + 11,
         .delay = -1,
-        .flags = lwt::AdvDataLegacy::FLAG_IS_AT_STOP
+        .flags = lwt::AdvDataBasic::FLAG_IS_AT_STOP
     };
     test_adv_data.pack(svc_data + sizeof(uint32_t));
     fields.svc_data_uuid32 = svc_data;
     fields.svc_data_uuid32_len = sizeof(svc_data);
 
-    os_mbuf* adv_data = os_msys_get_pkthdr(BLE_HS_ADV_MAX_FIELD_SZ, 0);
+    os_mbuf* adv_data = os_msys_get_pkthdr(BLE_HS_ADV_MAX_SZ, 0);
     assert(adv_data);
     rc = ble_hs_adv_set_fields_mbuf(&fields, adv_data);
     if (rc != 0) {
@@ -197,7 +216,7 @@ static void bleprph_advertise(void)
 }
 
 static void bleprph_readvertise(void) {
-    if (!ble_gap_adv_active()) {
+    if (!ble_gap_ext_adv_active(0)) {
         int rc = ble_gap_ext_adv_start(0, 0, 0);
         if (rc != 0)
         {
@@ -207,9 +226,15 @@ static void bleprph_readvertise(void) {
     }
 }
 
+bool ble_synced{ false };
+
 static void bleprph_on_sync(void)
 {
-    bleprph_advertise();
+    ble_synced = true;
+    if (g_AppMain) {
+        g_AppMain->StartAdvertising();
+    }
+    //bleprph_advertise();
 }
 
 void init_nimble() {
@@ -236,11 +261,14 @@ extern "C" void app_main() {
     ethernet_init();
     ethernet_init_netif();
 
-    AppMain* app = new AppMain();
+    g_AppMain = new AppMain();
+    if (ble_synced) {
+        g_AppMain->StartAdvertising();
+    }
 
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 
-    delete app;
+    delete g_AppMain;
 }

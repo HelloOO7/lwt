@@ -4,7 +4,14 @@ EventQueue::EventQueue(const std::string& name, size_t capacity, size_t stackSiz
     m_Name(name),
     m_Capacity(capacity)
 {
-    xTaskCreate(TaskFunc, m_Name.c_str(), stackSize, this, priority, &m_Task);
+    bool isPsram = (stackSize & STACK_PSRAM_BIT) != 0;
+    stackSize &= STACK_SIZE_MASK;
+    if (isPsram) {
+        m_TaskStackPSRAM = psram_vector<StackType_t>(stackSize / sizeof(StackType_t));
+        m_Task = xTaskCreateStatic(TaskFunc, m_Name.c_str(), stackSize, this, priority, m_TaskStackPSRAM.data(), &m_TaskBuffer);
+    } else {
+        xTaskCreate(TaskFunc, m_Name.c_str(), stackSize, this, priority, &m_Task);
+    }
     configASSERT(m_Task);
 }
 

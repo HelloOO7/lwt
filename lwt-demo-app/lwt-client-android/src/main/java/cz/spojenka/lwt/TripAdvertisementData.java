@@ -8,7 +8,7 @@ import java.time.LocalTime;
 
 import androidx.annotation.NonNull;
 
-public class TripAdvertisementDataLegacy {
+public class TripAdvertisementData {
 
     public static final int BYTES = 20;
 
@@ -25,7 +25,7 @@ public class TripAdvertisementDataLegacy {
     private final int delay;
     private final int flags;
 
-    public TripAdvertisementDataLegacy(InputStream in) throws IOException {
+    public TripAdvertisementData(InputStream in) throws IOException {
         DataInputStream dis = new DataInputStream(in);
         lineType = dis.readUnsignedByte(); // +0x0
         lineLicenseNumber = readInt24(dis); // +0x1
@@ -110,9 +110,9 @@ public class TripAdvertisementDataLegacy {
         return (flags & FLAG_IS_AT_STOP) != 0;
     }
 
-    public static TripAdvertisementDataLegacy unwrap(byte[] serviceData) throws IOException {
+    public static TripAdvertisementData unwrap(byte[] serviceData) throws IOException {
         try (InputStream in = new ByteArrayInputStream(serviceData)) {
-            return new TripAdvertisementDataLegacy(in);
+            return new TripAdvertisementData(in);
         }
     }
 
@@ -130,7 +130,7 @@ public class TripAdvertisementDataLegacy {
     @NonNull
     @Override
     public String toString() {
-        return "TripAdvertisementDataLegacy{" +
+        return "TripAdvertisementData{" +
                 "lineType=" + lineType +
                 ", lineLicenseNumber=" + lineLicenseNumber +
                 ", tripNumber=" + tripNumber +

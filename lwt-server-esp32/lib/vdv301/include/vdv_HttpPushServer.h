@@ -13,7 +13,7 @@ namespace vdv301 {
     class HttpPushServer
     {
     public:
-        using PushBody = std::string;
+        using PushBody = psram_string;
         using PushConsumer = std::function<void(const PushBody& body)>;
 
     private:

@@ -9,7 +9,11 @@ namespace vdv301
 
     class SubscriberCIS : public SubscriberHttp
     {
+    private:
+        using AllDataResponse = IBIS_IP_CustomerInformationService_V2_3CZ1_0::CustomerInformationService_GetAllDataResponseStructure;
     public:
+        using AllData = IBIS_IP_CustomerInformationService_V2_3CZ1_0::CustomerInformationService_AllData;
+
         enum class Operation : SubscriberHttp::OperationIDType {
             GetAllData = (1 << 0),
             GetCurrentAnnouncement = (1 << 1),
@@ -23,10 +27,13 @@ namespace vdv301
         };
 
     private:
-        IBIS_IP_CustomerInformationService_V2_3CZ1_0::CustomerInformationService_GetAllDataResponseStructure m_LastAllData;
+        AllDataResponse m_LastAllData;
+        uint32_t m_LastAllDataHash{ 0 };
 
     public:
         SubscriberCIS(ServiceDiscovery& sd, Operation subscribedOps = (Operation) 0);
+
+        void ObserveAllData(SubscriberObserver<AllData>& observer);
 
     protected:
         void OnOperationResult(const OperationResult& result) override;

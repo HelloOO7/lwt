@@ -13,7 +13,8 @@ namespace vdv301
             .FilterInstanceName("TicketValidationService*")
             .FilterTxtRecord("ver", "2.2CZ1.0")
             .Build(),
-            std::to_underlying(subscribedOps)
+            std::to_underlying(subscribedOps),
+            4096 | EventQueue::STACK_PSRAM_BIT
         )
     {
     }
@@ -47,7 +48,7 @@ namespace vdv301
             case Operation::GetRazzia:
             {
                 TicketValidationService_GetRazziaResponseStructure razziaResp;
-                load_data(result.GetResult(), razziaResp);
+                load_data(result.GetResult().c_str(), razziaResp);
                 if (razziaResp.RazziaData) {
                     m_LastRazziaResp = std::move(*razziaResp.RazziaData);
                     ESP_LOGI(TAG, "Updated Razzia data: state=%s timestamp=%s",
@@ -62,7 +63,7 @@ namespace vdv301
             case Operation::GetCurrentStopPoint:
             {
                 TicketValidationService_GetCurrentTariffStopResponseStructure stopResp;
-                load_data(result.GetResult(), stopResp);
+                load_data(result.GetResult().c_str(), stopResp);
                 if (stopResp.CurrentTariffStopData) {
                     m_CurTariffStop = std::move(*stopResp.CurrentTariffStopData);
                     ESP_LOGI(TAG, "Updated CurrentStopPoint data: stop=%s timestamp=%s",

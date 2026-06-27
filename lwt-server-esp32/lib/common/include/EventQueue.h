@@ -8,6 +8,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <string>
+#include "PSRAMContainers.h"
 
 class EventQueue
 {
@@ -15,6 +16,9 @@ public:
     using EventTag = int;
     static constexpr EventTag EVENT_TAG_NONE = -1;
     using EventCallback = std::function<void()>;
+
+    static constexpr size_t STACK_PSRAM_BIT = 0x80000000;
+    static constexpr size_t STACK_SIZE_MASK = ~STACK_PSRAM_BIT;
 
 private:
     struct EventRegistration {
@@ -30,8 +34,10 @@ private:
     size_t m_Capacity;
 
     TaskHandle_t m_Task;
+    StaticTask_t m_TaskBuffer;
+    psram_vector<StackType_t> m_TaskStackPSRAM;
+    
     std::deque<EventRegistration> m_Queue;
-
     std::mutex m_Mutex;
     std::condition_variable m_TaskReadyCV;
     std::condition_variable m_CloseFinishedCV;

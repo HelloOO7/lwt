@@ -57,13 +57,23 @@ table TripInfo {
     line: LineInfo (required);
 }
 
+enum LocationState : ubyte {
+    AtStop,
+    BeforeStop,
+    AfterStop
+}
+
 table TripStateInfo {
     /// Trip info.
     trip: TripInfo (required);
     /// Delay of the trip in minutes.
     delay: int;
     /// Stop at which the vehicle is currently stationed, is about to depart from or has recently departed from.
-    current_departure_stop: StopReference;
+    current_departure_stop: StopReference (required);
+    /// General position of the trip in relation to current_departure_stop. Most of the time, this will be either
+    /// AtStop or BeforeStop. The exception is when the trip has ended its journey, when AfterStop is used to
+    /// signal the terminus.
+    location_state: LocationState;
 }
 
 table TicketValidationInfo {

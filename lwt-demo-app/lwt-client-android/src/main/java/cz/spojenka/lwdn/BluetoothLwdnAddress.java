@@ -2,6 +2,8 @@ package cz.spojenka.lwdn;
 
 import android.bluetooth.BluetoothDevice;
 
+import androidx.annotation.NonNull;
+
 public final class BluetoothLwdnAddress implements LwdnAddress {
 
     private final BluetoothDevice device;
@@ -28,5 +30,14 @@ public final class BluetoothLwdnAddress implements LwdnAddress {
     @Override
     public int getPortNumber() {
         return psm;
+    }
+
+    @NonNull
+    @Override
+    public String toString() {
+        return "BluetoothLwdnAddress{" +
+                "device=" + device +
+                ", psm=" + psm +
+                '}';
     }
 }

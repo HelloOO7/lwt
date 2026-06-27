@@ -14,10 +14,10 @@ namespace vdv301
 
     static constexpr EventQueue::EventTag SERVICE_UPDATE_EVENT_TAG = 1;
 
-    SubscriberHttp::SubscriberHttp(ServiceDiscovery& sd, const std::string& serviceClassName, const ServiceDiscovery::Query& serviceQuery, OperationIDType subscribedOps) :
+    SubscriberHttp::SubscriberHttp(ServiceDiscovery& sd, const std::string& serviceClassName, const ServiceDiscovery::Query& serviceQuery, OperationIDType subscribedOps, size_t taskStackSize) :
         SubscriberBase(),
         m_SD{ sd },
-        m_EventQueue("SubscriberHttp" + serviceClassName, 5, 6144),
+        m_EventQueue("SubscriberHttp" + serviceClassName, 5, taskStackSize),
         m_ServiceClassName{ serviceClassName },
         m_SubscribedOperations{ subscribedOps }
     {
