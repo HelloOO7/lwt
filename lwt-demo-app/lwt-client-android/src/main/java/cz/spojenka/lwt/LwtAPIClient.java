@@ -148,4 +148,7 @@ public class LwtAPIClient extends LwtClient {
         });
     }
 
+    public CompletableFuture<TripRouteInfo> getTripRouteInfo(CommType comm) {
+        return enqueueOrCall(LwtAPI::getTripRouteInfo, comm);
+    }
 }

@@ -76,32 +76,25 @@ table TripStateInfo {
     location_state: LocationState;
 }
 
-table TicketValidationInfo {
-    /// Trip state.
-    trip: TripStateInfo;
-    /// The time at which a ticket should be activated to be valid for departure from the given stop.
-    /// This can sometimes be in the past, such as when activation is started in the grace period after entry.
-    /// This time includes delay.
-    scheduled_activation_time: long;
-    /// Tariff zones where the vehicle is currently located, i.e. from which a ticket can be activated.
-    tariff_zones: string;
-    /// Tariff zones where the vehicle will travel in the future. There is no guarantee as to the order thereof,
-    /// given that the particular zone chosen for a given stop may vary depending on subscription tickets owned.
-    next_tariff_zones: string;
-}
-
 table TripStopInfo {
     /// ID and name of the stop.
     stop_ref: StopReference;
-    /// Time of arrival at the stop (scheduled, absolute).
-    arr_time: long;
-    /// Time of departure from the stop (scheduled, absolute).
-    dep_time: long;
+    /// Time of arrival at the stop (scheduled, absolute). Can be -1 if not present.
+    /// The value is an Unix timestamp in the time zone of the stop (number of seconds since 1. 1. 1970).
+    arr_time: long = -1;
+    /// Time of departure from the stop (scheduled, absolute). Can be -1 if not present.
+    /// The value is an Unix timestamp in the time zone of the stop (number of seconds since 1. 1. 1970).
+    dep_time: long = -1;
     /// List of tariff zones at the stop. These only contain the zones valid for the current
     /// line and the transport authority operating the LWT module. String is comma separated for
-    /// memory efficiency (avoid 32bit flatbuffer pointers).
+    /// memory efficiency (avoid 32bit flatbuffer pointers). If there are multiple transport networks
+    /// at the stop, data for each individual one is separated by semicolons and prefixed
+    /// with the transport network ID. For example: "PID 8,9;IDOL 4269". If there is only a single
+    /// transport network, then there is no information about which one it actually is. This is a limitation
+    /// of the vehicle information system which broadcasts the source data.
     tariff_zones: string;
-    /// Number of kilometers travelled here from the first stop.
+    /// Number of kilometers travelled here from the first stop. Can be NaN if not present in
+    /// the data sent by the vehicle information system.
     tariff_kilometers: float;
 }
 

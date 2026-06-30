@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <cstring>
+#include <ctime>
 
 struct LocalTime {
     uint8_t hour{ 0 };
@@ -63,5 +64,16 @@ struct LocalDateTime {
 
     inline static LocalDateTime parse(const std::string& str) {
         return parse(str.c_str());
+    }
+
+    inline int64_t to_epoch_seconds() const {
+        std::tm tm = {};
+        tm.tm_year = date.year - 1900;
+        tm.tm_mon = date.month - 1;
+        tm.tm_mday = date.day;
+        tm.tm_hour = time.hour;
+        tm.tm_min = time.minute;
+        tm.tm_sec = time.second;
+        return static_cast<int64_t>(std::mktime(&tm));
     }
 };

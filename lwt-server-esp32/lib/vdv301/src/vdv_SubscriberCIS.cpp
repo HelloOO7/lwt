@@ -8,6 +8,8 @@
 
 namespace vdv301
 {
+    using namespace IBIS_IP_CustomerInformationService_V2_3CZ1_0;
+
     SubscriberCIS::SubscriberCIS(ServiceDiscovery& sd, Operation subscribedOps) :
         SubscriberHttp(
             sd,
@@ -28,15 +30,15 @@ namespace vdv301
         AddObserver<Operation, AllData>(Operation::GetAllData, observer);
     }
 
-    static std::regex VEHICLE_STOP_FIX_0(R"(<VehicleStopRequested>\s*<Value>0</Value>\s*</VehicleStopRequested>)");
-    static std::regex VEHICLE_STOP_FIX_1(R"(<VehicleStopRequested>\s*<Value>1</Value>\s*</VehicleStopRequested>)");
+    void SubscriberCIS::RemoveObserver(SubscriberObserver<AllData>& observer) {
+        SubscriberBase::RemoveObserver<Operation, AllData>(Operation::GetAllData, observer);
+    }
+
     static std::regex SUBMODE_FIX(R"(<[A-Za-z]+Submode>\s*[A-Za-z]+\s*</[A-Za-z]+Submode>)");
     static std::regex TIMESTAMP_RE(R"(<TimeStamp>\s*<Value>([^<]+)</Value>\s*</TimeStamp>)");
 
     psram_string FixupXml(const psram_string& input) {
-        psram_string output = std::regex_replace(input, VEHICLE_STOP_FIX_0, "<VehicleStopRequested><Value>false</Value></VehicleStopRequested>");
-        output = std::regex_replace(output, VEHICLE_STOP_FIX_1, "<VehicleStopRequested><Value>true</Value></VehicleStopRequested>");
-        output = std::regex_replace(output, SUBMODE_FIX, "");
+        psram_string output = std::regex_replace(input, SUBMODE_FIX, "");
         return output;
     }
 
@@ -59,7 +61,7 @@ namespace vdv301
                 auto fixedResult = FixupXml(result.GetResult());
                 {
                     UseHeapCaps<MALLOC_CAP_SPIRAM> usePsram;
-                    IBIS_IP_CustomerInformationService_V2_3CZ1_0::load_data(fixedResult.c_str(), m_LastAllData);
+                    load_data(fixedResult.c_str(), m_LastAllData);
                     m_LastAllDataHash = resultHash;
                 }
                 ssize_t freeAfter = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
@@ -69,7 +71,8 @@ namespace vdv301
                     std::cout << "Timestamp: " << m_LastAllData.AllData->TimeStamp.Value << std::endl;
 
                     NotifyObservers(Operation::GetAllData, &*m_LastAllData.AllData);
-                } else {
+                }
+                else {
                     NotifyObservers(Operation::GetAllData, (AllData*) nullptr);
                 }
             }
@@ -107,5 +110,68 @@ namespace vdv301
         default:
             return "";
         }
+    }
+
+    bool SubscriberCIS::IsTripRefPresent(const TripInformationStructure& tripInfo)
+    {
+        return !tripInfo.TripRef.Value.empty() && tripInfo.TripRef.Value != "noRef";
+    }
+
+    const TripInformationStructure* SubscriberCIS::GetTripInformationFromAllData(const AllData& allData)
+    {
+        if (allData.TripInformation.empty()) {
+            return nullptr;
+        }
+        return &allData.TripInformation.front();
+    }
+
+    const StopInformationStructure* SubscriberCIS::GetCurrentStopFromAllData(const AllData& allData)
+    {
+        if (allData.CurrentStopIndex.ErrorCode) {
+            return nullptr;
+        }
+        const TripInformationStructure* tripInfo = GetTripInformationFromAllData(allData);
+        if (!tripInfo) {
+            return nullptr;
+        }
+        auto index = allData.CurrentStopIndex.Value;
+        if (index < 0 || index >= tripInfo->StopSequence.StopPoint.size()) {
+            return nullptr;
+        }
+        return &tripInfo->StopSequence.StopPoint[index];
+    }
+
+    const StopInformationStructure* SubscriberCIS::FindStopByRef(const std::string& stopRef, const AllData& allData)
+    {
+        for (auto&& tripInfo : allData.TripInformation) {
+            for (auto&& stop : tripInfo.StopSequence.StopPoint) {
+                if (stop.StopRef.Value == stopRef) {
+                    return &stop;
+                }
+            }
+        }
+        return nullptr;
+    }
+
+    const StopInformationStructure* SubscriberCIS::FindLastStopByRef(const std::string& stopRef, const AllData& allData)
+    {
+        for (auto tripIt = allData.TripInformation.rbegin(); tripIt != allData.TripInformation.rend(); ++tripIt) {
+            for (auto stopIt = tripIt->StopSequence.StopPoint.rbegin(); stopIt != tripIt->StopSequence.StopPoint.rend(); ++stopIt) {
+                if (stopIt->StopRef.Value == stopRef) {
+                    return &*stopIt;
+                }
+            }
+        }
+        return nullptr;
+    }
+
+    const DisplayContentStructure* SubscriberCIS::FindDisplayContent(const std::string& displayContentRef, const StopInformationStructure& parent)
+    {
+        for (auto&& displayContent : parent.DisplayContent) {
+            if (displayContent.DisplayContentRef && displayContent.DisplayContentRef->Value == displayContentRef) {
+                return &displayContent;
+            }
+        }
+        return nullptr;
     }
 }

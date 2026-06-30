@@ -21,6 +21,7 @@ namespace lwt {
 
     public:
         TripInfoAdvertiser(vdv301::SubscriberCIS& cisSubscriber, std::initializer_list<lwdn::Advertiser*> advertisers);
+        ~TripInfoAdvertiser();
 
         virtual void OnDataChanged(const vdv301::SubscriberCIS::AllData* result) override;
 
@@ -32,10 +33,5 @@ namespace lwt {
         void UpdateExtendedData(const AdvDataExtended& result);
         
         static uint32_t FindCisNumberByRef(const std::string& ref, const vdv301::SubscriberCIS::AllData& result);
-        static size_t FindLastStopIndexByRef(const std::string& ref, const vdv301::SubscriberCIS::AllData& result);
-
-        static LineType VehicleModeToLineType(IBIS_IP_CustomerInformationService_V2_3CZ1_0::VehicleModeEnumeration mode);
-
-        static const IBIS_IP_CustomerInformationService_V2_3CZ1_0::DisplayContentStructure* FindDisplayContent(const std::string& displayContentRef, const IBIS_IP_CustomerInformationService_V2_3CZ1_0::StopInformationStructure& parent);
     };
 }

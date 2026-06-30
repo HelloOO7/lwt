@@ -1,4 +1,22 @@
+include "trip_information.fbs";
+
 namespace lwt;
+
+table TicketValidationInfo {
+    /// Trip state.
+    trip: TripStateInfo (required);
+    /// The time at which a ticket should be activated to be valid for departure from the given stop.
+    /// This can sometimes be in the past, such as when activation is started in the grace period after entry.
+    /// This time includes delay.
+    scheduled_activation_time: long;
+    /// Tariff zones where the vehicle is currently located, i.e. from which a ticket can be activated.
+    /// Individual zones are comma-separated rather than an array in order to save memory in the flatbuffer.
+    /// This field only contains tariff zones of the transport network that operates this LWT device.
+    tariff_zones: string;
+    /// Tariff zones where the vehicle will travel in the future. There is no guarantee as to the order thereof,
+    /// given that the particular zone chosen for a given stop may vary depending on subscription tickets owned.
+    next_tariff_zones: string;
+}
 
 table PreauthorizationTokenRequest {
     /// CRC-32 checksums of the activation tokens which the client

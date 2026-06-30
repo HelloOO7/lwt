@@ -169,6 +169,17 @@ public class MainActivity extends AppCompatActivity {
                 return null;
             });
         }
+        client.getTripRouteInfo(CommType.ENQUEUE).thenAccept(tripRouteInfo -> {
+            Log.i(TAG, "Trip route info received: " + routeInfoToString(tripRouteInfo));
+        }).exceptionally(ex -> {
+            Log.e(TAG, "LWT operation failed", ex);
+            return null;
+        });
+    }
+
+    private String routeInfoToString(TripRouteInfo t) {
+        return t.trip().trip().line().name() + " (" + t.trip().trip().globalRefId() + ") "
+                + t.stopsLength() + " stops";
     }
 
     private void executeOps(LwtAPIClient client) {

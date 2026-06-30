@@ -31,9 +31,19 @@ namespace vdv301
         uint32_t m_LastAllDataHash{ 0 };
 
     public:
-        SubscriberCIS(ServiceDiscovery& sd, Operation subscribedOps = (Operation) 0);
+        SubscriberCIS(ServiceDiscovery& sd, Operation subscribedOps = (Operation)0);
 
         void ObserveAllData(SubscriberObserver<AllData>& observer);
+        void RemoveObserver(SubscriberObserver<AllData>& observer);
+
+        static bool IsTripRefPresent(const IBIS_IP_CustomerInformationService_V2_3CZ1_0::TripInformationStructure& tripInfo);
+        static const IBIS_IP_CustomerInformationService_V2_3CZ1_0::TripInformationStructure* GetTripInformationFromAllData(const AllData& allData);
+        static const IBIS_IP_CustomerInformationService_V2_3CZ1_0::StopInformationStructure* GetCurrentStopFromAllData(const AllData& allData);
+        static const IBIS_IP_CustomerInformationService_V2_3CZ1_0::StopInformationStructure* FindStopByRef(const std::string& stopRef, const AllData& allData);
+        static const IBIS_IP_CustomerInformationService_V2_3CZ1_0::StopInformationStructure* FindLastStopByRef(const std::string& stopRef, const AllData& allData);
+        static const IBIS_IP_CustomerInformationService_V2_3CZ1_0::DisplayContentStructure* FindDisplayContent(
+            const std::string& displayContentRef, const IBIS_IP_CustomerInformationService_V2_3CZ1_0::StopInformationStructure& parent
+        );
 
     protected:
         void OnOperationResult(const OperationResult& result) override;

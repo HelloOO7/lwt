@@ -6,6 +6,7 @@
 #include <esp_log.h>
 #include <cstdio>
 #include "FNVHash.h"
+#include "lwt_TripInformationService.h"
 
 namespace lwt {
 
@@ -17,6 +18,10 @@ namespace lwt {
         m_Advertisers{ advertisers }
     {
         m_CISSubscriber.ObserveAllData(*this);
+    }
+
+    TripInfoAdvertiser::~TripInfoAdvertiser() {
+        m_CISSubscriber.RemoveObserver(*this);
     }
 
     void TripInfoAdvertiser::OnDataChanged(const SubscriberCIS::AllData* result)
@@ -62,53 +67,53 @@ namespace lwt {
         AdvDataBasic legacyData;
         memset(&legacyData, 0, sizeof(legacyData));
 
-        legacyData.line_type = result.VehicleMode ? VehicleModeToLineType(*result.VehicleMode) : LineType::LineType_GenericBus;
+        legacyData.line_type = result.VehicleMode ? TripInformationService::VehicleModeToLineType(*result.VehicleMode) : LineType::LineType_GenericBus;
 
-        if (!result.TripInformation.empty()) {
-            auto&& tripInfo = result.TripInformation.front();
+        const TripInformationStructure* tripInfo = SubscriberCIS::GetTripInformationFromAllData(result);
 
-            if (tripInfo.TripRef.Value.empty() || "noRef" == tripInfo.TripRef.Value) {
+        if (tripInfo) {
+            if (!SubscriberCIS::IsTripRefPresent(*tripInfo)) {
                 legacyData.trip_number = 0;
             }
             else {
-                legacyData.trip_number = std::stoi(tripInfo.TripRef.Value);
+                legacyData.trip_number = std::stoi(tripInfo->TripRef.Value);
             }
 
-            if (!result.CurrentStopIndex.ErrorCode && result.CurrentStopIndex.Value < tripInfo.StopSequence.StopPoint.size()) {
-                auto&& stop = tripInfo.StopSequence.StopPoint[result.CurrentStopIndex.Value];
+            const StopInformationStructure* stop = SubscriberCIS::GetCurrentStopFromAllData(result);
 
-                if (!stop.DisplayContent.empty()) {
-                    auto&& displayContent = stop.DisplayContent.front();
+            if (stop) {
+                if (!stop->DisplayContent.empty()) {
+                    auto&& displayContent = stop->DisplayContent.front();
                     if (displayContent.LineInformation.LineNumber) {
                         legacyData.line_license_number = displayContent.LineInformation.LineNumber->Value;
                     }
                     legacyData.direction_cis_number = FindCisNumberByRef(displayContent.Destination.DestinationRef.Value, result);
                 }
 
-                legacyData.stop_cis_number = std::stoi(stop.GlobalStopRef.Value);
+                legacyData.stop_cis_number = std::stoi(stop->GlobalStopRef.Value);
 
-                if (tripInfo.LocationState) {
-                    if (*tripInfo.LocationState == LocationStateEnumeration::AtStop) {
+                if (tripInfo->LocationState) {
+                    if (*tripInfo->LocationState == LocationStateEnumeration::AtStop) {
                         legacyData.flags |= AdvDataBasic::FLAG_IS_AT_STOP;
                     }
                 }
 
-                if (stop.ArrivalScheduled) {
-                    legacyData.stop_arrival_time = LocalDateTime::parse(stop.ArrivalScheduled->Value).time.to_minute_of_day();
+                if (stop->ArrivalScheduled) {
+                    legacyData.stop_arrival_time = LocalDateTime::parse(stop->ArrivalScheduled->Value).time.to_minute_of_day();
                 }
                 else {
                     legacyData.stop_arrival_time = -1;
                 }
-                if (stop.DepartureScheduled) {
-                    legacyData.stop_departure_time = LocalDateTime::parse(stop.DepartureScheduled->Value).time.to_minute_of_day();
+                if (stop->DepartureScheduled) {
+                    legacyData.stop_departure_time = LocalDateTime::parse(stop->DepartureScheduled->Value).time.to_minute_of_day();
                 }
                 else {
                     legacyData.stop_departure_time = -1;
                 }
             }
 
-            if (tripInfo.TimetableDelay) {
-                legacyData.delay = tripInfo.TimetableDelay->Value;
+            if (tripInfo->TimetableDelay) {
+                legacyData.delay = tripInfo->TimetableDelay->Value;
             }
         }
 
@@ -120,14 +125,12 @@ namespace lwt {
         AdvDataExtended extData(basicData);
 
         if (!result.TripInformation.empty()) {
-            const TripInformationStructure& tripInfo = result.TripInformation.front();
+            const StopInformationStructure* curStop = SubscriberCIS::GetCurrentStopFromAllData(result);
 
-            if (!result.CurrentStopIndex.ErrorCode && result.CurrentStopIndex.Value < tripInfo.StopSequence.StopPoint.size()) {
-                const StopInformationStructure& curStop = tripInfo.StopSequence.StopPoint[result.CurrentStopIndex.Value];
+            if (curStop) {
+                extData.cur_stop_name = curStop->StopName.empty() ? InternationalTextType_Value_t{} : curStop->StopName.front().Value;
 
-                extData.cur_stop_name = curStop.StopName.empty() ? InternationalTextType_Value_t{} : curStop.StopName.front().Value;
-
-                const DisplayContentStructure* displayContent = FindDisplayContent("Interior", curStop);
+                const DisplayContentStructure* displayContent = SubscriberCIS::FindDisplayContent("Interior", *curStop);
 
                 if (displayContent) {
                     auto&& dest = displayContent->Destination;
@@ -154,58 +157,10 @@ namespace lwt {
 
     uint32_t TripInfoAdvertiser::FindCisNumberByRef(const std::string& ref, const SubscriberCIS::AllData& result)
     {
-        for (auto&& tripInfo : result.TripInformation) {
-            for (auto&& stop : tripInfo.StopSequence.StopPoint) {
-                if (stop.StopRef.Value == ref) {
-                    return std::stoi(stop.GlobalStopRef.Value);
-                }
-            }
+        auto stop = SubscriberCIS::FindStopByRef(ref, result);
+        if (stop) {
+            return std::stoi(stop->GlobalStopRef.Value);
         }
         return 0;
-    }
-
-    size_t TripInfoAdvertiser::FindLastStopIndexByRef(const std::string& ref, const SubscriberCIS::AllData& result)
-    {
-        for (auto&& tripInfo : result.TripInformation) {
-            for (size_t i = tripInfo.StopSequence.StopPoint.size(); i-- > 0;) {
-                auto&& stop = tripInfo.StopSequence.StopPoint[i];
-                if (stop.StopRef.Value == ref) {
-                    return i;
-                }
-            }
-        }
-        return -1;
-    }
-
-    LineType TripInfoAdvertiser::VehicleModeToLineType(VehicleModeEnumeration mode)
-    {
-        switch (mode) {
-        case VehicleModeEnumeration::air:
-            return LineType::LineType_AirportBus;
-        case VehicleModeEnumeration::bus:
-        case VehicleModeEnumeration::coach:
-            return LineType::LineType_GenericBus;
-        case VehicleModeEnumeration::ferry:
-            return LineType::LineType_Ferry;
-        case VehicleModeEnumeration::metro:
-            return LineType::LineType_Metro;
-        case VehicleModeEnumeration::underground:
-        case VehicleModeEnumeration::rail:
-            return LineType::LineType_GenericTrain;
-        case VehicleModeEnumeration::tram:
-            return LineType::LineType_Tram;
-        default:
-            return LineType::LineType_GenericBus;
-        }
-    }
-
-    const DisplayContentStructure* TripInfoAdvertiser::FindDisplayContent(const std::string& displayContentRef, const StopInformationStructure& parent)
-    {
-        for (auto&& displayContent : parent.DisplayContent) {
-            if (displayContent.DisplayContentRef && displayContent.DisplayContentRef->Value == displayContentRef) {
-                return &displayContent;
-            }
-        }
-        return nullptr;
     }
 }

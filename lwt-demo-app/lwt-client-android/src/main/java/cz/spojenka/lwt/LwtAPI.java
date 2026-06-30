@@ -13,4 +13,7 @@ public interface LwtAPI {
 
     @LwtOperation(Operation.AuthenticateServer)
     public CompletableFuture<ServerAuthenticationResponse> authenticateServer(ByteBuffer request);
+
+    @LwtOperation(Operation.GetTripRouteInfo)
+    public CompletableFuture<TripRouteInfo> getTripRouteInfo();
 }
