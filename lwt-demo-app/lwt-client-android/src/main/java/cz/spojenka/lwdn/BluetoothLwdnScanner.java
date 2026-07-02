@@ -62,7 +62,7 @@ public class BluetoothLwdnScanner implements LwdnScanner {
         return adapter.isEnabled();
     }
 
-    @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
+    @SuppressLint("MissingPermission")
     @Override
     public LwdnScan startScan(List<UUID> services, LwdnScanConfig config) {
         LwdnScan scan = new LwdnScan();
@@ -81,27 +81,17 @@ public class BluetoothLwdnScanner implements LwdnScanner {
                         for (var e : result.getScanRecord().getServiceData().entrySet()) {
                             serviceData.put(e.getKey().getUuid(), e.getValue());
                         }
-                        scan.addResult(new LwdnScanResult(new BluetoothLwdnAddress(result.getDevice(), addressPsm), serviceData));
+                        scan.addResult(new LwdnScanResult(new BluetoothLwdnAddress(result.getDevice(), addressPsm), result.getRssi(), serviceData));
                     }
                 }
                 if (scan.getResultCount() >= config.getMaxDevices()) {
-                    stopScan();
+                    scan.cancel();
                 }
             }
 
             @Override
             protected void onTimedOut() {
-                stopScan();
-            }
-
-            @SuppressLint("MissingPermission")
-            private void stopScan() {
-                try {
-                    scanner.stopScan(this);
-                    scan.markFinished();
-                } catch (SecurityException ex) {
-                    scan.markFailed(new LwdnScanException(ScanErrorCode.NOT_PERMITTED, ex));
-                }
+                scan.cancel();
             }
 
             @Override
@@ -118,6 +108,14 @@ public class BluetoothLwdnScanner implements LwdnScanner {
                 }));
             }
         };
+        scan.setCancellationHandler(() -> {
+            try {
+                scanner.stopScan(callback);
+                scan.markFinished();
+            } catch (SecurityException ex) {
+                scan.markFailed(new LwdnScanException(ScanErrorCode.NOT_PERMITTED, ex));
+            }
+        });
 
         try {
             ScanSettings.Builder settings = new ScanSettings.Builder()

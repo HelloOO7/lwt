@@ -5,6 +5,7 @@ import java.util.UUID;
 
 public record LwdnScanResult(
         LwdnAddress deviceAddress,
+        int rssi,
         Map<UUID, byte[]> serviceData
 ) {
 }

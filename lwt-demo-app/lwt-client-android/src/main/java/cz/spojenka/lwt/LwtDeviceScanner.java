@@ -58,69 +58,11 @@ public class LwtDeviceScanner {
             } else {
                 uuid = LwtServiceConstants.serviceUUIDForDeviceType(deviceType);
             }
-            serviceUUIDs.add(make32BitUUID(uuid));
+            serviceUUIDs.add(LwtScan.make32BitUUID(uuid));
         }
 
         LwdnScan lwdnScan = lwdnScanner.startScan(serviceUUIDs, config);
-        LwtScan scan = new LwtScan();
 
-        lwdnScan.addOnResultListener(new LwdnScan.OnResultListener() {
-            @Override
-            public void onResult(LwdnScan lwdnScan, LwdnScanResult result) {
-                LwtDevice dev = createDeviceFromResult(result);
-                if (dev != null) {
-                    scan.addResult(dev);
-                }
-            }
-
-            @Override
-            public void onFailure(LwdnScan lwdnScan, LwdnScanException e) {
-                // ignore - handle in onFinishedListener
-            }
-        });
-        lwdnScan.addOnFinishedListener(new LwdnScan.OnFinishedListener() {
-            @Override
-            public void onFinished(LwdnScan lwdnScan) {
-                scan.markFinished();
-            }
-
-            @Override
-            public void onFailure(LwdnScan lwdnScan, LwdnScanException e) {
-                scan.markFailed(e);
-            }
-        });
-
-        return scan;
-    }
-
-    private LwtDevice createDeviceFromResult(LwdnScanResult result) {
-        byte[] vehicleData = getVehicleResultData(result);
-        if (vehicleData != null) {
-            try {
-                TripAdvertisementData advData;
-                if (TripAdvertisementDataExt.isPresent(vehicleData)) {
-                    advData = TripAdvertisementDataExt.unwrap(vehicleData);
-                } else {
-                    advData = TripAdvertisementData.unwrap(vehicleData);
-                }
-                return new LwtDevice.Vehicle(result.deviceAddress(), advData);
-            } catch (IOException e) {
-                Log.e(TAG, "Failed to parse vehicle advertisement data", e);
-            }
-        }
-        return null;
-    }
-
-    private byte[] getVehicleResultData(LwdnScanResult result) {
-        byte[] data = result.serviceData().get(make32BitUUID(LwtServiceConstants.BLE_SERVICE_UUID_VEHICLE));
-        if (data == null) {
-            data = result.serviceData().get(make32BitUUID(LwtServiceConstants.BLE_SERVICE_UUID_VEHICLE_EXTENDED));
-        }
-        return data;
-    }
-
-    private static UUID make32BitUUID(int value) {
-        // https://stackoverflow.com/questions/13964342/android-how-do-bluetooth-uuids-work
-        return new UUID((Integer.toUnsignedLong(value) << 32) | 0x1000, 0x800000805f9b34fbL);
+        return new LwtScan(lwdnScan);
     }
 }

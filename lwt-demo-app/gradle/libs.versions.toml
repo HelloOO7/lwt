@@ -1,12 +1,13 @@
 [versions]
 agp = "9.2.1"
 junit = "4.13.2"
-junitVersion = "1.1.5"
-espressoCore = "3.5.1"
-appcompat = "1.6.1"
-material = "1.10.0"
+junitVersion = "1.3.0"
+espressoCore = "3.7.0"
+appcompat = "1.7.1"
+material = "1.14.0"
 flatbuffers = "25.2.10"
 tlsChannel = "1.0.0"
+swipeRefreshLayout = "1.2.0"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -16,6 +17,7 @@ appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "a
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 flatbuffers-java = { group = "com.google.flatbuffers", name = "flatbuffers-java", version.ref = "flatbuffers" }
 tlsChannel = { group = "com.github.marianobarrios", name = "tls-channel", version.ref = "tlsChannel" }
+swipeRefreshLayout = { group = "androidx.swiperefreshlayout", name = "swiperefreshlayout", version.ref = "swipeRefreshLayout" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

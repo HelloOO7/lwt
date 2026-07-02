@@ -34,7 +34,6 @@ public class HybridLwdnScanner implements LwdnScanner {
         return isBluetoothScannerAvailable();
     }
 
-    @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     @Override
     public LwdnScan startScan(List<UUID> services, LwdnScanConfig config) {
         if (isBluetoothScannerAvailable()) {

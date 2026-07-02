@@ -26,15 +26,21 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+    buildFeatures {
+        viewBinding = true
+        buildConfig = true
+        resValues = true
+    }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 }
 
 dependencies {
     implementation libs.appcompat
     implementation libs.material
+    implementation libs.swipeRefreshLayout
     implementation libs.flatbuffers.java
     implementation project(":lwt-client-android")
     testImplementation libs.junit

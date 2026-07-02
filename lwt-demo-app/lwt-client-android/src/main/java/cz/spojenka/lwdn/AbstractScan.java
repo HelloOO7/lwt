@@ -3,10 +3,11 @@ package cz.spojenka.lwdn;
 import java.util.ArrayList;
 import java.util.List;
 
-public class AbstractScan<R, E extends Exception, THIS extends AbstractScan<R, E, THIS>> {
+public abstract class AbstractScan<R, E extends Exception, THIS extends AbstractScan<R, E, THIS>> {
 
     private final List<R> results = new ArrayList<>();
     private boolean isFinished = false;
+    private boolean wasCancelled = false;
 
     private final List<OnResultListener<THIS, R, E>> resultListeners = new ArrayList<>();
     private final List<OnFinishedListener<THIS, R, E>> finishedListeners = new ArrayList<>();
@@ -37,6 +38,10 @@ public class AbstractScan<R, E extends Exception, THIS extends AbstractScan<R, E
     }
 
     protected synchronized void addResult(R result) {
+        if (isFinished()) {
+            // not accepting any more results
+            return;
+        }
         results.add(result);
         for (var listener : resultListeners) {
             listener.onResult(getThis(), result);
@@ -71,6 +76,18 @@ public class AbstractScan<R, E extends Exception, THIS extends AbstractScan<R, E
     public boolean isFinished() {
         return isFinished;
     }
+
+    public boolean wasCancelled() {
+        return wasCancelled;
+    }
+
+    public synchronized void cancel() {
+        wasCancelled = true;
+        onCancel();
+        markFinished();
+    }
+
+    protected abstract void onCancel();
 
     protected static interface OnResultListener<S extends AbstractScan<R, E, S>, R, E extends Exception> {
 

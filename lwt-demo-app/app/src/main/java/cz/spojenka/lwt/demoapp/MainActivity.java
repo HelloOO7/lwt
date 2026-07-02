@@ -2,12 +2,7 @@ package cz.spojenka.lwt.demoapp;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothManager;
-import android.bluetooth.le.ScanCallback;
-import android.bluetooth.le.ScanFilter;
-import android.bluetooth.le.ScanResult;
-import android.bluetooth.le.ScanSettings;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.wifi.aware.AttachCallback;
 import android.net.wifi.aware.WifiAwareManager;
@@ -15,36 +10,28 @@ import android.net.wifi.aware.WifiAwareSession;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.ParcelUuid;
 import android.util.Log;
 import android.widget.Button;
 import android.widget.Toast;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.util.HexFormat;
-import java.util.List;
-import java.util.UUID;
 
 import javax.net.ssl.SSLContext;
 
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
-import cz.spojenka.lwdn.LwdnAddress;
+import cz.spojenka.android.ui.activity.BaseActivity;
 import cz.spojenka.lwdn.LwdnScanConfig;
 import cz.spojenka.lwdn.LwdnScanException;
 import cz.spojenka.lwt.*;
-import cz.spojenka.lwt.util.BLEScanRecordUtil;
 import cz.spojenka.lwt.util.TLSTrustManager;
 import cz.spojenka.lwtp.LwtpTLSConfig;
 import cz.spojenka.lwtp.LwtpTLSPolicy;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends BaseActivity {
 
     private static final String TAG = "LWTDemoApp";
 
@@ -55,6 +42,7 @@ public class MainActivity extends AppCompatActivity {
 
     private Button btnRunTest;
     private Button btnRunTlsTest;
+    private Button btnShowDeviceList;
 
     private LwtDevice foundDevice;
 
@@ -65,6 +53,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         btnRunTest = findViewById(R.id.btnTest);
         btnRunTlsTest = findViewById(R.id.btnTestTls);
+        btnShowDeviceList = findViewById(R.id.btnShowDeviceList);
         setButtonsEnabled(false);
         sslContext = createSSLContext();
         lwtScanner = new LwtDeviceScanner(this);
@@ -93,6 +82,8 @@ public class MainActivity extends AppCompatActivity {
         btnRunTest.setOnClickListener(v -> checkTrustAndRunTest());
         btnRunTlsTest.setOnClickListener(v -> runTestOverTLS());
         testWifiAware();
+
+        btnShowDeviceList.setOnClickListener(v -> startActivity(new Intent(this, DeviceListActivity.class)));
     }
 
     private boolean hasBluetoothScanPermission() {

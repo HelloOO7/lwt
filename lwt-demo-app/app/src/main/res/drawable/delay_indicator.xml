@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval"
+    android:tint="#43A047"
+    android:tintMode="multiply">
+
+    <size
+        android:width="12dp"
+        android:height="12dp" />
+
+    <gradient
+        android:type="radial"
+        android:gradientRadius="5dp"
+        android:startColor="#FFFFFF"
+        android:endColor="#CCCCCC" />
+
+</shape>

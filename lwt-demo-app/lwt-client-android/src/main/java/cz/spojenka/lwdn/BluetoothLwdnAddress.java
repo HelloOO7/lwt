@@ -2,6 +2,8 @@ package cz.spojenka.lwdn;
 
 import android.bluetooth.BluetoothDevice;
 
+import java.util.Objects;
+
 import androidx.annotation.NonNull;
 
 public final class BluetoothLwdnAddress implements LwdnAddress {
@@ -39,5 +41,17 @@ public final class BluetoothLwdnAddress implements LwdnAddress {
                 "device=" + device +
                 ", psm=" + psm +
                 '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == this) return true;
+        if (!(o instanceof BluetoothLwdnAddress that)) return false;
+        return psm == that.psm && device.equals(that.device);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(device, psm);
     }
 }

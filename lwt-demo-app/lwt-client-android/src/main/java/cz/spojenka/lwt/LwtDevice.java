@@ -2,17 +2,22 @@ package cz.spojenka.lwt;
 
 import androidx.annotation.NonNull;
 import cz.spojenka.lwdn.LwdnAddress;
+import cz.spojenka.lwdn.LwdnScanResult;
 
 public sealed abstract class LwtDevice permits LwtDevice.Vehicle {
 
-    private final LwdnAddress address;
+    private final LwdnScanResult scanResult;
 
-    public LwtDevice(LwdnAddress address) {
-        this.address = address;
+    public LwtDevice(LwdnScanResult scanResult) {
+        this.scanResult = scanResult;
     }
 
     public LwdnAddress getAddress() {
-        return address;
+        return scanResult.deviceAddress();
+    }
+
+    public LwdnScanResult getScanResult() {
+        return scanResult;
     }
 
     public abstract LwtDeviceType getType();
@@ -21,8 +26,8 @@ public sealed abstract class LwtDevice permits LwtDevice.Vehicle {
 
         private final TripAdvertisementData advData;
 
-        public Vehicle(LwdnAddress address, TripAdvertisementData advData) {
-            super(address);
+        public Vehicle(LwdnScanResult scanResult, TripAdvertisementData advData) {
+            super(scanResult);
             this.advData = advData;
         }
 
@@ -39,7 +44,7 @@ public sealed abstract class LwtDevice permits LwtDevice.Vehicle {
         @Override
         public String toString() {
             return "Vehicle{" +
-                    "address=" + getAddress() +
+                    "scanResult=" + getScanResult() +
                     ", advData=" + getAdvData() +
                     "} " + super.toString();
         }
