@@ -2,7 +2,6 @@
 
 #include <string>
 #include "ISO8601.h"
-#include "publisher_ssi_generated.h"
 #include <esp_log.h>
 #include <cstdio>
 #include "FNVHash.h"
@@ -24,7 +23,7 @@ namespace lwt {
         m_CISSubscriber.RemoveObserver(*this);
     }
 
-    void TripInfoAdvertiser::OnDataChanged(const SubscriberCIS::AllData* result)
+    void TripInfoAdvertiser::OnChanged(const SubscriberCIS::AllData* result)
     {
         if (!result) {
             for (auto* advertiser : m_Advertisers) {

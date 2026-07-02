@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include "esp_heap_caps.h"
 
 template <typename T>

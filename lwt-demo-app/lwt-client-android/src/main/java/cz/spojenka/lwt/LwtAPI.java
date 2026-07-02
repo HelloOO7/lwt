@@ -16,4 +16,7 @@ public interface LwtAPI {
 
     @LwtOperation(Operation.GetTripRouteInfo)
     public CompletableFuture<TripRouteInfo> getTripRouteInfo();
+
+    @LwtOperation(Operation.GetTicketValidationInfo)
+    public CompletableFuture<TicketValidationInfo> getTicketValidationInfo();
 }

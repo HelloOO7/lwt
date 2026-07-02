@@ -24,6 +24,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
@@ -171,6 +173,12 @@ public class MainActivity extends AppCompatActivity {
         }
         client.getTripRouteInfo(CommType.ENQUEUE).thenAccept(tripRouteInfo -> {
             Log.i(TAG, "Trip route info received: " + routeInfoToString(tripRouteInfo));
+        }).exceptionally(ex -> {
+            Log.e(TAG, "LWT operation failed", ex);
+            return null;
+        });
+        client.getTicketValidationInfo(CommType.ENQUEUE).thenAccept(tvi -> {
+            Log.i(TAG, "Ticket validation info received: zone " + tvi.tariffZones() + ", act. time=" + Instant.ofEpochSecond(tvi.scheduledActivationTime()));
         }).exceptionally(ex -> {
             Log.e(TAG, "LWT operation failed", ex);
             return null;

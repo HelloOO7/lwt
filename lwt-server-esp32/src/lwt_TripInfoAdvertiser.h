@@ -10,7 +10,7 @@
 
 namespace lwt {
 
-    class TripInfoAdvertiser : public vdv301::SubscriberObserver<vdv301::SubscriberCIS::AllData>
+    class TripInfoAdvertiser : Observer<vdv301::SubscriberCIS::AllData>
     {
     private:
         vdv301::SubscriberCIS& m_CISSubscriber;
@@ -23,7 +23,7 @@ namespace lwt {
         TripInfoAdvertiser(vdv301::SubscriberCIS& cisSubscriber, std::initializer_list<lwdn::Advertiser*> advertisers);
         ~TripInfoAdvertiser();
 
-        virtual void OnDataChanged(const vdv301::SubscriberCIS::AllData* result) override;
+        virtual void OnChanged(const vdv301::SubscriberCIS::AllData* result) override;
 
     private:
         static AdvDataBasic CreateBasicAdvData(const vdv301::SubscriberCIS::AllData& result);

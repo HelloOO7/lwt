@@ -4,15 +4,28 @@
 #include <span>
 #include <string>
 
+inline uint32_t FNV1aHashInit() {
+    return 2166136261u; // FNV offset basis
+}
+
+template<typename ByteT>
+inline uint32_t FNV1aHashUpdate(uint32_t hash, ByteT byte) {
+    return (hash ^ static_cast<uint8_t>(byte)) * 16777619u; // FNV prime
+}
+
+template<typename ByteT>
+inline uint32_t FNV1aHashUpdate(uint32_t hash, const std::span<const ByteT>& data) {
+    for (ByteT byte : data) {
+        hash = FNV1aHashUpdate(hash, byte);
+    }
+    return hash;
+}
+
 template<typename ByteT>
 inline uint32_t FNV1aHash(const std::span<const ByteT>& data) {
-    constexpr uint32_t FNV_OFFSET_BASIS = 2166136261u;
-    constexpr uint32_t FNV_PRIME = 16777619u;
-
-    uint32_t hash = FNV_OFFSET_BASIS;
+    uint32_t hash = FNV1aHashInit();
     for (ByteT byte : data) {
-        hash ^= static_cast<uint8_t>(byte);
-        hash *= FNV_PRIME;
+        hash = FNV1aHashUpdate(hash, static_cast<uint8_t>(byte));
     }
     return hash;
 }

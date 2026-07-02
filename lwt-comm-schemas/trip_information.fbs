@@ -24,7 +24,8 @@ enum LineType : ubyte {
 }
 
 table StopReference {
-    /// Sequence number of the stop within the route. This matches StopInformationStructure.StopIndex in VDV 301.
+    /// Sequence number of the stop within the route. This matches StopInformationStructure.StopIndex in VDV 301,
+    /// minus one to account for 1-based -> 0-based indexing.
     sequence_id: ushort;
     /// Unique and stable stop identifier as transmitted by VDV 301 services.
     /// In V2.3CZ1.0, this is the numeric ID from the Ministry of Transport's CIS JŘ station register,
@@ -33,7 +34,7 @@ table StopReference {
     global_ref_id: uint;
     /// Name of the stop as seen in vehicle information systems. This should match what is seen on
     /// interior LCD screens for maximum passenger convenience.
-    name: string;
+    name: string (required);
 }
 
 table LineInfo {
@@ -44,10 +45,10 @@ table LineInfo {
     /// User-friendly line number. Is a string to support substitute transport (X26) and trains (Os 8854).
     /// It may contain more arbitrarily separated numbers if a line number change is going to take place.
     /// It can also be styled using basic inline HTML.
-    name: string;
+    name: string (required);
     /// Headsign aka the stop name shown in big caps on interior displays. The stop name inside may be adjusted
     /// and enriched with icons/pictograms.
-    headsign: StopReference;
+    headsign: StopReference (required);
 }
 
 table TripInfo {
@@ -78,7 +79,7 @@ table TripStateInfo {
 
 table TripStopInfo {
     /// ID and name of the stop.
-    stop_ref: StopReference;
+    stop_ref: StopReference (required);
     /// Time of arrival at the stop (scheduled, absolute). Can be -1 if not present.
     /// The value is an Unix timestamp in the time zone of the stop (number of seconds since 1. 1. 1970).
     arr_time: long = -1;
@@ -102,5 +103,5 @@ table TripRouteInfo {
     /// Trip info and state.
     trip: TripStateInfo (required);    
     /// All stops of the trip, including already passed.
-    stops: [TripStopInfo];
+    stops: [TripStopInfo] (required);
 }

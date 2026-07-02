@@ -5,6 +5,7 @@
 #include <regex>
 #include "NewAndDelete.h"
 #include "FNVHash.h"
+#include "vdv_Utility.h"
 
 namespace vdv301
 {
@@ -25,25 +26,20 @@ namespace vdv301
 
     }
 
-    void SubscriberCIS::ObserveAllData(SubscriberObserver<AllData>& observer)
+    void SubscriberCIS::ObserveAllData(Observer<AllData>& observer)
     {
-        AddObserver<Operation, AllData>(Operation::GetAllData, observer);
+        Observable<AllData>::AddObserver(observer);
     }
 
-    void SubscriberCIS::RemoveObserver(SubscriberObserver<AllData>& observer) {
-        SubscriberBase::RemoveObserver<Operation, AllData>(Operation::GetAllData, observer);
+    void SubscriberCIS::RemoveObserver(Observer<AllData>& observer) {
+        Observable<AllData>::RemoveObserver(observer);
     }
 
     static std::regex SUBMODE_FIX(R"(<[A-Za-z]+Submode>\s*[A-Za-z]+\s*</[A-Za-z]+Submode>)");
-    static std::regex TIMESTAMP_RE(R"(<TimeStamp>\s*<Value>([^<]+)</Value>\s*</TimeStamp>)");
 
     psram_string FixupXml(const psram_string& input) {
         psram_string output = std::regex_replace(input, SUBMODE_FIX, "");
         return output;
-    }
-
-    psram_string RemoveTimestampFromXml(const psram_string& input) {
-        return std::regex_replace(input, TIMESTAMP_RE, "<TimeStamp><Value></Value></TimeStamp>");
     }
 
     void SubscriberCIS::OnOperationResult(const OperationResult& result)
@@ -53,7 +49,7 @@ namespace vdv301
             std::cout << "Received SubscribeAllData result" << std::endl;
             try {
                 ssize_t freeBefore = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
-                uint32_t resultHash = FNV1aHash(RemoveTimestampFromXml(result.GetResult()));
+                uint32_t resultHash = HashResponseWithoutTimestamp(result.GetResult());
                 if (resultHash == m_LastAllDataHash) {
                     std::cout << "Received data is identical to last received data, ignoring" << std::endl;
                     return;
@@ -70,10 +66,10 @@ namespace vdv301
                 if (m_LastAllData.AllData) {
                     std::cout << "Timestamp: " << m_LastAllData.AllData->TimeStamp.Value << std::endl;
 
-                    NotifyObservers(Operation::GetAllData, &*m_LastAllData.AllData);
+                    Observable<AllData>::NotifyObservers(&*m_LastAllData.AllData);
                 }
                 else {
-                    NotifyObservers(Operation::GetAllData, (AllData*) nullptr);
+                    Observable<AllData>::InvalidateObservers();
                 }
             }
             catch (const std::exception& e) {
@@ -134,7 +130,7 @@ namespace vdv301
         if (!tripInfo) {
             return nullptr;
         }
-        auto index = allData.CurrentStopIndex.Value;
+        auto index = ConvertStopIndex(allData.CurrentStopIndex);
         if (index < 0 || index >= tripInfo->StopSequence.StopPoint.size()) {
             return nullptr;
         }
@@ -173,5 +169,13 @@ namespace vdv301
             }
         }
         return nullptr;
+    }
+
+    ssize_t SubscriberCIS::ConvertStopIndex(IBIS_IP_int stopIndex)
+    {
+        if (stopIndex.Value <= 0) {
+            return -1;
+        }
+        return static_cast<ssize_t>(stopIndex.Value - 1); // Convert from 1-based to 0-based index
     }
 }

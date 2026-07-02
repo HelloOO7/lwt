@@ -3,11 +3,12 @@
 #include "vdv_SubscriberHttp.h"
 #include "EnumBitflags.h"
 #include "IBIS_IP_CustomerInformationService_V2_3CZ1_0.hpp"
+#include "Observable.h"
 
 namespace vdv301
 {
 
-    class SubscriberCIS : public SubscriberHttp
+    class SubscriberCIS : public SubscriberHttp, private Observable<IBIS_IP_CustomerInformationService_V2_3CZ1_0::CustomerInformationService_AllData>
     {
     private:
         using AllDataResponse = IBIS_IP_CustomerInformationService_V2_3CZ1_0::CustomerInformationService_GetAllDataResponseStructure;
@@ -33,8 +34,8 @@ namespace vdv301
     public:
         SubscriberCIS(ServiceDiscovery& sd, Operation subscribedOps = (Operation)0);
 
-        void ObserveAllData(SubscriberObserver<AllData>& observer);
-        void RemoveObserver(SubscriberObserver<AllData>& observer);
+        void ObserveAllData(Observer<AllData>& observer);
+        void RemoveObserver(Observer<AllData>& observer);
 
         static bool IsTripRefPresent(const IBIS_IP_CustomerInformationService_V2_3CZ1_0::TripInformationStructure& tripInfo);
         static const IBIS_IP_CustomerInformationService_V2_3CZ1_0::TripInformationStructure* GetTripInformationFromAllData(const AllData& allData);
@@ -44,6 +45,8 @@ namespace vdv301
         static const IBIS_IP_CustomerInformationService_V2_3CZ1_0::DisplayContentStructure* FindDisplayContent(
             const std::string& displayContentRef, const IBIS_IP_CustomerInformationService_V2_3CZ1_0::StopInformationStructure& parent
         );
+        
+        static ssize_t ConvertStopIndex(IBIS_IP_CustomerInformationService_V2_3CZ1_0::IBIS_IP_int stopIndex);
 
     protected:
         void OnOperationResult(const OperationResult& result) override;

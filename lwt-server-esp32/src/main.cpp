@@ -18,6 +18,7 @@
 #include "lwt_PingService.h"
 #include "lwt_ServerAuthenticationService.h"
 #include "lwt_TripInformationService.h"
+#include "lwt_TicketValidationService.h"
 #include "lwtp_StartTLSInterceptor.h"
 #include "lwt_AdvData.h"
 #include "lwdn_BleAdvertiser.h"
@@ -48,6 +49,7 @@ private:
     lwt::PingService m_PingService;
     lwt::ServerAuthenticationService m_ServerAuthService;
     lwt::TripInformationService m_TripInfoService;
+    lwt::TicketValidationService m_TicketService;
 
     lwdn::BleAdvertiser m_BLETripAdvertiserLegacy;
     lwdn::BleAdvertiser m_BLETripAdvertiserExt;
@@ -70,6 +72,7 @@ public:
         m_AppServer(m_ServiceRegistry),
         m_ServerAuthService(TLS_DEVICE_CRT_START, m_TlsCredentials.device_key, m_TlsCredentials.ctr_drbg),
         m_TripInfoService(m_CISSubscriber),
+        m_TicketService("PID", m_TripInfoService), //TVS not yet implemented
         m_BLETripAdvertiserLegacy(0, BLE_SERVICE_UUID_VEHICLE, lwdn::BleAdvertiser::Flags::INCLUDE_DEVICE_NAME | lwdn::BleAdvertiser::Flags::USE_LEGACY_ADVERTISING),
         m_BLETripAdvertiserExt(1, BLE_SERVICE_UUID_VEHICLE_EXTENDED, lwdn::BleAdvertiser::Flags::INCLUDE_DEVICE_NAME),
         m_TripInfoAdvertiser(m_CISSubscriber, { &m_BLETripAdvertiserLegacy, &m_BLETripAdvertiserExt })
@@ -78,7 +81,7 @@ public:
 
         setup_tls_config(m_TlsCredentials, m_MbedTlsConfig);
 
-        m_ServiceRegistry.RegisterServices(m_PingService, m_ServerAuthService, m_TripInfoService);
+        m_ServiceRegistry.RegisterServices(m_PingService, m_ServerAuthService, m_TripInfoService, m_TicketService);
 
         m_AppServer.AddInterceptor(std::make_unique<lwtp::StartTLSInterceptor>(m_MbedTlsConfig));
         m_AppServer.AddSocket(&m_BLEServer);
