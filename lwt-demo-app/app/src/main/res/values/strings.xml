@@ -6,4 +6,15 @@
     <string name="delay_minutes_format">%1$d min</string>
     <string name="vehicle_at_stop_prefix">"at "</string>
     <string name="vehicle_next_stop_prefix">"next stop "</string>
+    <string name="zone_selection_confirm">Confirm selection</string>
+    <string name="zone_selection_not_applicable">Not applicable</string>
+    <string name="warning">Warning</string>
+    <string name="zone_selection_warning_format">The ticket entitles you to travel in up to %1$d %2$s in total. Are you sure you wish to activate it just for the %3$s %4$s?</string>
+    <string name="zone_selection_pid_title_prague">Prague</string>
+    <string name="zone_selection_pid_title_outer">Region/Outer zones</string>
+    <string name="zone_selection_pid_note_outer">Zones 10 and onwards are outside of the Central Bohemian region.</string>
+    <string name="zone_selection_pid_note_prague">The P zone counts as two regular tariff zones.</string>
+    <string name="zone_selection_pid_prompt">Choose zones</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
 </resources>

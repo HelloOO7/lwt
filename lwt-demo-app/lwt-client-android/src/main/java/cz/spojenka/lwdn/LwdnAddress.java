@@ -1,6 +1,8 @@
 package cz.spojenka.lwdn;
 
-public sealed interface LwdnAddress permits BluetoothLwdnAddress {
+import android.os.Parcelable;
+
+public sealed interface LwdnAddress extends Parcelable permits BluetoothLwdnAddress {
 
     public String getLocalHostName();
     public int getPortNumber();

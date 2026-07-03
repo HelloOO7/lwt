@@ -3,8 +3,10 @@ package cz.spojenka.lwt;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
 public class TripAdvertisementDataExt extends TripAdvertisementData {
@@ -26,6 +28,16 @@ public class TripAdvertisementDataExt extends TripAdvertisementData {
         headsign = readString(dis);
     }
 
+    @Override
+    public void write(OutputStream out) throws IOException {
+        super.write(out);
+        DataOutputStream dos = new DataOutputStream(out);
+        dos.writeShort(DATA_MARK);
+        writeString(dos, currentStopName);
+        writeString(dos, lineName);
+        writeString(dos, headsign);
+    }
+
     public static boolean isPresent(byte[] data) {
         if (data.length >= TripAdvertisementData.BYTES + 2) {
             int off = TripAdvertisementData.BYTES;
@@ -44,7 +56,12 @@ public class TripAdvertisementDataExt extends TripAdvertisementData {
             }
             out.write(b);
         }
-        return out.toString(StandardCharsets.UTF_8);
+        return out.toString("UTF-8"); //Charset method requires newer API level
+    }
+
+    private static void writeString(OutputStream out, String str) throws IOException {
+        out.write(str.getBytes(StandardCharsets.UTF_8));
+        out.write(0); // null terminator
     }
 
     public String getCurrentStopName() {

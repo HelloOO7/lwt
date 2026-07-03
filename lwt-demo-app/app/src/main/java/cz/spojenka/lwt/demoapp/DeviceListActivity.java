@@ -17,11 +17,13 @@ import java.util.List;
 import androidx.annotation.ColorRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.IntentCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.widget.TextViewCompat;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.ConcatAdapter;
+import cz.spojenka.android.polyfills.BundleCompat;
 import cz.spojenka.android.ui.activity.BaseActivity;
 import cz.spojenka.android.ui.helpers.AdapterListObserver;
 import cz.spojenka.android.ui.helpers.BasicListAdapter;
@@ -29,6 +31,7 @@ import cz.spojenka.android.ui.helpers.SingleViewAdapter;
 import cz.spojenka.android.ui.helpers.VerticalSpaceItemDecoration;
 import cz.spojenka.android.util.ViewUtils;
 import cz.spojenka.lwt.LwtDevice;
+import cz.spojenka.lwt.LwtDeviceType;
 import cz.spojenka.lwt.TripAdvertisementData;
 import cz.spojenka.lwt.TripAdvertisementDataExt;
 import cz.spojenka.lwt.demoapp.databinding.ActivityDeviceListBinding;
@@ -37,6 +40,8 @@ import cz.spojenka.lwt.demoapp.databinding.DeviceListLoadingBinding;
 import cz.spojenka.lwt.util.TextMarkupConverter;
 
 public class DeviceListActivity extends BaseActivity {
+
+    public static final String EXTRA_DEVICE_TYPE_FILTER = DeviceListActivity.class.getName() + ".EXTRA_DEVICE_TYPE_FILTER";
 
     private static final int VIEW_TYPE_VEHICLE = 1;
 
@@ -52,6 +57,10 @@ public class DeviceListActivity extends BaseActivity {
         binding = ActivityDeviceListBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         viewModel = new ViewModelProvider(this).get(DeviceListViewModel.class);
+        if (getIntent().getExtras() != null) {
+            viewModel.setDeviceTypes(BundleCompat.getParcelableArray(getIntent().getExtras(), EXTRA_DEVICE_TYPE_FILTER, LwtDeviceType.class));
+        }
+        viewModel.startScan();
         iconFont = getResources().getFont(R.font.ropid_piktogramy);
         markupConverter = new TextMarkupConverter(iconFont);
 
@@ -67,6 +76,11 @@ public class DeviceListActivity extends BaseActivity {
             public int getItemViewType(int position) {
                 // currently only vehicles
                 return VIEW_TYPE_VEHICLE;
+            }
+
+            @Override
+            protected View.OnClickListener onBindItemClickListener(LwtDevice item) {
+                return v -> onDeviceSelected(item);
             }
         };
         new AdapterListObserver<>(itemAdapter) {
@@ -126,6 +140,10 @@ public class DeviceListActivity extends BaseActivity {
             );
             return insets;
         });
+    }
+
+    protected void onDeviceSelected(LwtDevice device) {
+
     }
 
     @Override

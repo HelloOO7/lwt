@@ -1,10 +1,12 @@
 package cz.spojenka.lwdn;
 
 import android.bluetooth.BluetoothDevice;
+import android.os.Parcel;
 
 import java.util.Objects;
 
 import androidx.annotation.NonNull;
+import androidx.core.os.ParcelCompat;
 
 public final class BluetoothLwdnAddress implements LwdnAddress {
 
@@ -53,5 +55,31 @@ public final class BluetoothLwdnAddress implements LwdnAddress {
     @Override
     public int hashCode() {
         return Objects.hash(device, psm);
+    }
+
+    static final Creator<BluetoothLwdnAddress> CREATOR = new Creator<>() {
+        @Override
+        public BluetoothLwdnAddress createFromParcel(Parcel in) {
+            return new BluetoothLwdnAddress(
+                    ParcelCompat.readParcelable(in, BluetoothDevice.class.getClassLoader(), BluetoothDevice.class),
+                    in.readInt()
+            );
+        }
+
+        @Override
+        public BluetoothLwdnAddress[] newArray(int size) {
+            return new BluetoothLwdnAddress[size];
+        }
+    };
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    @Override
+    public void writeToParcel(@NonNull Parcel dest, int flags) {
+        dest.writeParcelable(device, flags);
+        dest.writeInt(psm);
     }
 }

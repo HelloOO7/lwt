@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import androidx.annotation.Nullable;
 import cz.spojenka.lwdn.HybridLwdnScanner;
 import cz.spojenka.lwdn.LwdnScan;
 import cz.spojenka.lwdn.LwdnScanConfig;
@@ -44,7 +45,7 @@ public class LwtDeviceScanner {
         return startScan(List.of(), config);
     }
 
-    public LwtScan startScan(List<LwtDeviceType> deviceTypes, LwdnScanConfig config) {
+    public LwtScan startScan(@Nullable List<LwtDeviceType> deviceTypes, LwdnScanConfig config) {
         List<UUID> serviceUUIDs = new ArrayList<>();
 
         if (deviceTypes == null || deviceTypes.isEmpty()) {

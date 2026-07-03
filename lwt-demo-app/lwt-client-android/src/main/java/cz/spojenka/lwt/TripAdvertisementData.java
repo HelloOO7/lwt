@@ -1,9 +1,12 @@
 package cz.spojenka.lwt;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.time.LocalTime;
 
 import androidx.annotation.NonNull;
@@ -38,6 +41,18 @@ public class TripAdvertisementData {
         delay = timeUnion >> 22;
         flags = dis.readUnsignedByte(); // +0x13
         // total 0x14 = 20 bytes
+    }
+
+    public void write(OutputStream out) throws IOException {
+        DataOutputStream dos = new DataOutputStream(out);
+        dos.writeByte(lineType);
+        writeInt24(dos, lineLicenseNumber);
+        writeInt24(dos, tripNumber);
+        dos.writeInt(directionCisNumber);
+        dos.writeInt(stopCisNumber);
+        int timeUnion = (delay << 22) | (stopDepTime.toSecondOfDay() / 60 << 11) | (stopArrTime.toSecondOfDay() / 60);
+        dos.writeInt(timeUnion);
+        dos.writeByte(flags);
     }
 
     public int getLineType() {
@@ -116,6 +131,13 @@ public class TripAdvertisementData {
         }
     }
 
+    public static byte[] wrap(TripAdvertisementData data) throws IOException {
+        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            data.write(out);
+            return out.toByteArray();
+        }
+    }
+
     private LocalTime convertTime(int bits) {
         return LocalTime.ofSecondOfDay((bits & 2047) * 60);
     }
@@ -125,6 +147,12 @@ public class TripAdvertisementData {
         int b2 = dis.readUnsignedByte();
         int b3 = dis.readUnsignedByte();
         return (b1 << 16) | (b2 << 8) | b3;
+    }
+
+    private void writeInt24(DataOutputStream dos, int value) throws IOException {
+        dos.writeByte((value >> 16) & 0xFF);
+        dos.writeByte((value >> 8) & 0xFF);
+        dos.writeByte(value & 0xFF);
     }
 
     @NonNull

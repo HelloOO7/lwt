@@ -16,12 +16,14 @@ import cz.spojenka.lwdn.LwdnScanConfig;
 import cz.spojenka.lwdn.LwdnScanException;
 import cz.spojenka.lwt.LwtDevice;
 import cz.spojenka.lwt.LwtDeviceScanner;
+import cz.spojenka.lwt.LwtDeviceType;
 import cz.spojenka.lwt.LwtScan;
 
 public class DeviceListViewModel extends AndroidViewModel {
 
     private final LwtDeviceScanner scanner;
 
+    private List<LwtDeviceType> deviceTypes;
     private LwtScan currentScan;
 
     private final LiveList<LwtDevice> deviceResults = new LiveList<>();
@@ -31,7 +33,18 @@ public class DeviceListViewModel extends AndroidViewModel {
     public DeviceListViewModel(@NonNull Application application) {
         super(application);
         scanner = new LwtDeviceScanner(application);
-        reload();
+    }
+
+    public void setDeviceTypes(List<LwtDeviceType> deviceTypes) {
+        this.deviceTypes = deviceTypes;
+    }
+
+    public void setDeviceTypes(LwtDeviceType[] deviceTypes) {
+        if (deviceTypes != null && deviceTypes.length > 0) {
+            this.deviceTypes = List.of(deviceTypes);
+        } else {
+            this.deviceTypes = null;
+        }
     }
 
     public LiveList<LwtDevice> getDeviceResults() {
@@ -75,13 +88,17 @@ public class DeviceListViewModel extends AndroidViewModel {
         deviceResults.add(insertIndex, device);
     }
 
+    public void startScan() {
+        reload();
+    }
+
     public void reload() {
         cancel();
         deviceResults.clear();
 
         isLoading.setValue(true);
 
-        currentScan = scanner.startScan(new LwdnScanConfig.Builder().setTimeout(Duration.ofSeconds(5)).build());
+        currentScan = scanner.startScan(deviceTypes, new LwdnScanConfig.Builder().setTimeout(Duration.ofSeconds(5)).build());
         currentScan.addOnResultListener(new LwtScan.OnResultListener() {
             @Override
             public void onResult(LwtScan scan, LwtDevice result) {

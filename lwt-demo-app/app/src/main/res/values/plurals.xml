@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="zones_pid_locative">
+        <item quantity="one">zone</item>
+        <item quantity="other">zones</item>
+    </plurals>
+    <plurals name="zones_pid_accusative">
+        <item quantity="one">zone</item>
+        <item quantity="other">zones</item>
+    </plurals>
+</resources>
