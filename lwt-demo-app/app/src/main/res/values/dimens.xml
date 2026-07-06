@@ -17,4 +17,12 @@
     <dimen name="fab_bottom_offset">16dp</dimen>
     <dimen name="fab_height">48dp</dimen>
     <dimen name="zone_picker_card_elevation">4dp</dimen>
+    <dimen name="keyboard_time_picker_btn_image_padding">16dp</dimen>
+    <dimen name="keyboard_time_picker_btn_colon_padding">24dp</dimen>
+    <dimen name="ticket_activation_selected_card_elevation">10dp</dimen>
+    <dimen name="swiper_rails_offset">55dp</dimen>
+    <dimen name="route_divider_height">1dp</dimen>
+    <dimen name="connection_route_point_safe_margin">4dp</dimen>
+    <dimen name="connection_route_point_node_width">35dp</dimen>
+    <dimen name="connection_route_point_min_height">50dp</dimen>
 </resources>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
+
+    <cz.spojenka.android.ui.view.DateSwiper
+        android:id="@+id/dateSwiper"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/activity_vertical_margin"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="@id/fcvTimeKeypadContainer"
+        app:layout_constraintStart_toStartOf="@id/fcvTimeKeypadContainer" />
+
+    <com.google.android.material.divider.MaterialDivider
+        android:id="@+id/divider"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/section_margin_normal"
+        app:layout_constraintStart_toStartOf="@id/fcvTimeKeypadContainer"
+        app:layout_constraintEnd_toEndOf="@id/fcvTimeKeypadContainer"
+        app:layout_constraintTop_toBottomOf="@id/dateSwiper" />
+
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/fcvTimeKeypadContainer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/item_margin_normal"
+        android:layout_marginHorizontal="@dimen/activity_horizontal_margin"
+        tools:layout="@layout/dialog_keypad_time_picker"
+        app:layout_constraintTop_toBottomOf="@id/divider"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+</androidx.constraintlayout.widget.ConstraintLayout>

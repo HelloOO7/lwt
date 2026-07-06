@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ForkJoinPool;
 
 import cz.spojenka.lwdn.LwdnSocket;
 import cz.spojenka.lwdn.LwdnSocketFactory;
@@ -71,7 +72,30 @@ public class LwtpSession {
      * @param socket the socket to use for the transaction
      */
     public void execute(LwdnSocket socket) {
+        execute(socket, null);
+    }
+
+    public CompletableFuture<Void> executeAsync(LwdnSocket socket) {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        CompletableFuture.runAsync(() -> {
+            try {
+                execute(socket, future);
+                future.complete(null);
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+            }
+        });
+        return future;
+    }
+
+    private void execute(LwdnSocket socket, CompletableFuture<?> cancellationToken) {
         for (PendingRequest pendingRequest : pendingRequests) {
+            if (cancellationToken.isCancelled() && !pendingRequest.future.isCancelled()) {
+                pendingRequest.future.cancel(true);
+            }
+            if (pendingRequest.future.isCancelled()) {
+                continue;
+            }
             try {
                 LwtpPacket response = sendRequest(socket, pendingRequest.request);
                 pendingRequest.future.complete(response);
@@ -98,8 +122,25 @@ public class LwtpSession {
      * @param socketFactory the socket factory to obtain the socket from
      */
     public void execute(LwdnSocketFactory socketFactory) {
+        execute(socketFactory, null);
+    }
+
+    public CompletableFuture<Void> executeAsync(LwdnSocketFactory socketFactory) {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        CompletableFuture.runAsync(() -> {
+            try {
+                execute(socketFactory, future);
+                future.complete(null);
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+            }
+        });
+        return future;
+    }
+
+    private void execute(LwdnSocketFactory socketFactory, CompletableFuture<?> cancellationToken) {
         try (LwdnSocket socket = socketFactory.openSocket()) {
-            execute(socket);
+            execute(socket, cancellationToken);
         } catch (IOException ex) {
             // socket exception
             finishRemainingWithException(ex);

@@ -23,8 +23,10 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
+        android:localeConfig="@xml/locale_config"
         android:supportsRtl="true"
-        android:theme="@style/Theme.LWTDemo">
+        android:theme="@style/Theme.LWTDemo"
+        tools:targetApi="33">
 
         <activity
             android:name=".MainActivity"
@@ -35,9 +37,11 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".DeviceListActivity" android:exported="false" />
-        <activity android:name=".DevicePickerActivity" android:exported="false" />
-        <activity android:name=".LitackaZonePickerActivity" android:exported="false" />
+        <activity android:name=".DeviceListActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
+        <activity android:name=".DevicePickerActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
+        <activity android:name=".LitackaZonePickerActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
+        <activity android:name=".TripStopPickerActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
+        <activity android:name=".TicketActivationActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
     </application>
 
 </manifest>

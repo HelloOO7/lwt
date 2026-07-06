@@ -1,19 +1,17 @@
 package cz.spojenka.lwdn;
 
-import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
+import android.content.Context;
 
 import java.util.List;
 import java.util.UUID;
-
-import androidx.annotation.RequiresPermission;
 
 public class HybridLwdnScanner implements LwdnScanner {
 
     private BluetoothLwdnScanner bluetoothScanner;
 
-    public void addBluetoothScanner(BluetoothAdapter bluetoothAdapter, int addressPsm) {
-        this.bluetoothScanner = new BluetoothLwdnScanner(bluetoothAdapter, addressPsm);
+    public void addBluetoothScanner(Context context, BluetoothAdapter bluetoothAdapter, int addressPsm) {
+        this.bluetoothScanner = new BluetoothLwdnScanner(context, bluetoothAdapter, addressPsm);
     }
 
     public boolean isBluetoothScannerAvailable() {

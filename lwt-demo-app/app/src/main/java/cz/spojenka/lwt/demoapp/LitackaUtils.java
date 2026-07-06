@@ -24,7 +24,7 @@ public class LitackaUtils {
     }
 
     public static List<String> sortZonesForPrint(List<String> zones) {
-        return zones.stream().sorted(Comparator.comparingInt(zone -> {
+        return zones.stream().distinct().sorted(Comparator.comparingInt(zone -> {
             int index = PRAGUE_SORT_ORDER.indexOf(zone);
             try {
                 return index == -1 ? 1000 + Integer.parseInt(zone) : index;

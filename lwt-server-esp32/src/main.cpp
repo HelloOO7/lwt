@@ -28,6 +28,7 @@
 #include "esp_event.h"
 #include "tls_setup.h"
 #include "tls_certs.h"
+#include "debug_device.h"
 #include <atomic>
 
 static constexpr uint16_t BLE_PSM = 0xD7; // 0x80 + 'W'
@@ -57,7 +58,10 @@ private:
 
 public:
     AppMain() :
-        m_TlsCredentials(TLS_DEVICE_CRT_START, TLS_DEVICE_CRT_END, TLS_LWT_SERVER_KEY_DEBUG_START, TLS_LWT_SERVER_KEY_DEBUG_END),
+        m_TlsCredentials(
+            get_debug_device_crt_start(), get_debug_device_crt_end(),
+            TLS_LWT_SERVER_KEY_DEBUG_START, TLS_LWT_SERVER_KEY_DEBUG_END
+        ),
         m_HttpServiceDiscovery{ vdv301::HttpServiceDiscovery() },
         m_CISSubscriber(
             m_HttpServiceDiscovery,
@@ -70,7 +74,7 @@ public:
         m_BLEServer(BLE_PSM, lwtp::MAX_PACKET_SIZE),
         m_ServiceRegistry(lwt::Operation_MIN, lwt::Operation_MAX),
         m_AppServer(m_ServiceRegistry),
-        m_ServerAuthService(TLS_DEVICE_CRT_START, m_TlsCredentials.device_key, m_TlsCredentials.ctr_drbg),
+        m_ServerAuthService(get_debug_device_crt_start(), m_TlsCredentials.device_key, m_TlsCredentials.ctr_drbg),
         m_TripInfoService(m_CISSubscriber),
         m_TicketService("PID", m_TripInfoService), //TVS not yet implemented
         m_BLETripAdvertiserLegacy(0, BLE_SERVICE_UUID_VEHICLE, lwdn::BleAdvertiser::Flags::INCLUDE_DEVICE_NAME | lwdn::BleAdvertiser::Flags::USE_LEGACY_ADVERTISING),

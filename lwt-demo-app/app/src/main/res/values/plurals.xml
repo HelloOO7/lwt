@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <plurals name="zones_locative">
+        <item quantity="one">zone</item>
+        <item quantity="other">zones</item>
+    </plurals>
+    <plurals name="zones_accusative">
+        <item quantity="one">zone</item>
+        <item quantity="other">zones</item>
+    </plurals>
     <plurals name="zones_pid_locative">
         <item quantity="one">zone</item>
         <item quantity="other">zones</item>
@@ -7,5 +15,25 @@
     <plurals name="zones_pid_accusative">
         <item quantity="one">zone</item>
         <item quantity="other">zones</item>
+    </plurals>
+    <plurals name="day_short">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
+    <plurals name="hour_short">
+        <item quantity="one">%1$d hr</item>
+        <item quantity="other">%1$d hrs</item>
+    </plurals>
+    <plurals name="minute_short">
+        <item quantity="one">%1$d min</item>
+        <item quantity="other">%1$d mins</item>
+    </plurals>
+    <plurals name="second_short">
+        <item quantity="one">%1$d sec</item>
+        <item quantity="other">%1$d secs</item>
+    </plurals>
+    <plurals name="hour_short_fractional">
+        <item quantity="one">%1$s hr</item>
+        <item quantity="other">%1$s hrs</item>
     </plurals>
 </resources>

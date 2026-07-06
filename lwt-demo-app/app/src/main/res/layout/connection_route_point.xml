@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:minHeight="@dimen/connection_route_point_min_height"
+    android:paddingHorizontal="10dp"
+    app:paddingWindowInsets="horizontal"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?android:attr/selectableItemBackground"
+    android:gravity="start|center_vertical">
+
+    <cz.spojenka.android.ui.view.ConnectionRouteNode
+        android:id="@+id/connectionRouteNode"
+        android:layout_width="@dimen/connection_route_point_node_width"
+        android:layout_height="match_parent" />
+
+    <LinearLayout
+        android:id="@+id/llTimesContainer"
+        android:layout_marginVertical="@dimen/connection_route_point_safe_margin"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_weight="0"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvArrivalTime"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="start|center_vertical"
+            tools:text="0:07"
+            tools:visibility="visible" />
+
+        <TextView
+            android:id="@+id/tvDepartureTime"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="start|center_vertical"
+            tools:text="12:38" />
+    </LinearLayout>
+
+    <com.google.android.flexbox.FlexboxLayout
+        android:id="@+id/stationInfoContainer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        app:flexDirection="row"
+        app:flexWrap="wrap"
+        app:alignItems="center"
+        android:paddingHorizontal="10dp"
+        app:showDividerVertical="middle"
+        app:showDividerHorizontal="middle"
+        android:layout_marginVertical="@dimen/connection_route_point_safe_margin">
+
+        <TextView
+            android:id="@+id/tvStationName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            tools:text="Ve stanici\nNázev stanice" />
+    </com.google.android.flexbox.FlexboxLayout>
+
+    <LinearLayout
+        android:id="@+id/llZonesContainer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_weight="0"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:layout_marginVertical="@dimen/connection_route_point_safe_margin"
+        android:layout_marginHorizontal="@dimen/item_margin_normal">
+
+    </LinearLayout>
+</LinearLayout>

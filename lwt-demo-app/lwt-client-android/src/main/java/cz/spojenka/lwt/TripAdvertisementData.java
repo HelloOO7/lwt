@@ -125,6 +125,10 @@ public class TripAdvertisementData {
         return (flags & FLAG_IS_AT_STOP) != 0;
     }
 
+    public boolean isEnRoute() {
+        return lineLicenseNumber != 0 && directionCisNumber != 0;
+    }
+
     public static TripAdvertisementData unwrap(byte[] serviceData) throws IOException {
         try (InputStream in = new ByteArrayInputStream(serviceData)) {
             return new TripAdvertisementData(in);
@@ -139,7 +143,12 @@ public class TripAdvertisementData {
     }
 
     private LocalTime convertTime(int bits) {
-        return LocalTime.ofSecondOfDay((bits & 2047) * 60);
+        final int mask = 2047;
+        bits &= mask;
+        if (bits == mask) {
+            return null;
+        }
+        return LocalTime.ofSecondOfDay(bits * 60);
     }
 
     private int readInt24(DataInputStream dis) throws IOException {

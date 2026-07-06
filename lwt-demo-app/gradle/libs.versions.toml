@@ -8,6 +8,7 @@ material = "1.14.0"
 flatbuffers = "25.2.10"
 tlsChannel = "1.0.0"
 swipeRefreshLayout = "1.2.0"
+flexboxLayout = "3.0.0"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -18,6 +19,7 @@ material = { group = "com.google.android.material", name = "material", version.r
 flatbuffers-java = { group = "com.google.flatbuffers", name = "flatbuffers-java", version.ref = "flatbuffers" }
 tlsChannel = { group = "com.github.marianobarrios", name = "tls-channel", version.ref = "tlsChannel" }
 swipeRefreshLayout = { group = "androidx.swiperefreshlayout", name = "swiperefreshlayout", version.ref = "swipeRefreshLayout" }
+flexboxLayout = { group = "com.google.android.flexbox", name = "flexbox", version.ref = "flexboxLayout" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -127,6 +127,23 @@ public class TLSTrustManager {
         return false;
     }
 
+    public boolean isDNSNameMatched(X509Certificate[] chain, String domain) throws GeneralSecurityException {
+        for (X509Certificate cert : chain) {
+            var altNames = cert.getSubjectAlternativeNames();
+            if (altNames == null) {
+                continue;
+            }
+            for (var altName : altNames) {
+                if (altName != null && altName.size() >= 2 && altName.get(0) instanceof Integer type && altName.get(1) instanceof String value) {
+                    if (type == 2 && domain.equalsIgnoreCase(value)) { // DNS name
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     public boolean verifySignature(byte[] challenge, byte[] response, String algorithm, X509Certificate cert) throws GeneralSecurityException {
         var signature = Signature.getInstance(algorithm + "with" + translateKeyAlgToSignatureAlg(cert.getPublicKey().getAlgorithm()));
         signature.initVerify(cert);

@@ -36,4 +36,33 @@
             <flag name="all" value="10"/>
         </attr>
     </declare-styleable>
+
+    <declare-styleable name="ConnectionRouteNode">
+        <attr name="pathWidth" format="dimension"/>
+        <attr name="nodeDiameter" format="dimension"/>
+        <attr name="nodeMargin" format="dimension"/>
+        <attr name="nodeType" format="enum">
+            <enum name="segment_start" value="0"/>
+            <enum name="segment_end" value="1"/>
+            <enum name="start" value="2"/>
+            <enum name="finish" value="3"/>
+            <enum name="normal" value="4"/>
+        </attr>
+        <attr name="showNode" format="boolean"/>
+        <attr name="pathTypeIn" format="enum">
+            <enum name="normal" value="0"/>
+            <enum name="selected" value="1"/>
+            <enum name="error" value="2"/>
+        </attr>
+        <attr name="showPathIn" format="boolean"/>
+        <attr name="pathTypeOut" format="enum">
+            <enum name="normal" value="0"/>
+            <enum name="selected" value="1"/>
+            <enum name="error" value="2"/>
+        </attr>
+        <attr name="showPathOut" format="boolean"/>
+        <attr name="pathColor" format="color"/>
+    </declare-styleable>
+
+    <attr name="colorPrimaryMuted" />
 </resources>

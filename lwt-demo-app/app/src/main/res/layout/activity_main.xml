@@ -10,18 +10,18 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Run test"
-        app:layout_constraintVertical_chainStyle="packed"
         app:layout_constraintBottom_toTopOf="@id/btnTestTls"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_chainStyle="packed" />
 
     <Button
         android:id="@+id/btnTestTls"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Run TLS test"
-        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/btnShowDeviceList"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/btnTest" />
@@ -33,5 +33,82 @@
         android:text="Show device list"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/btnTestTls" />
+        app:layout_constraintTop_toBottomOf="@+id/btnTestTls"
+        app:layout_constraintBottom_toTopOf="@id/btnRunTicketActivation"/>
+
+    <Button
+        android:id="@+id/btnRunTicketActivation"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Demo ticket activation"
+        app:layout_constraintBottom_toTopOf="@id/etNumZones"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/btnShowDeviceList" />
+
+    <EditText
+        android:id="@+id/etNumZones"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:ems="3"
+        android:inputType="number"
+        android:selectAllOnFocus="true"
+        android:text="4"
+        android:textAlignment="textEnd"
+        app:layout_constraintBottom_toTopOf="@id/etValidMinutes"
+        app:layout_constraintEnd_toEndOf="@+id/btnRunTicketActivation"
+        app:layout_constraintTop_toBottomOf="@+id/btnRunTicketActivation" />
+
+    <TextView
+        android:id="@+id/tvNumZonesLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Num. of zones: "
+        app:layout_constraintBottom_toBottomOf="@+id/etNumZones"
+        app:layout_constraintEnd_toStartOf="@+id/etNumZones"
+        app:layout_constraintTop_toTopOf="@+id/etNumZones" />
+
+    <EditText
+        android:id="@+id/etValidMinutes"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:ems="3"
+        android:inputType="number"
+        android:text="60"
+        android:textAlignment="textEnd"
+        app:layout_constraintBottom_toTopOf="@id/etPrepaidZones"
+        app:layout_constraintEnd_toEndOf="@+id/btnRunTicketActivation"
+        app:layout_constraintTop_toBottomOf="@+id/etNumZones" />
+
+    <TextView
+        android:id="@+id/tvMinutesLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:selectAllOnFocus="true"
+        android:text="Validity (minutes): "
+        app:layout_constraintBottom_toBottomOf="@+id/etValidMinutes"
+        app:layout_constraintEnd_toStartOf="@+id/etValidMinutes"
+        app:layout_constraintTop_toTopOf="@+id/etValidMinutes" />
+
+    <EditText
+        android:id="@+id/etPrepaidZones"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:ems="8"
+        android:inputType="text"
+        android:text="P, 0, B"
+        android:textAlignment="textEnd"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="@+id/btnRunTicketActivation"
+        app:layout_constraintTop_toBottomOf="@+id/etValidMinutes" />
+
+    <TextView
+        android:id="@+id/tvPrepaidZonesLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Prepaid zones: "
+        app:layout_constraintBottom_toBottomOf="@+id/etPrepaidZones"
+        app:layout_constraintEnd_toStartOf="@+id/etPrepaidZones"
+        app:layout_constraintTop_toTopOf="@+id/etPrepaidZones" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

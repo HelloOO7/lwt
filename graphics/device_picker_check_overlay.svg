@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   height="48"
+   viewBox="0 -960 1920 1920"
+   width="48"
+   fill="#5f6368"
+   version="1.1"
+   id="svg1"
+   sodipodi:docname="device_picker_check_overlay.svg"
+   inkscape:version="1.3.2 (091e20e, 2023-11-25, custom)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="7.0014133"
+     inkscape:cx="-6.4272738"
+     inkscape:cy="22.35263"
+     inkscape:window-width="1920"
+     inkscape:window-height="1009"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg1" />
+  <path
+     id="rect1"
+     style="fill:#353535;stroke-width:252.019;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:2;paint-order:markers fill stroke"
+     d="M 0 -960 L 1920 960 L 1920 -960 L 0 -960 z M 1646.3281 -683.82812 L 1736.9531 -593.20312 L 1218.9844 -75.234375 L 960 -334.21875 L 1050.625 -424.84375 L 1218.9844 -256.48438 L 1646.3281 -683.82812 z " />
+</svg>

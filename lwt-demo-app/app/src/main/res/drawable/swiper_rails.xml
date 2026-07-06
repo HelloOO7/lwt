@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android" >
+    <item android:gravity="top" android:left="@dimen/swiper_rails_offset" android:right="@dimen/swiper_rails_offset">
+        <shape android:shape="rectangle">
+            <size android:height="1dp" />
+            <solid android:color="@color/mtrl_btn_stroke_color_selector" />
+        </shape>
+    </item>
+    <item android:gravity="bottom" android:left="@dimen/swiper_rails_offset" android:right="@dimen/swiper_rails_offset">
+        <shape android:shape="rectangle">
+            <size android:height="1dp" />
+            <solid android:color="@color/mtrl_btn_stroke_color_selector" />
+        </shape>
+    </item>
+</layer-list>

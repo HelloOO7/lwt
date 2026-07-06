@@ -27,6 +27,7 @@ import cz.spojenka.android.ui.activity.BaseActivity;
 import cz.spojenka.lwdn.LwdnScanConfig;
 import cz.spojenka.lwdn.LwdnScanException;
 import cz.spojenka.lwt.*;
+import cz.spojenka.lwt.demoapp.databinding.ActivityMainBinding;
 import cz.spojenka.lwt.util.TLSTrustManager;
 import cz.spojenka.lwtp.LwtpTLSConfig;
 import cz.spojenka.lwtp.LwtpTLSPolicy;
@@ -37,12 +38,9 @@ public class MainActivity extends BaseActivity {
 
     private LwtDeviceScanner lwtScanner;
 
-    private TLSTrustManager trustManager;
     private SSLContext sslContext;
 
-    private Button btnRunTest;
-    private Button btnRunTlsTest;
-    private Button btnShowDeviceList;
+    private ActivityMainBinding binding;
 
     private LwtDevice foundDevice;
 
@@ -50,10 +48,8 @@ public class MainActivity extends BaseActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-        btnRunTest = findViewById(R.id.btnTest);
-        btnRunTlsTest = findViewById(R.id.btnTestTls);
-        btnShowDeviceList = findViewById(R.id.btnShowDeviceList);
+        binding = ActivityMainBinding.inflate(getLayoutInflater());
+        setContentView(binding.getRoot());
         setButtonsEnabled(false);
         sslContext = createSSLContext();
         lwtScanner = new LwtDeviceScanner(this);
@@ -79,11 +75,38 @@ public class MainActivity extends BaseActivity {
         } else {
             Toast.makeText(this, "Bluetooth scan permission not granted.", Toast.LENGTH_LONG).show();
         }
-        btnRunTest.setOnClickListener(v -> checkTrustAndRunTest());
-        btnRunTlsTest.setOnClickListener(v -> runTestOverTLS());
+        binding.btnTest.setOnClickListener(v -> checkTrustAndRunTest());
+        binding.btnTestTls.setOnClickListener(v -> runTestOverTLS());
         testWifiAware();
 
-        btnShowDeviceList.setOnClickListener(v -> startActivity(new Intent(this, DeviceListActivity.class)));
+        binding.btnShowDeviceList.setOnClickListener(v -> startActivity(new Intent(this, DeviceListActivity.class)));
+        binding.btnRunTicketActivation.setOnClickListener(v -> {
+            int numZones;
+            int validityMinutes;
+            String[] prepaidZones;
+            try {
+                numZones = Integer.parseInt(binding.etNumZones.getText().toString());
+                validityMinutes = Integer.parseInt(binding.etValidMinutes.getText().toString());
+                prepaidZones = binding.etPrepaidZones.getText().toString().replace(" ", "").split(",");
+            } catch (NumberFormatException ex) {
+                return;
+            }
+
+            startActivity(
+                    new Intent(this, TicketActivationActivity.class)
+                            .putExtra(TicketActivationActivity.EXTRA_DEBUG_TICKET_TARIFF_SYSTEM, "PID")
+                            .putExtra(TicketActivationActivity.EXTRA_DEBUG_TICKET_NUM_ZONES, numZones)
+                            .putExtra(TicketActivationActivity.EXTRA_DEBUG_TICKET_VALIDITY_DURATION, validityMinutes)
+                            .putExtra(
+                                    TicketActivationActivity.EXTRA_DEBUG_TICKET_ZONE_OPTIONS,
+                                    new String[]{"P", "0", "B", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"}
+                            )
+                            .putExtra(
+                                    TicketActivationActivity.EXTRA_PREPAID_ZONES,
+                                    prepaidZones
+                            )
+            );
+        });
     }
 
     private boolean hasBluetoothScanPermission() {
@@ -122,7 +145,7 @@ public class MainActivity extends BaseActivity {
         LwtAPIClient client = new LwtAPIClient(foundDevice.getAddress());
         client.setSocketWatchdogTimeout(Duration.ofSeconds(5));
         client.disableTLS();
-        client.authenticateServer(trustManager, CommType.ENQUEUE).whenCompleteAsync((trusted, error) -> {
+        client.authenticateServer(GlobalTrustManager.getInstance(getApplication()), CommType.ENQUEUE).whenCompleteAsync((trusted, error) -> {
             if (error != null) {
                 Log.e(TAG, "Server auth operation error", error);
                 setButtonsEnabled(true);
@@ -188,17 +211,11 @@ public class MainActivity extends BaseActivity {
     }
 
     private void setButtonsEnabled(boolean enabled) {
-        btnRunTest.setEnabled(enabled);
-        btnRunTlsTest.setEnabled(enabled);
+        binding.btnTest.setEnabled(enabled);
+        binding.btnTestTls.setEnabled(enabled);
     }
 
     private SSLContext createSSLContext() {
-        try {
-            trustManager = new TLSTrustManager();
-            trustManager.addCertificate(getAssets(), "ROPID_Root_CA_Certificate_[DEBUG].crt", "Root CA");
-            return trustManager.createSSLContext();
-        } catch (GeneralSecurityException | IOException e) {
-            throw new RuntimeException(e);
-        }
+        return GlobalTrustManager.createSSLContext(getApplication());
     }
 }

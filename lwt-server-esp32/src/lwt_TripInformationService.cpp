@@ -44,15 +44,17 @@ namespace lwt {
         return dt.to_epoch_seconds();
     }
 
-    auto BuildTripStopInfo(flatbuffers::FlatBufferBuilder& fbb, const StopInformationStructure& stopInfo)
+    auto BuildTripStopInfo(flatbuffers::FlatBufferBuilder& fbb, const TripInformationStructure& tripInfo, const StopInformationStructure& stopInfo)
     {
         auto stopRef = fbb.CreateString(stopInfo.StopRef.Value);
+        bool isFirstStop = stopInfo.StopIndex.Value == tripInfo.StopSequence.StopPoint.front().StopIndex.Value;
+        bool isLastStop = stopInfo.StopIndex.Value == tripInfo.StopSequence.StopPoint.back().StopIndex.Value;
 
         return CreateTripStopInfo(
             fbb,
             BuildStopReference(fbb, stopInfo),
-            ConvertOptDateTime(stopInfo.ArrivalScheduled),
-            ConvertOptDateTime(stopInfo.DepartureScheduled),
+            !isFirstStop ? ConvertOptDateTime(stopInfo.ArrivalScheduled) : -1,
+            !isLastStop ? ConvertOptDateTime(stopInfo.DepartureScheduled) : -1,
             fbb.CreateString(TripInformationService::BuildTariffZonesString(stopInfo)),
             NAN // PID does not send this data, skip for now
         );
@@ -115,7 +117,7 @@ namespace lwt {
     auto BuildTripRouteInfo(flatbuffers::FlatBufferBuilder& fbb, const vdv301::SubscriberCIS::AllData& allData, const TripInformationStructure& tripInfo, const StopInformationStructure& curStop) {
         std::vector<flatbuffers::Offset<TripStopInfo>> stops;
         for (const auto& stop : tripInfo.StopSequence.StopPoint) {
-            stops.push_back(BuildTripStopInfo(fbb, stop));
+            stops.push_back(BuildTripStopInfo(fbb, tripInfo, stop));
         }
         auto stopsVector = fbb.CreateVector(stops);
 

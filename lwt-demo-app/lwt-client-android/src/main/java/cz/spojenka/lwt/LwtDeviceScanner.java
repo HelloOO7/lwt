@@ -28,7 +28,7 @@ public class LwtDeviceScanner {
         if (btm != null) {
             BluetoothAdapter adapter = btm.getAdapter();
             if (adapter != null) {
-                lwdnScanner.addBluetoothScanner(btm.getAdapter(), LwtServiceConstants.BLE_API_PSM);
+                lwdnScanner.addBluetoothScanner(context, btm.getAdapter(), LwtServiceConstants.BLE_API_PSM);
             }
         }
     }

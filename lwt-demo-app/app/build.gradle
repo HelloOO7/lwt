@@ -41,6 +41,7 @@ dependencies {
     implementation libs.appcompat
     implementation libs.material
     implementation libs.swipeRefreshLayout
+    implementation libs.flexboxLayout
     implementation libs.flatbuffers.java
     implementation project(":lwt-client-android")
     testImplementation libs.junit

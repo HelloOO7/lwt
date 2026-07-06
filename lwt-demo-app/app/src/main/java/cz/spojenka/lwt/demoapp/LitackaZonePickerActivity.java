@@ -11,9 +11,7 @@ import android.widget.LinearLayout;
 import com.google.android.material.color.MaterialColors;
 import com.google.android.material.divider.MaterialDivider;
 
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -24,6 +22,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import cz.spojenka.android.ui.activity.SubActivity;
 import cz.spojenka.android.ui.dialog.CommonDialogs;
+import cz.spojenka.android.ui.resources.ListFormat;
 import cz.spojenka.android.util.ViewUtils;
 import cz.spojenka.lwt.demoapp.databinding.ActivityLitackaZonePickerBinding;
 import cz.spojenka.lwt.demoapp.databinding.LitackaZoneToggleBinding;
@@ -119,7 +118,7 @@ public class LitackaZonePickerActivity extends SubActivity {
                             R.string.zone_selection_warning_format,
                             maxZones,
                             getResources().getQuantityString(R.plurals.zones_pid_locative, zones.size()),
-                            getResources().getQuantityString(R.plurals.zones_pid_accusative, zones.size()), String.join(", ", zones)
+                            getResources().getQuantityString(R.plurals.zones_pid_accusative, zones.size()), ListFormat.formatList(this, zones)
                     ),
                     (dialog, which) -> finishWithResult(zones),
                     null

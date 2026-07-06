@@ -4,40 +4,42 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:foreground="?android:attr/selectableItemBackground"
-    app:contentPadding="@dimen/item_margin_normal">
+    android:foreground="?android:attr/selectableItemBackground">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:padding="@dimen/item_margin_normal"
+        android:clipToPadding="false">
 
         <TextView
             android:id="@+id/tvLineNumber"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:gravity="center"
             android:background="@drawable/line_number_background"
-            app:layout_constrainedHeight="true"
-            tools:backgroundTint="#FF0000"
+            android:gravity="center"
             android:textSize="30sp"
             android:textStyle="bold"
+            app:layout_constrainedHeight="true"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
+            tools:backgroundTint="#FF0000"
+            android:elevation="3dp"
             tools:text="394" />
 
         <TextView
             android:id="@+id/tvHeadsign"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            tools:text="NOVÉ BUTOVICE"
-            android:textSize="20sp"
             android:layout_marginStart="@dimen/section_margin_normal"
+            android:textSize="20sp"
+            app:layout_constraintBottom_toTopOf="@id/tvNextStop"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@+id/tvLineNumber"
             app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toTopOf="@id/tvNextStop"
-            app:layout_constraintVertical_chainStyle="packed"/>
+            app:layout_constraintVertical_chainStyle="packed"
+            tools:text="NOVÉ BUTOVICE" />
 
         <TextView
             android:id="@+id/tvNextStop"
@@ -53,13 +55,14 @@
             android:id="@+id/tvDelayDisplay"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            app:drawableStartCompat="@drawable/delay_indicator"
             android:drawablePadding="4dp"
-            tools:text="včas"
             android:padding="@dimen/item_margin_normal"
-            app:layout_constraintStart_toEndOf="@id/tvNextStop"
+            app:drawableStartCompat="@drawable/delay_indicator"
+            app:layout_constraintBottom_toBottomOf="@id/tvNextStop"
             app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@id/tvNextStop"
             app:layout_constraintTop_toTopOf="@id/tvNextStop"
-            app:layout_constraintBottom_toBottomOf="@id/tvNextStop"/>
+            tools:text="včas" />
+
     </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.cardview.widget.CardView>

@@ -105,6 +105,35 @@ public class TextMarkupConverter {
         }
     }
 
+    public static String toPlainText(String markup, boolean keepIconFallbacks) {
+        try {
+            Document doc = parseMarkup(markup);
+            return toPlainText(doc.getDocumentElement(), keepIconFallbacks);
+        } catch (ParserConfigurationException | SAXException | IOException e) {
+            Log.e(TAG, "Failed to parse markup: " + markup, e);
+            return markup;
+        }
+    }
+
+    private static String toPlainText(Node node, boolean keepIconFallbacks) {
+        if (node instanceof Element element) {
+            if (!keepIconFallbacks && "icon".equals(element.getTagName())) {
+                return "";
+            }
+
+            StringBuilder textBuilder = new StringBuilder();
+            for (int i = 0; i < element.getChildNodes().getLength(); i++) {
+                Node childNode = element.getChildNodes().item(i);
+                textBuilder.append(toPlainText(childNode, keepIconFallbacks));
+            }
+            return textBuilder.toString();
+        } else if (node instanceof Text) {
+            return node.getTextContent();
+        } else {
+            return "";
+        }
+    }
+
     private Node transformElement(Document document, Element element) {
         if ("color".equals(element.getTagName())) {
             Element span = document.createElement("span");

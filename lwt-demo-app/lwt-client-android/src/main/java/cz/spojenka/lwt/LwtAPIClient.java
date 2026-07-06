@@ -29,11 +29,6 @@ public class LwtAPIClient extends LwtClient {
     private final LwtAPI api;
     private final SecureRandom random = new SecureRandom();
 
-    public LwtAPIClient(LwdnSocketFactory socketFactory) {
-        super(socketFactory);
-        api = bind(LwtAPI.class);
-    }
-
     public LwtAPIClient(LwdnAddress address) {
         super(address);
         api = bind(LwtAPI.class);
@@ -134,12 +129,18 @@ public class LwtAPIClient extends LwtClient {
             try {
                 X509Certificate[] certChain = trustManager.loadCertificates(authResponse.certificateAsByteBuffer());
                 if (trustManager.isCertificateChainTrusted(certChain)) {
-                    byte[] challengeResponse = ByteBufferUtils.toByteArray(authResponse.responseAsByteBuffer());
-                    for (X509Certificate cert : certChain) {
-                        if (trustManager.verifySignature(challenge, challengeResponse, "NONE", cert)) {
-                            return true;
+                    if (trustManager.isDNSNameMatched(certChain, getPeerAddress().getLocalHostName())) {
+                        byte[] challengeResponse = ByteBufferUtils.toByteArray(authResponse.responseAsByteBuffer());
+                        for (X509Certificate cert : certChain) {
+                            if (trustManager.verifySignature(challenge, challengeResponse, "NONE", cert)) {
+                                return true;
+                            }
                         }
+                    } else {
+                        Log.e(TAG, "Server certificate DNS name does not match expected hostname: " + getPeerAddress().getLocalHostName());
                     }
+                } else {
+                    Log.e(TAG, "Server certificate chain is not trusted");
                 }
             } catch (GeneralSecurityException | IOException e) {
                 Log.e(TAG, "Server authentication failed", e);

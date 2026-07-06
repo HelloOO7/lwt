@@ -14,6 +14,7 @@ import java.util.concurrent.CompletableFuture;
 import cz.spojenka.lwdn.LwdnAddress;
 import cz.spojenka.lwdn.LwdnSocketFactory;
 import cz.spojenka.lwdn.TLSLwdnSocketFactory;
+import cz.spojenka.lwt.util.FlatbufferUtils;
 import cz.spojenka.lwtp.LwtpPacket;
 import cz.spojenka.lwtp.LwtpSession;
 import cz.spojenka.lwtp.LwtpTLSConfig;
@@ -24,15 +25,17 @@ public class LwtClient {
 
     private static final Object[] EMPTY_ARGS = new Object[]{ByteBuffer.allocate(0)};
 
+    private final LwdnAddress address;
     private LwtpSession lwtpSession = new LwtpSession();
     private LwdnSocketFactory socketFactory;
 
-    public LwtClient(LwdnSocketFactory socketFactory) {
-        this.socketFactory = socketFactory;
+    public LwtClient(LwdnAddress address) {
+        this.address = address;
+        this.socketFactory = LwdnSocketFactory.create(address);
     }
 
-    public LwtClient(LwdnAddress address) {
-        this.socketFactory = LwdnSocketFactory.create(address);
+    public LwdnAddress getPeerAddress() {
+        return address;
     }
 
     /**
@@ -103,7 +106,7 @@ public class LwtClient {
     }
 
     public CompletableFuture<Void> executeAsync() {
-        return CompletableFuture.runAsync(this::execute);
+        return lwtpSession.executeAsync(socketFactory);
     }
 
     private <T> CompletableFuture<T> createResponseFuture(CompletableFuture<LwtpPacket> baseFuture, Class<T> responseType) {
@@ -114,7 +117,7 @@ public class LwtClient {
             } else {
                 try {
                     ByteBuffer respData = unwrapResponseFlatbuffer(lwtpResp.getPayload());
-                    T responseObj = reflectOpenFlatbuffer(respData, responseType);
+                    T responseObj = FlatbufferUtils.reflectOpenFlatbuffer(respData, responseType);
                     responseFuture.complete(responseObj);
                 } catch (Throwable e) {
                     responseFuture.completeExceptionally(e);
@@ -151,15 +154,5 @@ public class LwtClient {
             }
         }
         throw new IllegalArgumentException("Method " + method + " must return CompletableFuture<T> for some T");
-    }
-
-    @SuppressWarnings("unchecked")
-    private <T> T reflectOpenFlatbuffer(ByteBuffer data, Class<T> clazz) {
-        try {
-            Method getRootAsMethod = clazz.getMethod("getRootAs" + clazz.getSimpleName(), ByteBuffer.class);
-            return (T) getRootAsMethod.invoke(null, data);
-        } catch (ReflectiveOperationException e) {
-            throw new RuntimeException(e);
-        }
     }
 }

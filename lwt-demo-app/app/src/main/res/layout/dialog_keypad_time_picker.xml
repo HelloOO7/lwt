@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
+
+    <!-- https://stackoverflow.com/questions/13167529/android-margins-specified-in-custom-style-not-taking-effect -->
+    <!-- yeah, in case anyone is wondering why every single button has the style set explicitly, this is the answer -->
+
+    <TextView
+        android:id="@+id/tvHourField"
+        style="@style/Theme.KeyboardTimePicker.Field"
+        android:layout_height="wrap_content"
+        app:layout_constraintEnd_toStartOf="@id/ivColon"
+        app:layout_constraintStart_toStartOf="@+id/tlKeys"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintHorizontal_chainStyle="packed"
+        android:layout_marginTop="@dimen/section_margin_normal"
+        tools:text="16" />
+
+    <ImageView
+        android:id="@+id/ivColon"
+        android:layout_width="wrap_content"
+        android:layout_height="0dp"
+        android:src="@drawable/ic_colon_24px"
+        android:layout_marginHorizontal="@dimen/section_margin_normal"
+        app:layout_constraintBottom_toBottomOf="@+id/tvHourField"
+        app:layout_constraintEnd_toStartOf="@+id/tvMinuteField"
+        app:layout_constraintStart_toEndOf="@+id/tvHourField"
+        app:layout_constraintTop_toTopOf="@+id/tvHourField" />
+
+    <TextView
+        android:id="@+id/tvMinuteField"
+        style="@style/Theme.KeyboardTimePicker.Field"
+        android:layout_height="wrap_content"
+        app:layout_constraintEnd_toEndOf="@+id/tlKeys"
+        app:layout_constraintStart_toEndOf="@id/ivColon"
+        app:layout_constraintTop_toTopOf="@+id/tvHourField"
+        tools:text="45" />
+
+    <TableLayout
+        android:id="@+id/tlKeys"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="@dimen/section_margin_normal"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/ivColon"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <Button
+                style="@style/Theme.KeyboardTimePicker.Key"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                tools:text="1" />
+
+            <Button
+                style="@style/Theme.KeyboardTimePicker.Key"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                tools:text="2" />
+
+            <Button
+                style="@style/Theme.KeyboardTimePicker.Key"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                tools:text="3" />
+        </TableRow>
+
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <Button
+                style="@style/Theme.KeyboardTimePicker.Key"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                tools:text="4" />
+
+            <Button
+                style="@style/Theme.KeyboardTimePicker.Key"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                tools:text="5" />
+
+            <Button
+                style="@style/Theme.KeyboardTimePicker.Key"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                tools:text="6" />
+        </TableRow>
+
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <Button
+                style="@style/Theme.KeyboardTimePicker.Key"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                tools:text="7" />
+
+            <Button
+                style="@style/Theme.KeyboardTimePicker.Key"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                tools:text="8" />
+
+            <Button
+                style="@style/Theme.KeyboardTimePicker.Key"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                tools:text="9" />
+        </TableRow>
+
+        <TableRow
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <ImageButton
+                android:id="@+id/ibCancel"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:contentDescription="@string/back"
+                android:padding="@dimen/keyboard_time_picker_btn_image_padding"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_undo_24px" />
+
+            <Button
+                android:id="@+id/keyZero"
+                style="@style/Theme.KeyboardTimePicker.Key"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                tools:text="0" />
+
+            <ImageButton
+                android:id="@+id/ibConfirm"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:backgroundTint="?attr/colorPrimary"
+                android:contentDescription="@string/ok"
+                android:padding="@dimen/keyboard_time_picker_btn_image_padding"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_check_24px"
+                app:tint="?attr/colorOnPrimary" />
+        </TableRow>
+    </TableLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

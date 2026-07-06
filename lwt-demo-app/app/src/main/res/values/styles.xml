@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.KeyboardTimePicker.Key" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="android:textSize">24sp</item>
+        <item name="android:padding">16dp</item>
+        <item name="android:layout_marginHorizontal">4dp</item>
+    </style>
+
+    <style name="Theme.KeyboardTimePicker.Field" parent="Widget.MaterialComponents.TextView">
+        <item name="android:background">@drawable/keypad_time_picker_field</item>
+        <item name="android:padding">10dp</item>
+        <item name="android:textSize">40sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:layout_width">90sp</item>
+        <item name="android:textAlignment">center</item>
+    </style>
+</resources>

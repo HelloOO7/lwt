@@ -14,10 +14,10 @@ public class LwtScan extends AbstractScan<LwtDevice, LwdnScanException, LwtScan>
 
     private static final String TAG = "LwtScan";
 
-    private final LwdnScan lwdnScan;
+    private final AbstractScan<?, ?, ?> baseScan;
 
     LwtScan(LwdnScan lwdnScan) {
-        this.lwdnScan = lwdnScan;
+        this.baseScan = lwdnScan;
 
         lwdnScan.addOnResultListener(new LwdnScan.OnResultListener() {
             @Override
@@ -40,10 +40,40 @@ public class LwtScan extends AbstractScan<LwtDevice, LwdnScanException, LwtScan>
             }
 
             @Override
-            public void onFailure(LwdnScan lwdnScan, LwdnScanException e) {
+            public void onFinishedExceptionally(LwdnScan lwdnScan, LwdnScanException e) {
                 markFailed(e);
             }
         });
+    }
+
+    LwtScan(LwtScan baseScan, ScanMapper mapper) {
+        this.baseScan = baseScan;
+        baseScan.addOnResultListener(new OnResultListener() {
+            @Override
+            public void onResult(LwtScan scan, LwtDevice result) {
+                mapper.mapResult(scan, result, LwtScan.this);
+            }
+
+            @Override
+            public void onFailure(LwtScan scan, LwdnScanException e) {
+                // ignore - handle in onFinishedListener
+            }
+        });
+        baseScan.addOnFinishedListener(new OnFinishedListener() {
+            @Override
+            public void onFinished(LwtScan scan) {
+                mapper.mapFinished(scan, LwtScan.this);
+            }
+
+            @Override
+            public void onFinishedExceptionally(LwtScan scan, LwdnScanException e) {
+                mapper.mapFinishedExceptionally(scan, e, LwtScan.this);
+            }
+        });
+    }
+
+    public static LwtScan map(LwtScan base, ScanMapper mapper) {
+        return new LwtScan(base, mapper);
     }
 
     private LwtDevice createDeviceFromResult(LwdnScanResult result) {
@@ -79,7 +109,7 @@ public class LwtScan extends AbstractScan<LwtDevice, LwdnScanException, LwtScan>
 
     @Override
     protected void onCancel() {
-        lwdnScan.cancel();
+        baseScan.cancel();
     }
 
     /*
@@ -120,5 +150,34 @@ public class LwtScan extends AbstractScan<LwtDevice, LwdnScanException, LwtScan>
 
     public static interface OnFinishedListener extends AbstractScan.OnFinishedListener<LwtScan, LwtDevice, LwdnScanException> {
 
+    }
+
+    public static abstract class ScanMapper {
+
+        public void mapResult(LwtScan scan, LwtDevice result, LwtScan destScan) {
+            destScan.addResult(result);
+        }
+
+        public void mapFinished(LwtScan scan, LwtScan destScan) {
+            if (scan.wasCancelled()) {
+                if (!destScan.wasCancelled()) {
+                    destScan.cancel();
+                }
+            } else {
+                destScan.markFinished();
+            }
+        }
+
+        public void mapFinishedExceptionally(LwtScan scan, LwdnScanException e, LwtScan destScan) {
+            destScan.markFailed(e);
+        }
+
+        protected void copyResults(LwtScan source, LwtScan dest) {
+            source.getResults().forEach(dest::addResult);
+        }
+
+        protected void markFinished(LwtScan dest) {
+            dest.markFinished();
+        }
     }
 }

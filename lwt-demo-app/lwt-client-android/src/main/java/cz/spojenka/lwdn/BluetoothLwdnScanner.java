@@ -1,6 +1,5 @@
 package cz.spojenka.lwdn;
 
-import android.Manifest;
 import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.le.BluetoothLeScanner;
@@ -8,6 +7,7 @@ import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
+import android.content.Context;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -20,10 +20,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import androidx.annotation.RequiresPermission;
-
 public class BluetoothLwdnScanner implements LwdnScanner {
 
+    private final Context context;
     private final BluetoothAdapter adapter;
     private final BluetoothLeScanner scanner;
     private final int addressPsm;
@@ -31,7 +30,8 @@ public class BluetoothLwdnScanner implements LwdnScanner {
 
     private final Handler handler;
 
-    public BluetoothLwdnScanner(BluetoothAdapter adapter, int addressPsm) {
+    public BluetoothLwdnScanner(Context context, BluetoothAdapter adapter, int addressPsm) {
+        this.context = context;
         this.adapter = adapter;
         this.scanner = adapter.getBluetoothLeScanner();
         this.addressPsm = addressPsm;
@@ -100,7 +100,7 @@ public class BluetoothLwdnScanner implements LwdnScanner {
                     case ScanCallback.SCAN_FAILED_FEATURE_UNSUPPORTED ->
                             ScanErrorCode.NOT_SUPPORTED;
                     case ScanCallback.SCAN_FAILED_ALREADY_STARTED -> ScanErrorCode.ALREADY_RUNNING;
-                    case ScanCallback.SCAN_FAILED_SCANNING_TOO_FREQUENTLY ->
+                    case BluetoothLeScannerCompat.SCAN_FAILED_SCANNING_TOO_FREQUENTLY ->
                             ScanErrorCode.THROTTLED;
                     case ScanCallback.SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES ->
                             ScanErrorCode.OUT_OF_RESOURCES;
@@ -110,7 +110,11 @@ public class BluetoothLwdnScanner implements LwdnScanner {
         };
         scan.setCancellationHandler(() -> {
             try {
-                scanner.stopScan(callback);
+                try {
+                    scanner.stopScan(callback);
+                } catch (IllegalStateException ignored) {
+                    // adapter disabled by user, ignore
+                }
                 scan.markFinished();
             } catch (SecurityException ex) {
                 scan.markFailed(new LwdnScanException(ScanErrorCode.NOT_PERMITTED, ex));
@@ -127,12 +131,10 @@ public class BluetoothLwdnScanner implements LwdnScanner {
                 settings.setRssiThreshold(config.getMinRssi());
             }
 
-            scanner.startScan(
-                    buildScanFilters(services),
-                    settings.build(),
-                    callback
-            );
-            callback.startTimeout(config.getTimeout());
+            BluetoothLeScannerCompat.startScan(context, scanner, buildScanFilters(services), settings.build(), callback);
+            if (config.getTimeout() != null) {
+                callback.startTimeout(config.getTimeout());
+            }
         } catch (SecurityException ex) {
             scan.markFailed(new LwdnScanException(ScanErrorCode.NOT_PERMITTED, ex));
         }

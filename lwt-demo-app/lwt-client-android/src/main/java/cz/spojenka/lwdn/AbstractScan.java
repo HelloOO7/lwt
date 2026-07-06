@@ -8,27 +8,41 @@ public abstract class AbstractScan<R, E extends Exception, THIS extends Abstract
     private final List<R> results = new ArrayList<>();
     private boolean isFinished = false;
     private boolean wasCancelled = false;
+    private E failureException = null;
 
     private final List<OnResultListener<THIS, R, E>> resultListeners = new ArrayList<>();
     private final List<OnFinishedListener<THIS, R, E>> finishedListeners = new ArrayList<>();
 
-    protected void addOnResultListenerImpl(OnResultListener<THIS, R, E> listener) {
+    protected synchronized void addOnResultListenerImpl(OnResultListener<THIS, R, E> listener) {
         if (!resultListeners.contains(listener)) {
             resultListeners.add(listener);
+            for (R result : results) {
+                listener.onResult(getThis(), result);
+            }
+            if (failureException != null) {
+                listener.onFailure(getThis(), failureException);
+            }
         }
     }
 
-    protected void addOnFinishedListenerImpl(OnFinishedListener<THIS, R, E> listener) {
+    protected synchronized void addOnFinishedListenerImpl(OnFinishedListener<THIS, R, E> listener) {
         if (!finishedListeners.contains(listener)) {
             finishedListeners.add(listener);
+            if (isFinished()) {
+                if (failureException != null) {
+                    listener.onFinishedExceptionally(getThis(), failureException);
+                } else {
+                    listener.onFinished(getThis());
+                }
+            }
         }
     }
 
-    protected void removeOnResultListenerImpl(OnResultListener<THIS, R, E> listener) {
+    protected synchronized void removeOnResultListenerImpl(OnResultListener<THIS, R, E> listener) {
         resultListeners.remove(listener);
     }
 
-    protected void removeOnFinishedListenerImpl(OnFinishedListener<THIS, R, E> listener) {
+    protected synchronized void removeOnFinishedListenerImpl(OnFinishedListener<THIS, R, E> listener) {
         finishedListeners.remove(listener);
     }
 
@@ -48,20 +62,23 @@ public abstract class AbstractScan<R, E extends Exception, THIS extends Abstract
         }
     }
 
-    protected void markFinished() {
-        isFinished = true;
-        for (var listener : finishedListeners) {
-            listener.onFinished(getThis());
+    protected synchronized void markFinished() {
+        if (!isFinished) {
+            isFinished = true;
+            for (var listener : finishedListeners) {
+                listener.onFinished(getThis());
+            }
         }
     }
 
-    protected void markFailed(E e) {
-        markFinished();
+    protected synchronized void markFailed(E e) {
+        this.isFinished = true;
+        this.failureException = e;
         for (var listener : resultListeners) {
             listener.onFailure(getThis(), e);
         }
         for (var listener : finishedListeners) {
-            listener.onFailure(getThis(), e);
+            listener.onFinishedExceptionally(getThis(), e);
         }
     }
 
@@ -82,9 +99,11 @@ public abstract class AbstractScan<R, E extends Exception, THIS extends Abstract
     }
 
     public synchronized void cancel() {
-        wasCancelled = true;
-        onCancel();
-        markFinished();
+        if (!isFinished) {
+            wasCancelled = true;
+            onCancel();
+            markFinished();
+        }
     }
 
     protected abstract void onCancel();
@@ -92,12 +111,14 @@ public abstract class AbstractScan<R, E extends Exception, THIS extends Abstract
     protected static interface OnResultListener<S extends AbstractScan<R, E, S>, R, E extends Exception> {
 
         void onResult(S scan, R result);
+
         void onFailure(S scan, E e);
     }
 
     protected static interface OnFinishedListener<S extends AbstractScan<R, E, S>, R, E extends Exception> {
 
         void onFinished(S scan);
-        void onFailure(S scan, E e);
+
+        void onFinishedExceptionally(S scan, E e);
     }
 }
