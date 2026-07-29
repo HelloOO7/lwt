@@ -287,18 +287,6 @@ namespace lwt {
         }
     }
 
-    std::string TripInformationService::BuildTariffZonesString(const StopInformationStructure& stopInfo)
-    {
-        std::string zones;
-        for (const auto& zone : stopInfo.FareZone) {
-            if (!zones.empty()) {
-                zones += ";";
-            }
-            zones += zone.Value;
-        }
-        return zones;
-    }
-
     std::vector<std::string> TripInformationService::GetSpecifiedTariffSystemIDs(const std::string& tariffZones)
     {
         std::vector<std::string> systemIDs;

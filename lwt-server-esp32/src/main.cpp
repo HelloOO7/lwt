@@ -68,15 +68,15 @@ public:
             vdv301::SubscriberCIS::Operation::GetAllData
         ),
         m_TVSSubscriber(
-            m_HttpServiceDiscovery/*,
-            vdv301::SubscriberTVS::Operation::GetRazzia | vdv301::SubscriberTVS::Operation::GetCurrentStopPoint*/
+            m_HttpServiceDiscovery,
+            vdv301::SubscriberTVS::Operation::GetRazzia | vdv301::SubscriberTVS::Operation::GetCurrentTariffStop
         ),
         m_BLEServer(BLE_PSM, lwtp::MAX_PACKET_SIZE),
         m_ServiceRegistry(lwt::Operation_MIN, lwt::Operation_MAX),
         m_AppServer(m_ServiceRegistry),
         m_ServerAuthService(get_debug_device_crt_start(), m_TlsCredentials.device_key, m_TlsCredentials.ctr_drbg),
         m_TripInfoService(m_CISSubscriber),
-        m_TicketService("PID", m_TripInfoService), //TVS not yet implemented
+        m_TicketService("PID", m_TripInfoService, &m_TVSSubscriber), //TVS not yet implemented
         m_BLETripAdvertiserLegacy(0, BLE_SERVICE_UUID_VEHICLE, lwdn::BleAdvertiser::Flags::INCLUDE_DEVICE_NAME | lwdn::BleAdvertiser::Flags::USE_LEGACY_ADVERTISING),
         m_BLETripAdvertiserExt(1, BLE_SERVICE_UUID_VEHICLE_EXTENDED, lwdn::BleAdvertiser::Flags::INCLUDE_DEVICE_NAME),
         m_TripInfoAdvertiser(m_CISSubscriber, { &m_BLETripAdvertiserLegacy, &m_BLETripAdvertiserExt })

@@ -5,8 +5,11 @@
 #include "operations_generated.h"
 #include "lwt_ApplicationServer.h"
 #include "StringExtensions.h"
+#include "esp_log.h"
 
 namespace lwt {
+
+    static constexpr const char* TAG = "TicketValidationService";
 
     using namespace vdv301;
 
@@ -57,8 +60,10 @@ namespace lwt {
         if (result) {
             m_CurTripDelay = result->trip()->delay();
 
-            if (!m_TVS) {
-                // if we do not have a TVS subscription, we must generate this data from TripRouteInfo
+            if (!m_HasTVSData) {
+                ESP_LOGI(TAG, "No TVS data available (yet), generating ticket validation info from TripRouteInfo");
+
+                // if we do not have a TVS subscription or TVS is not supported, we must generate this data from TripRouteInfo
                 auto curStop = result->stops()->Get(result->trip()->current_departure_stop()->sequence_id());
 
                 m_TimeForTicketValidityStart = curStop->dep_time() + m_CurTripDelay * 60;
@@ -68,6 +73,8 @@ namespace lwt {
                 else {
                     m_TariffZonesForValidation.clear();
                 }
+            } else {
+                ESP_LOGI(TAG, "TVS data already present, ignoring TripRouteInfo for ticket validation");
             }
 
             m_NextTariffZonesFromRoute.clear();
@@ -96,13 +103,17 @@ namespace lwt {
         bool ok = false;
 
         if (result) {
+            ESP_LOGI(TAG, "Updating ticket validation info from TVS CurrentTariffStop data");
+            m_HasTVSData = true;
             auto&& scheduledDep = result->CurrentTariffStop.DepartureScheduled;
             if (scheduledDep && !scheduledDep->Value.empty()) {
                 m_TimeForTicketValidityStart = LocalDateTime::parse(scheduledDep->Value).to_epoch_seconds() + m_CurTripDelay * 60;
                 ok = true;
             }
-            m_TariffZonesForValidation = GetTariffZonesOnlyMyTariffSystem(TripInformationService::BuildTariffZonesString((IBIS_IP_CustomerInformationService_V2_3CZ1_0::StopInformationStructure&)result->CurrentTariffStop));
+            m_TariffZonesForValidation = GetTariffZonesOnlyMyTariffSystem(TripInformationService::BuildTariffZonesString(result->CurrentTariffStop));
             m_NextTariffZonesForValidation = ReduceNextTariffZones(m_NextTariffZonesFromRoute, m_TariffZonesForValidation);
+        } else {
+            m_HasTVSData = false;
         }
 
         if (!ok) {

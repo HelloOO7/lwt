@@ -18,6 +18,7 @@ namespace lwt {
 
         std::mutex m_DataMutex;
         bool m_HasData{ false };
+        bool m_HasTVSData{ false };
 
         int32_t m_CurTripDelay{ 0 };
         int64_t m_TimeForTicketValidityStart{ 0 };

@@ -2,6 +2,7 @@
 #include "esp_log.h"
 #include "FNVHash.h"
 #include "vdv_Utility.h"
+#include <regex>
 
 namespace vdv301
 {
@@ -13,10 +14,10 @@ namespace vdv301
             "TicketValidationService",
             ServiceDiscovery::QueryBuilder()
             .FilterInstanceName("TicketValidationService*")
-            .FilterTxtRecord("ver", "2.2CZ1.0")
+            .FilterTxtRecord("ver", "2.2")
             .Build(),
             std::to_underlying(subscribedOps),
-            4096 | EventQueue::STACK_PSRAM_BIT
+            8192 | EventQueue::STACK_PSRAM_BIT
         )
     {
     }
@@ -45,8 +46,8 @@ namespace vdv301
     {
         switch (static_cast<Operation>(operation))
         {
-        case Operation::GetCurrentStopPoint:
-            return "GetCurrentStopPoint";
+        case Operation::GetCurrentTariffStop:
+            return "GetCurrentTariffStop";
         case Operation::GetRazzia:
             return "GetRazzia";
         case Operation::GetCurrentLine:
@@ -58,6 +59,15 @@ namespace vdv301
         default:
             return "UnknownOperation";
         }
+    }
+
+    static std::regex CTS_ROOT_FIX("TicketValidationService\\.GetCurrentStopPointResponse");
+    static std::regex EXPECTED_FIX(R"(<[A-Za-z]+Expected>\s*<Value>\s*[^<]+\s*</Value>\s*</[A-Za-z]+Expected>)");
+
+    psram_string FixupCtsXml(const psram_string& input) {
+        psram_string output = std::regex_replace(input, CTS_ROOT_FIX, "TicketValidationService.GetCurrentTariffStopResponse");
+        output = std::regex_replace(output, EXPECTED_FIX, "");
+        return output;
     }
 
     void SubscriberTVS::OnOperationResult(const OperationResult& result)
@@ -88,15 +98,15 @@ namespace vdv301
                 }
                 break;
             }
-            case Operation::GetCurrentStopPoint:
+            case Operation::GetCurrentTariffStop:
             {
                 auto hash = HashResponseWithoutTimestamp(result.GetResult());
                 if (hash != m_LastCurTariffStopHash) {
                     TicketValidationService_GetCurrentTariffStopResponseStructure stopResp;
-                    load_data(result.GetResult().c_str(), stopResp);
+                    load_data(FixupCtsXml(result.GetResult()).c_str(), stopResp);
                     if (stopResp.CurrentTariffStopData) {
                         m_CurTariffStop = std::move(*stopResp.CurrentTariffStopData);
-                        ESP_LOGI(TAG, "Updated CurrentStopPoint data: stop=%s timestamp=%s",
+                        ESP_LOGI(TAG, "Updated CurrentTariffStop data: stop=%s timestamp=%s",
                             m_CurTariffStop.CurrentTariffStop.StopRef.Value.c_str(),
                             m_CurTariffStop.TimeStamp.Value.c_str());
 
@@ -104,7 +114,7 @@ namespace vdv301
                         Observable<CurrentTariffStop>::NotifyObservers(&m_CurTariffStop);
                     }
                     else if (stopResp.OperationErrorMessage) {
-                        ESP_LOGE(TAG, "Error in CurrentStopPoint response (keeping old data): %s", stopResp.OperationErrorMessage->Value.c_str());
+                        ESP_LOGE(TAG, "Error in CurrentTariffStop response (keeping old data): %s", stopResp.OperationErrorMessage->Value.c_str());
                     }
                 }
                 break;

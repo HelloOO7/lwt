@@ -41,7 +41,9 @@ namespace lwt {
         flatbuffers::Offset<TripStateInfo> GetTripStateInfo(flatbuffers::FlatBufferBuilder& fbb);
 
         static LineType VehicleModeToLineType(IBIS_IP_CustomerInformationService_V2_3CZ1_0::VehicleModeEnumeration mode);
-        static std::string BuildTariffZonesString(const IBIS_IP_CustomerInformationService_V2_3CZ1_0::StopInformationStructure& stopInfo);
+
+        template<typename TStopInformationStructure>
+        static std::string BuildTariffZonesString(const TStopInformationStructure& stopInfo);
         static std::vector<std::string> GetSpecifiedTariffSystemIDs(const std::string& tariffZones);
         static std::string GetZonesInTariffSystem(const std::string& tariffZones, const std::string& tariffSystemID);
 
@@ -53,4 +55,16 @@ namespace lwt {
         flatbuffers::Offset<LineInfo> GetLineInfo(flatbuffers::FlatBufferBuilder& fbb, const LineInfo* src) const;
         flatbuffers::Offset<StopReference> GetStopReference(flatbuffers::FlatBufferBuilder& fbb, const StopReference* src) const;
     };
+
+    template<typename TStopInformationStructure>
+    std::string TripInformationService::BuildTariffZonesString(const TStopInformationStructure& stopInfo) {
+        std::string zones;
+        for (const auto& zone : stopInfo.FareZone) {
+            if (!zones.empty()) {
+                zones += ";";
+            }
+            zones += zone.Value;
+        }
+        return zones;
+    }
 }

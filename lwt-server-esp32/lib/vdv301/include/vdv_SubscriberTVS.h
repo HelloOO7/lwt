@@ -14,7 +14,7 @@ namespace vdv301
     {
     public:
         enum class Operation : SubscriberHttp::OperationIDType {
-            GetCurrentStopPoint = (1 << 0),
+            GetCurrentTariffStop = (1 << 0),
             GetRazzia = (1 << 1),
             GetCurrentLine = (1 << 2),
             GetVehicleData = (1 << 3),
