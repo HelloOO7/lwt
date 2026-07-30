@@ -9,41 +9,64 @@
         android:id="@+id/svScroller"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:paddingWindowInsets="vertical"
-        android:paddingVertical="@dimen/activity_vertical_margin">
+        android:paddingVertical="@dimen/activity_vertical_margin"
+        app:paddingWindowInsets="vertical">
 
         <LinearLayout
             android:id="@+id/llContent"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
+            android:animateLayoutChanges="true"
             android:clipChildren="false"
-            android:paddingBottom="@dimen/fab_top_offset"
-            android:animateLayoutChanges="true">
+            android:orientation="vertical"
+            android:paddingBottom="@dimen/fab_top_offset">
 
-            <TextView
+            <LinearLayout
+                android:id="@+id/llHeader"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:orientation="horizontal"
                 android:paddingHorizontal="@dimen/activity_horizontal_margin"
-                android:text="@string/ticket_activation_title"
-                android:textSize="@dimen/text_title_l"
-                app:paddingWindowInsets="horizontal" />
+                app:paddingWindowInsets="horizontal"
+                android:animateLayoutChanges="true">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/ticket_activation_title"
+                    android:textSize="@dimen/text_title_l"
+                    android:layout_gravity="start|center_vertical" />
+
+                <TextView
+                    android:id="@+id/tvFastActivationTimer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/fast_activation_countdown_pill"
+                    android:foreground="?android:attr/selectableItemBackground"
+                    tools:text="1:00"
+                    android:textColor="@color/white"
+                    android:layout_gravity="end|center_vertical"
+                    android:gravity="center"
+                    app:drawableStartCompat="@drawable/ic_bolt_boost_24px"
+                    app:drawableTint="@color/white" />
+            </LinearLayout>
 
             <com.google.android.material.divider.MaterialDivider
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="@dimen/activity_horizontal_margin"
-                app:marginWindowInsets="horizontal"
-                android:layout_marginTop="@dimen/item_margin_normal"/>
+                android:layout_marginTop="@dimen/item_margin_normal"
+                app:marginWindowInsets="horizontal" />
 
             <LinearLayout
                 android:id="@+id/llZoneChoiceType"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:foreground="?android:attr/selectableItemBackground"
                 android:orientation="vertical"
                 android:paddingHorizontal="@dimen/activity_horizontal_margin"
                 android:paddingVertical="@dimen/section_margin_normal"
-                android:foreground="?android:attr/selectableItemBackground"
                 app:paddingWindowInsets="horizontal">
 
                 <TextView
@@ -67,28 +90,28 @@
                 android:id="@+id/tripChoiceSubscreens"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:paddingWindowInsets="horizontal"
+                android:clipChildren="false"
                 android:clipToPadding="false"
-                android:clipChildren="false">
+                app:paddingWindowInsets="horizontal">
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/rvDeviceList"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
                     android:clipToPadding="false"
                     android:paddingHorizontal="@dimen/activity_horizontal_margin"
                     android:visibility="visible"
-                    tools:listitem="@layout/device_list_item"
-                    tools:itemCount="3" />
+                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+                    tools:itemCount="3"
+                    tools:listitem="@layout/device_list_item" />
 
                 <include
                     android:id="@+id/selectedDeviceView"
+                    layout="@layout/device_list_item"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginHorizontal="@dimen/activity_horizontal_margin"
-                    android:visibility="gone"
-                    layout="@layout/device_list_item" />
+                    android:visibility="gone" />
 
             </FrameLayout>
 
@@ -96,25 +119,25 @@
                 android:id="@+id/cvActivationStopCard"
                 android:layout_width="match_parent"
                 android:layout_height="50dp"
-                android:layout_marginTop="@dimen/item_margin_normal"
                 android:layout_marginHorizontal="@dimen/activity_horizontal_margin"
+                android:layout_marginTop="@dimen/item_margin_normal"
                 app:marginWindowInsets="horizontal">
 
                 <include
                     android:id="@+id/activationStop"
+                    layout="@layout/connection_route_point"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    layout="@layout/connection_route_point" />
+                    android:layout_height="wrap_content" />
             </androidx.cardview.widget.CardView>
 
             <LinearLayout
                 android:id="@+id/llActivationTime"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:foreground="?android:attr/selectableItemBackground"
                 android:orientation="vertical"
                 android:paddingHorizontal="@dimen/activity_horizontal_margin"
                 android:paddingVertical="@dimen/section_margin_normal"
-                android:foreground="?android:attr/selectableItemBackground"
                 app:paddingWindowInsets="horizontal">
 
                 <TextView
@@ -138,8 +161,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="@dimen/activity_horizontal_margin"
-                app:marginWindowInsets="horizontal"
-                android:layout_marginTop="@dimen/item_margin_normal"/>
+                android:layout_marginTop="@dimen/item_margin_normal"
+                app:marginWindowInsets="horizontal" />
 
             <TextView
                 android:id="@+id/tvActivationSummary"
@@ -149,6 +172,7 @@
                 android:paddingVertical="@dimen/section_margin_normal"
                 app:marginWindowInsets="horizontal"
                 tools:text="Ticket will activate at X:XX for zones 1,2,3,4" />
+
         </LinearLayout>
     </ScrollView>
 

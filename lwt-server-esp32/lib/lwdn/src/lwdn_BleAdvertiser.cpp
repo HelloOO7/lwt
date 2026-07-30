@@ -132,7 +132,7 @@ namespace lwdn {
             advData.resize(advData.size() + uuidSize); // reserve space for the UUID
             uint8_t* uuidPtr = advData.data() + advData.size() - uuidSize;
 
-            using BC = BitConverter<LITTLE_ENDIAN>;
+            using BC = BitConverter<std::endian::little>;
             std::visit(
                 overloaded{
                     [&](UUID16 u16) {

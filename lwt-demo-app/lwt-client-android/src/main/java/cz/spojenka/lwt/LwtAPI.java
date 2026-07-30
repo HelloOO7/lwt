@@ -19,4 +19,7 @@ public interface LwtAPI {
 
     @LwtOperation(Operation.GetTicketValidationInfo)
     public CompletableFuture<TicketValidationInfo> getTicketValidationInfo();
+
+    @LwtOperation(Operation.CreatePreauthorizationToken)
+    public CompletableFuture<PreauthorizationTokenResponse> createPreauthorizationToken(ByteBuffer request);
 }

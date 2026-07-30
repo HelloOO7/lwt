@@ -7,9 +7,14 @@ import com.google.flatbuffers.FlatBufferBuilder;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -18,6 +23,8 @@ import cz.spojenka.lwdn.BluetoothLwdnAddress;
 import cz.spojenka.lwdn.LwdnAddress;
 import cz.spojenka.lwdn.LwdnSocketFactory;
 import cz.spojenka.lwt.util.ByteBufferUtils;
+import cz.spojenka.lwt.util.RTTExecutionObserver;
+import cz.spojenka.lwt.util.RemoteTime;
 import cz.spojenka.lwt.util.TLSTrustManager;
 
 public class LwtAPIClient extends LwtClient {
@@ -114,6 +121,8 @@ public class LwtAPIClient extends LwtClient {
         return enqueueOrCall(LwtAPI::ping, comm);
     }
 
+    private static final byte[] SERVER_CHALLENGE_SALT = "LwtServerAuthentication".getBytes(StandardCharsets.US_ASCII);
+
     public CompletableFuture<Boolean> authenticateServer(TLSTrustManager trustManager, CommType comm) {
         byte[] challenge = new byte[32];
         random.nextBytes(challenge);
@@ -127,12 +136,16 @@ public class LwtAPIClient extends LwtClient {
         CompletableFuture<ServerAuthenticationResponse> responseFuture = enqueueOrCall(LwtAPI::authenticateServer, builder.dataBuffer(), comm);
         return responseFuture.thenApply(authResponse -> {
             try {
+                byte[] saltedChallenge = new byte[SERVER_CHALLENGE_SALT.length + challenge.length];
+                System.arraycopy(SERVER_CHALLENGE_SALT, 0, saltedChallenge, 0, SERVER_CHALLENGE_SALT.length);
+                System.arraycopy(challenge, 0, saltedChallenge, SERVER_CHALLENGE_SALT.length, challenge.length);
+
                 X509Certificate[] certChain = trustManager.loadCertificates(authResponse.certificateAsByteBuffer());
                 if (trustManager.isCertificateChainTrusted(certChain)) {
                     if (trustManager.isDNSNameMatched(certChain, getPeerAddress().getLocalHostName())) {
                         byte[] challengeResponse = ByteBufferUtils.toByteArray(authResponse.responseAsByteBuffer());
                         for (X509Certificate cert : certChain) {
-                            if (trustManager.verifySignature(challenge, challengeResponse, "NONE", cert)) {
+                            if (trustManager.verifySignature(saltedChallenge, challengeResponse, "SHA256", cert)) {
                                 return true;
                             }
                         }
@@ -155,5 +168,51 @@ public class LwtAPIClient extends LwtClient {
 
     public CompletableFuture<TicketValidationInfo> getTicketValidationInfo(CommType comm) {
         return enqueueOrCall(LwtAPI::getTicketValidationInfo, comm);
+    }
+
+    private ByteBuffer createPreauthorizationTokensRequest(List<byte[]> activationTokenHashes) {
+        FlatBufferBuilder builder = new FlatBufferBuilder();
+        int[] activationTokenHashesOffsets = new int[activationTokenHashes.size()];
+        for (int i = 0; i < activationTokenHashes.size(); i++) {
+            activationTokenHashesOffsets[i] = ActivationTokenHash.createActivationTokenHash(builder, ActivationTokenHash.createDataVector(builder, activationTokenHashes.get(i)));
+        }
+        builder.finish(
+                PreauthorizationTokenRequest.createPreauthorizationTokenRequest(
+                        builder,
+                        PreauthorizationTokenRequest.createActivationTokenHashesVector(builder, activationTokenHashesOffsets)
+                )
+        );
+        return builder.dataBuffer();
+    }
+
+    public CompletableFuture<TokenWithExpiration<Map<byte[], PreauthorizationToken>>> requestPreauthorizationTokens(List<byte[]> activationTokenHashes, CommType comm) {
+        CompletableFuture<PreauthorizationTokenResponse> responseFuture = enqueueOrCall(LwtAPI::createPreauthorizationToken, createPreauthorizationTokensRequest(activationTokenHashes), comm);
+        RTTExecutionObserver rtt = new RTTExecutionObserver(responseFuture);
+        addExecutionObserver(rtt);
+        responseFuture.whenCompleteAsync((r, e) -> removeExecutionObserver(rtt));
+        return responseFuture.thenApply(response -> {
+            Map<byte[], PreauthorizationToken> tokenMap = new HashMap<>();
+            for (int i = 0; i < response.tokensLength(); i++) {
+                PreauthorizationToken token = response.tokens(i);
+                if (token != null) {
+                    tokenMap.put(activationTokenHashes.get(i), token);
+                }
+            }
+
+            RemoteTime remoteTime = new RemoteTime(rtt.getRoundTripStartTime(), Instant.ofEpochMilli(response.issuedAt()), rtt.getRoundTripDuration());
+
+            return new TokenWithExpiration<>(
+                    remoteTime.remoteToLocal(Instant.ofEpochMilli(response.issuedAt())),
+                    remoteTime.remoteToLocal(Instant.ofEpochMilli(response.expiresAt())),
+                    tokenMap
+            );
+        });
+    }
+
+    public CompletableFuture<TokenWithExpiration<PreauthorizationToken>> requestPreauthorizationToken(byte[] activationTokenHash, CommType comm) {
+        return requestPreauthorizationTokens(List.of(activationTokenHash), comm)
+                .thenApply(tokenMap -> new TokenWithExpiration<>(
+                        tokenMap.issuedAt(), tokenMap.expiresAt(), tokenMap.token().get(activationTokenHash)
+                ));
     }
 }

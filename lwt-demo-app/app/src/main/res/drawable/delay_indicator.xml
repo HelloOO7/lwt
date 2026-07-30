@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="oval"
-    android:tint="#43A047"
+    android:tint="@color/delay_ok"
     android:tintMode="multiply">
 
     <size

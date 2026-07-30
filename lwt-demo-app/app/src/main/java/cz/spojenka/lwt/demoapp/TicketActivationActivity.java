@@ -1,12 +1,21 @@
 package cz.spojenka.lwt.demoapp;
 
+import android.animation.Animator;
 import android.animation.LayoutTransition;
+import android.animation.ValueAnimator;
 import android.content.Intent;
+import android.content.res.ColorStateList;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.ShapeDrawable;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewPropertyAnimator;
+import android.view.animation.AccelerateDecelerateInterpolator;
+import android.view.animation.PathInterpolator;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -22,8 +31,10 @@ import java.util.Objects;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.annotation.Nullable;
 import androidx.annotation.PluralsRes;
+import androidx.core.content.IntentCompat;
 import androidx.lifecycle.ViewModelProvider;
 import cz.spojenka.android.ui.activity.BaseActivity;
+import cz.spojenka.android.ui.dialog.CommonDialogs;
 import cz.spojenka.android.ui.dialog.DateTimePickerDialog;
 import cz.spojenka.android.ui.resources.ListFormat;
 import cz.spojenka.android.ui.view.ConnectionRouteNode;
@@ -43,11 +54,7 @@ public class TicketActivationActivity extends BaseActivity {
     private static final String TAG = TicketActivationActivity.class.getSimpleName();
 
     public static final String EXTRA_TICKET_ID = TicketActivationActivity.class.getName() + ".EXTRA_TICKET_ID";
-
-    public static final String EXTRA_DEBUG_TICKET_TARIFF_SYSTEM = TicketActivationActivity.class.getName() + ".EXTRA_DEBUG_TICKET_TARIFF_SYSTEM";
-    public static final String EXTRA_DEBUG_TICKET_NUM_ZONES = TicketActivationActivity.class.getName() + ".EXTRA_DEBUG_TICKET_NUM_ZONES";
-    public static final String EXTRA_DEBUG_TICKET_VALIDITY_DURATION = TicketActivationActivity.class.getName() + ".EXTRA_DEBUG_TICKET_VALIDITY_DURATION";
-    public static final String EXTRA_DEBUG_TICKET_ZONE_OPTIONS = TicketActivationActivity.class.getName() + ".EXTRA_DEBUG_TICKET_ZONE_OPTIONS";
+    public static final String EXTRA_TICKET = TicketActivationActivity.class.getName() + ".EXTRA_TICKET";
     public static final String EXTRA_PREPAID_ZONES = TicketActivationActivity.class.getName() + ".EXTRA_PREPAID_ZONES";
 
     private static final String REQUEST_KEY_ACTIVATION_TIME = TicketActivationActivity.class.getName() + ".REQUEST_KEY_ACTIVATION_TIME";
@@ -61,6 +68,8 @@ public class TicketActivationActivity extends BaseActivity {
 
     private TicketActivationViewModel viewModel;
     private DeviceListViewModel devicesViewModel;
+
+    private PillPopoutAnimation currentFastPillAnim;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -101,12 +110,9 @@ public class TicketActivationActivity extends BaseActivity {
         if (intent.hasExtra(EXTRA_TICKET_ID)) {
             // not implemented in demo app
         } else {
-            String tariffSystem = Objects.requireNonNull(intent.getStringExtra(EXTRA_DEBUG_TICKET_TARIFF_SYSTEM));
-            int numZones = intent.getIntExtra(EXTRA_DEBUG_TICKET_NUM_ZONES, 4);
-            List<String> zoneOptions = List.of(Objects.requireNonNull(intent.getStringArrayExtra(EXTRA_DEBUG_TICKET_ZONE_OPTIONS)));
-            Duration validityDuration = Duration.ofMinutes(intent.getIntExtra(EXTRA_DEBUG_TICKET_VALIDITY_DURATION, 60));
+            TicketData ticket = Objects.requireNonNull(IntentCompat.getParcelableExtra(intent, EXTRA_TICKET, TicketData.class));
 
-            viewModel.setDebugTicket(new TicketActivationViewModel.DebugTicket(tariffSystem, numZones, zoneOptions, validityDuration));
+            viewModel.setTicket(ticket);
 
             String[] prepaid = intent.getStringArrayExtra(EXTRA_PREPAID_ZONES);
             if (prepaid != null) {
@@ -137,6 +143,8 @@ public class TicketActivationActivity extends BaseActivity {
         });
 
         binding.llContent.getLayoutTransition().enableTransitionType(LayoutTransition.CHANGING);
+        LayoutTransition headerLayoutAnim = binding.llHeader.getLayoutTransition();
+        headerLayoutAnim.enableTransitionType(LayoutTransition.CHANGING);
 
         binding.llActivationTime.setOnClickListener(v -> showActivationTimeTypeDialog());
 
@@ -176,7 +184,7 @@ public class TicketActivationActivity extends BaseActivity {
 
         viewModel.getDeviceDataIsLoading().observe(this, loading -> {
             deviceDataLoadingBar.setVisibility(loading ? View.VISIBLE : View.GONE);
-            checkmark.setVisibility((loading || !viewModel.isCurrentDeviceTrusted()) ? View.GONE : View.VISIBLE);
+            updateDeviceCheckmark(checkmark);
         });
 
         viewModel.getActivationStop().observe(this, activationStop -> {
@@ -211,6 +219,7 @@ public class TicketActivationActivity extends BaseActivity {
         binding.activationStop.getRoot().setOnClickListener(v -> launchStopPicker());
 
         viewModel.getRawServerAuthenticationResult().observe(this, trusted -> {
+            updateDeviceCheckmark(checkmark);
             if (trusted == null) {
                 // no device
                 return;
@@ -249,6 +258,57 @@ public class TicketActivationActivity extends BaseActivity {
         viewModel.getCanActivateTicket().observe(this, binding.fabConfirm::setEnabled);
 
         binding.fabConfirm.setOnClickListener(v -> showTicketActivationConfirmation());
+
+        viewModel.getPreauthExpirationSecondsLeft().observe(this, secondsLeft -> fastActivationCountdownPillUpdater.run());
+
+        binding.tvFastActivationTimer.setOnClickListener(v -> {
+            CommonDialogs.newInfoDialog(this, R.string.fast_activation_infobox_title, R.string.fast_activation_infobox_message)
+                    .show();
+        });
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        binding.tvFastActivationTimer.removeCallbacks(fastActivationCountdownPillUpdater);
+    }
+
+    private final Runnable fastActivationCountdownPillUpdater = new Runnable() {
+        @Override
+        public void run() {
+            Long secondsLeft = viewModel.getPreauthExpirationSecondsLeft().getValue();
+            if (secondsLeft != null && secondsLeft >= 0) {
+                TextView pill = binding.tvFastActivationTimer;
+                boolean wasGone = pill.getVisibility() == View.GONE;
+                pill.setVisibility(secondsLeft > 0 ? View.VISIBLE : View.GONE);
+                long minutes = secondsLeft / 60;
+                long seconds = secondsLeft % 60;
+                int color = R.color.delay_ok;
+                if (secondsLeft <= 10) {
+                    color = R.color.delay_high;
+                } else if (secondsLeft <= 30) {
+                    color = R.color.delay_mid;
+                }
+                pill.setBackgroundTintList(ColorStateList.valueOf(getColor(color)));
+                if (wasGone) {
+                    if (currentFastPillAnim != null) {
+                        currentFastPillAnim.cancel();
+                    }
+                    pill.setText("");
+                    currentFastPillAnim = new PillPopoutAnimation(pill);
+                    currentFastPillAnim.start();
+                    pill.post(this);
+                } else {
+                    pill.setText(getString(R.string.fast_activation_countdown_time_format, minutes, seconds));
+                }
+            } else {
+                binding.tvFastActivationTimer.setVisibility(View.GONE);
+            }
+        }
+    };
+
+    private void updateDeviceCheckmark(View checkmark) {
+        checkmark.setVisibility((viewModel.isDeviceDataLoading() || (viewModel.isDeviceTrustDecided() && !viewModel.isCurrentDeviceTrusted())) ? View.GONE : View.VISIBLE);
     }
 
     private String formatValidityStartText() {
@@ -414,5 +474,61 @@ public class TicketActivationActivity extends BaseActivity {
                 .setPositiveButton(R.string.ticket_activation_confirm_yes, (dialog, which) -> finish())
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
+    }
+
+    private static class PillPopoutAnimation {
+
+        private final View pill;
+
+        private ViewPropertyAnimator scale;
+        private ValueAnimator corners;
+
+        private final int defaultWidth;
+        private final int defaultHeight;
+
+        public PillPopoutAnimation(View pill) {
+            this.pill = pill;
+            ViewUtils.measureViewForWrapContent(pill);
+            defaultWidth = pill.getMeasuredWidth();
+            defaultHeight = pill.getMeasuredHeight();
+        }
+
+        public void start() {
+            PathInterpolator interpolator = new PathInterpolator(0.2f, 0f, 0f, 1f);
+
+            pill.setAlpha(0f);
+            pill.setScaleX(0.4f);
+            pill.setScaleY(0.4f);
+            pill.setPivotX(defaultWidth);
+            pill.setPivotY(0);
+
+            scale = pill.animate()
+                    .alpha(1f)
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .setDuration(500)
+                    .setInterpolator(interpolator);
+
+            GradientDrawable background = (GradientDrawable) pill.getBackground();
+
+            corners = ValueAnimator.ofFloat(defaultHeight / 2f, pill.getContext().getResources().getDimensionPixelSize(R.dimen.section_margin_normal));
+
+            corners.setDuration(scale.getDuration());
+            corners.setInterpolator(interpolator);
+
+            corners.addUpdateListener(animation -> {
+                background.setCornerRadius(
+                        (float) animation.getAnimatedValue()
+                );
+            });
+
+            scale.start();
+            corners.start();
+        }
+
+        public void cancel() {
+            scale.cancel();
+            corners.cancel();
+        }
     }
 }

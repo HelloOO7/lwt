@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 
 import javax.net.ssl.SSLContext;
 
@@ -94,12 +95,16 @@ public class MainActivity extends BaseActivity {
 
             startActivity(
                     new Intent(this, TicketActivationActivity.class)
-                            .putExtra(TicketActivationActivity.EXTRA_DEBUG_TICKET_TARIFF_SYSTEM, "PID")
-                            .putExtra(TicketActivationActivity.EXTRA_DEBUG_TICKET_NUM_ZONES, numZones)
-                            .putExtra(TicketActivationActivity.EXTRA_DEBUG_TICKET_VALIDITY_DURATION, validityMinutes)
                             .putExtra(
-                                    TicketActivationActivity.EXTRA_DEBUG_TICKET_ZONE_OPTIONS,
-                                    new String[]{"P", "0", "B", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"}
+                                    TicketActivationActivity.EXTRA_TICKET,
+                                    new TicketData(
+                                            "PID",
+                                            numZones,
+                                            List.of("P", "0", "B", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"),
+                                            Duration.ofMinutes(validityMinutes),
+                                            TestingTicketData.ACTIVATION_TOKEN,
+                                            TestingTicketData.ACTIVATION_TOKEN_SIGNED_HASH
+                                    )
                             )
                             .putExtra(
                                     TicketActivationActivity.EXTRA_PREPAID_ZONES,

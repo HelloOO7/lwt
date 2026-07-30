@@ -20,40 +20,56 @@ table TicketValidationInfo {
     is_razzia: bool;
 }
 
+table ActivationTokenHash {
+    /// Raw data of the activation token hash, which contains the SHA256 digest of the activation token.
+    /// It is suffixed with the signature of the data within by the ticket issuer authority.
+    /// This is used as a security measure so that clients can not easily flood the activation server
+    /// with unsigned hashes with the goal of evicting themselves out of the server's memory and resetting
+    /// their preauthorization token limit.
+    /// A malicious client could also attempt to gather a large number of valid activation tokens over time
+    /// and then use them for a DoS attack. For this reason, use of activation tokens should be periodically reported
+    /// to a central server, so that reuse of already redeemed tokens can be detected and penalized.
+    data: [ubyte] (required);
+}
+
 table PreauthorizationTokenRequest {
-    /// CRC-32 checksums of the activation tokens which the client
+    /// SHA256 checksums of the activation tokens which the client
     /// promises to send, should they choose to redeem the preauthorization token.
     /// These are limited to a small amount of elements so as to prevent abuse.
     /// The client will not be able to activate a ticket whose token was not provided
     /// as part of this request, as the preauthorization token will not contain a
     /// digital signature for such tokens.
-    activation_token_hashes: [int] (required);
+    activation_token_hashes: [ActivationTokenHash] (required);
+}
+
+enum PreauthorizationTokenStatus : ubyte {
+    Ok,
+    RequestedTooOften
 }
 
 table PreauthorizationToken {
-    /// CRC-32 checksum of the activation token for which this preauthorization token
-    /// was generated.
-    activation_token_hash: int;
-    /// The actual preauthorization token. The data within is implementation-dependent
-    /// and contains information such as the expiry timestamp.
-    preauthorization_token: [ubyte] (required);
-    /// Signature of the preauthorization_token field. The client needn't worry about the details thereof,
-    /// as their only responsibility is to simply send this unmodified token with an activation request.
-    preauthorization_signature: [ubyte] (required);
+    /// Status of the preauthorization token.
+    status: PreauthorizationTokenStatus;
+    /// The raw preauthorization token. The data within is implementation-dependent
+    /// and contains information such as the expiry timestamp, as well as a SHA256
+    /// HMAC at the end.
+    /// This field may not be present if the "status" field is not equal to "Ok".
+    preauthorization_token: [ubyte];
 }
 
 table PreauthorizationTokenResponse {
-    /// Timestamp when the server has issued these tokens (in server time).
+    /// Timestamp when the server has issued these tokens (in milliseconds of server time).
     /// The server adjusts this to be approximately halfway between the time of receiving
     /// the request and sending the response, as this may take a long time because of the
     /// cryptographic operations involved.
     /// The client may measure the request RTT and use this to calculate an
     /// estimate of their local expiry time.
     issued_at: long;
-    /// Timestamp (in server time) when the preauthorization tokens become invalid.
+    /// Timestamp (in milliseconds of server time) when the preauthorization tokens become invalid.
     expires_at: long;
-    /// Preauthorization tokens for the individual activation tokens requested.
-    tokens: [PreauthorizationToken];
+    /// Preauthorization tokens for the individual activation tokens requested. The order of these
+    /// tokens is the same as in the PreauthorizationTokenRequest.
+    tokens: [PreauthorizationToken] (required);
 }
 
 table TicketActivationRequest {

@@ -23,11 +23,14 @@
 #include "lwt_AdvData.h"
 #include "lwdn_BleAdvertiser.h"
 #include "lwt_TripInfoAdvertiser.h"
+#include "lwt_PreauthorizationTokenManager.h"
+#include "lwt_TicketSignatureVerifier.h"
 #include "BitConverter.h"
 #include "operations_generated.h"
 #include "esp_event.h"
 #include "tls_setup.h"
 #include "tls_certs.h"
+#include "ticket_pubkey.h"
 #include "debug_device.h"
 #include <atomic>
 
@@ -36,6 +39,12 @@ static constexpr lwdn::BleAdvertiser::UUID32 BLE_SERVICE_UUID_VEHICLE = 0x4C5754
 static constexpr lwdn::BleAdvertiser::UUID32 BLE_SERVICE_UUID_STOP = 0x4C575453; // 'LWTS'
 static constexpr lwdn::BleAdvertiser::UUID32 BLE_SERVICE_UUID_VEHICLE_EXTENDED = BLE_SERVICE_UUID_VEHICLE + 'E';
 static constexpr lwdn::BleAdvertiser::UUID32 BLE_SERVICE_UUID_STOP_EXTENDED = BLE_SERVICE_UUID_STOP + 'E';
+
+static const lwt::TicketValidationConfig TICKETING_CONFIG = {
+    .TariffSystemID = "PID",
+    .PreauthorizationGracePeriodUs = 2 * 60 * 1000 * 1000, // 2 minutes
+    .ValidationProtectionPeriodUs = 1 * 60 * 1000 * 1000, // 1 minute
+};
 
 class AppMain {
 private:
@@ -50,6 +59,8 @@ private:
     lwt::PingService m_PingService;
     lwt::ServerAuthenticationService m_ServerAuthService;
     lwt::TripInformationService m_TripInfoService;
+    lwt::PreauthorizationTokenManager m_PreauthTokenManager;
+    lwt::TicketSignatureVerifier m_TicketVerifier;
     lwt::TicketValidationService m_TicketService;
 
     lwdn::BleAdvertiser m_BLETripAdvertiserLegacy;
@@ -76,7 +87,9 @@ public:
         m_AppServer(m_ServiceRegistry),
         m_ServerAuthService(get_debug_device_crt_start(), m_TlsCredentials.device_key, m_TlsCredentials.ctr_drbg),
         m_TripInfoService(m_CISSubscriber),
-        m_TicketService("PID", m_TripInfoService, &m_TVSSubscriber), //TVS not yet implemented
+        m_PreauthTokenManager(LoadOrCreateHmacKey(m_TlsCredentials.ctr_drbg, "pat_hmac_key", 32)),
+        m_TicketVerifier(),
+        m_TicketService(TICKETING_CONFIG, m_PreauthTokenManager, m_TicketVerifier, m_TripInfoService, &m_TVSSubscriber), //TVS not yet implemented
         m_BLETripAdvertiserLegacy(0, BLE_SERVICE_UUID_VEHICLE, lwdn::BleAdvertiser::Flags::INCLUDE_DEVICE_NAME | lwdn::BleAdvertiser::Flags::USE_LEGACY_ADVERTISING),
         m_BLETripAdvertiserExt(1, BLE_SERVICE_UUID_VEHICLE_EXTENDED, lwdn::BleAdvertiser::Flags::INCLUDE_DEVICE_NAME),
         m_TripInfoAdvertiser(m_CISSubscriber, { &m_BLETripAdvertiserLegacy, &m_BLETripAdvertiserExt })
@@ -84,6 +97,8 @@ public:
         lwt::ensure_generated_types_linked();
 
         setup_tls_config(m_TlsCredentials, m_MbedTlsConfig);
+
+        m_TicketVerifier.RegisterPublicKey(0, {TICKET_SIGNING_KEY_PUB_START, TICKET_SIGNING_KEY_PUB_END});
 
         m_ServiceRegistry.RegisterServices(m_PingService, m_ServerAuthService, m_TripInfoService, m_TicketService);
 
@@ -94,6 +109,27 @@ public:
     void StartAdvertising() {
         m_BLETripAdvertiserLegacy.Start();
         m_BLETripAdvertiserExt.Start();
+    }
+
+private:
+    static std::vector<uint8_t> LoadOrCreateHmacKey(mbedtls_ctr_drbg_context& ctrDrbg, const char* nvsKey, size_t expectedSize) {
+        nvs_handle nvsHandle;
+        ESP_ERROR_CHECK(nvs_open("lwt", NVS_READWRITE, &nvsHandle));
+        std::vector<uint8_t> hmacKey(expectedSize);
+        size_t pBlobSize = expectedSize;
+        esp_err_t err = nvs_get_blob(nvsHandle, nvsKey, hmacKey.data(), &pBlobSize);
+        if (err == ESP_ERR_NVS_NOT_FOUND) {
+            // generate new key
+            int rc = mbedtls_ctr_drbg_random(&ctrDrbg, hmacKey.data(), expectedSize);
+            assert(rc == 0);
+            ESP_ERROR_CHECK(nvs_set_blob(nvsHandle, nvsKey, hmacKey.data(), expectedSize));
+            ESP_ERROR_CHECK(nvs_commit(nvsHandle));
+        }
+        else {
+            ESP_ERROR_CHECK(err);
+        }
+        nvs_close(nvsHandle);
+        return hmacKey;
     }
 };
 
@@ -185,7 +221,7 @@ static void bleprph_advertise(void)
     fields.name_len = strlen(name);
     fields.name_is_complete = 1;
     uint8_t svc_data[sizeof(uint32_t) + lwt::AdvDataBasic::PACKED_SIZE];
-    BitConverter<LITTLE_ENDIAN>::FromUInt32(BLE_SERVICE_UUID_VEHICLE, svc_data);
+    BitConverter<std::endian::little>::FromUInt32(BLE_SERVICE_UUID_VEHICLE, svc_data);
     lwt::AdvDataBasic test_adv_data{
         .line_type = lwt::LineType::LineType_GenericBus,
         .line_license_number = 100394,

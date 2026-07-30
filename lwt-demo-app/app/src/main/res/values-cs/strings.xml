@@ -68,4 +68,6 @@
     <string name="ticket_activation_end_summary_stop">Na této lince jízdenka platí až do zastávky %1$s a rovněž kdekoli v povolených zónách až do konce platnosti %2$s.</string>
     <string name="list_format_last_separator">" a&#xA0;"</string>
     <string name="list_format_serial_comma_policy">NORMAL</string>
+    <string name="fast_activation_infobox_title">Zrychlená aktivace</string>
+    <string name="fast_activation_infobox_message">Aktivace jízdenky pro zvolený spoj v uvedeném časovém okně nepodléhá ochranné lhůtě - jízdenka začne platit okamžitě.</string>
 </resources>

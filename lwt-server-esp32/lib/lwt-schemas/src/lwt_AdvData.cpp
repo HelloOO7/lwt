@@ -12,7 +12,7 @@ namespace lwt {
     }
 
     void AdvDataBasic::pack(uint8_t* pDst) const {
-        auto out = BitConverter<BIG_ENDIAN>::OutputStream(pDst);
+        auto out = BitConverter<std::endian::big>::OutputStream(pDst);
         out.WriteUInt8((uint8_t)line_type);
         out.WriteUInt24(line_license_number);
         out.WriteUInt24(trip_number);
@@ -44,7 +44,7 @@ namespace lwt {
     void AdvDataExtended::pack(uint8_t* pDst) const {
         AdvDataBasic::pack(pDst);
         pDst += PACKED_SIZE;
-        BitConverter<BIG_ENDIAN>::FromUInt16(DATA_MARK, pDst);
+        BitConverter<std::endian::big>::FromUInt16(DATA_MARK, pDst);
         pDst += sizeof(DATA_MARK);
 
         EncodeString(cur_stop_name, &pDst);

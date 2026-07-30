@@ -5,14 +5,50 @@
 #include "lwt_TripInformationService.h"
 #include "ticket_validation_generated.h"
 #include <string>
+#include <deque>
 #include "lwt_ServiceRegistry.h"
+#include "lwt_PreauthorizationTokenManager.h"
+#include "lwt_TicketSignatureVerifier.h"
+#include "PSRAMAllocator.h"
 
 namespace lwt {
+
+    struct TicketValidationConfig {
+        std::string TariffSystemID;
+        int64_t PreauthorizationGracePeriodUs;
+        int64_t ValidationProtectionPeriodUs;
+    };
+
+    class TicketPreauthRateLimiter {
+    private:
+        struct Entry {
+            SHA256Hash TokenHash;
+            int64_t TimestampUs;
+        };
+
+        size_t m_Capacity;
+        int64_t m_MaxAgeUs;
+        std::deque<Entry, psram_allocator<Entry>> m_Entries;
+
+    public:
+        TicketPreauthRateLimiter(size_t capacity, int64_t maxAgeUs);
+
+        void InvalidateAll();
+
+        bool IsTokenHashAllowed(const SHA256HashView& tokenHash, int64_t currentTime);
+        void RegisterTokenHashUsed(const SHA256HashView& tokenHash, int64_t currentTime);
+
+    private:
+        void InvalidateOldEntries(int64_t currentTime);
+    };
 
     class TicketValidationService : Observer<TripRouteInfo>, Observer<vdv301::SubscriberTVS::CurrentTariffStop>, Observer<vdv301::SubscriberTVS::RazziaState>
     {
     private:
-        std::string m_TariffSystemID;
+        TicketValidationConfig m_Config;
+        PreauthorizationTokenManager& m_TokenManager;
+        TicketPreauthRateLimiter m_PreauthRateLimiter;
+        TicketSignatureVerifier& m_TicketVerifier;
         TripInformationService& m_TripInfoService;
         vdv301::SubscriberTVS* m_TVS;
 
@@ -29,8 +65,10 @@ namespace lwt {
 
         flatbuffers::FlatBufferBuilder m_ValidationInfoFBB{ PSRAMFlatBufferBuilder() };
 
+        std::mutex m_TokenGeneratorMutex;
+
     public:
-        TicketValidationService(const std::string& tariffSystemId, TripInformationService& tripInfoService, vdv301::SubscriberTVS* tvsOpt = nullptr);
+        TicketValidationService(const TicketValidationConfig& config, PreauthorizationTokenManager& tokenManager, TicketSignatureVerifier& ticketVerifier, TripInformationService& tripInfoService, vdv301::SubscriberTVS* tvsOpt = nullptr);
         virtual ~TicketValidationService() override;
 
         void Register(ServiceRegistry& registry);
@@ -45,6 +83,7 @@ namespace lwt {
         void UpdateValidationInfo();
         void ResetValidationInfo();
         void FinishValidationInfo(flatbuffers::Offset<TicketValidationInfo> data);
+        std::string GetCurrentTripKey();
 
         std::string GetTariffZonesOnlyMyTariffSystem(const std::string& tariffZones) const;
 

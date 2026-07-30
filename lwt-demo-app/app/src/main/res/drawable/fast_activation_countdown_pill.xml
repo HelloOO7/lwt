@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle"
+    android:tint="@color/delay_ok">
+
+    <solid android:color="@color/white"/>
+    <corners android:radius="@dimen/section_margin_normal"/>
+    <padding android:bottom="@dimen/item_margin_normal" android:left="@dimen/item_margin_normal" android:right="@dimen/item_margin_normal" android:top="@dimen/item_margin_normal"/>
+</shape>

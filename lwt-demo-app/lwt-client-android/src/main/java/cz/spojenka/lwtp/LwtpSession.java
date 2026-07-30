@@ -5,7 +5,9 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
+import java.util.function.Consumer;
 
 import cz.spojenka.lwdn.LwdnSocket;
 import cz.spojenka.lwdn.LwdnSocketFactory;
@@ -15,8 +17,38 @@ public class LwtpSession {
 
     private final List<PendingRequest> pendingRequests = new ArrayList<>();
     private Duration watchdogTimeout = null;
+    private final List<ExecutionObserver> observers = new ArrayList<>();
+
+    public LwtpSession cloneAsEmpty() {
+        LwtpSession newSession = new LwtpSession();
+        cloneAsEmpty(newSession);
+        return newSession;
+    }
+
+    protected void cloneAsEmpty(LwtpSession dest) {
+        dest.watchdogTimeout = this.watchdogTimeout;
+        dest.observers.addAll(this.observers);
+    }
+
+    public void addObserver(ExecutionObserver observer) {
+        if (!observers.contains(observer)) {
+            observers.add(observer);
+        }
+    }
+
+    public void removeObserver(ExecutionObserver observer) {
+        observers.remove(observer);
+    }
+
+    private void invokeObservers(Consumer<ExecutionObserver> action) {
+        for (ExecutionObserver observer : observers) {
+            action.accept(observer);
+        }
+    }
 
     protected LwtpPacket sendRequest(LwdnSocket socket, LwtpPacket request) throws IOException {
+        invokeObservers(o -> o.onStartRequest(request));
+
         SocketWatchdog watchdog = null;
         if (watchdogTimeout != null) {
             watchdog = new SocketWatchdog(socket, watchdogTimeout);
@@ -27,10 +59,15 @@ public class LwtpSession {
         if (watchdog != null) {
             watchdog.resetWatchdog();
         }
+        invokeObservers(o -> o.onRequestSent(request));
+
+        invokeObservers(o -> o.onStartResponse(request));
         LwtpPacket response = new LwtpPacket(socket.getInputStream());
         if (watchdog != null) {
             watchdog.stopWatchdog();
         }
+        invokeObservers(o -> o.onResponseReceived(request, response));
+
         return response;
     }
 
@@ -65,6 +102,13 @@ public class LwtpSession {
         return pendingRequest.future;
     }
 
+    public void clear() {
+        for (PendingRequest pendingRequest : pendingRequests) {
+            pendingRequest.future.cancel(true);
+        }
+        pendingRequests.clear();
+    }
+
     /**
      * Execute all pending requests in a single transaction. The requests will be sent in the order
      * they were added. After execution, the session will be cleared and can be reused for another transaction.
@@ -88,9 +132,9 @@ public class LwtpSession {
         return future;
     }
 
-    private void execute(LwdnSocket socket, CompletableFuture<?> cancellationToken) {
+    protected void execute(LwdnSocket socket, CompletableFuture<?> cancellationToken) {
         for (PendingRequest pendingRequest : pendingRequests) {
-            if (cancellationToken.isCancelled() && !pendingRequest.future.isCancelled()) {
+            if (cancellationToken != null && cancellationToken.isCancelled() && !pendingRequest.future.isCancelled()) {
                 pendingRequest.future.cancel(true);
             }
             if (pendingRequest.future.isCancelled()) {
@@ -98,15 +142,27 @@ public class LwtpSession {
             }
             try {
                 LwtpPacket response = sendRequest(socket, pendingRequest.request);
-                pendingRequest.future.complete(response);
-            } catch (IOException e) {
-                pendingRequest.future.completeExceptionally(e);
+                if (cancellationToken != null && cancellationToken.isCancelled()) {
+                    pendingRequest.future.cancel(true);
+                } else {
+                    pendingRequest.future.complete(response);
+                }
+            } catch (Exception e) {
+                if (cancellationToken != null && cancellationToken.isCancelled()) {
+                    pendingRequest.future.cancel(true);
+                } else {
+                    pendingRequest.future.completeExceptionally(e);
+                    if (cancellationToken != null && !cancellationToken.isCompletedExceptionally()) {
+                        // only the first error will be reported to the overarching future, if present
+                        cancellationToken.completeExceptionally(e);
+                    }
+                }
             }
         }
         pendingRequests.clear();
     }
 
-    protected void finishRemainingWithException(IOException ex) {
+    protected void finishRemainingWithException(Exception ex) {
         for (PendingRequest pendingRequest : pendingRequests) {
             if (!pendingRequest.future.isDone() && !pendingRequest.future.isCancelled()) {
                 pendingRequest.future.completeExceptionally(ex);
@@ -126,15 +182,19 @@ public class LwtpSession {
     }
 
     public CompletableFuture<Void> executeAsync(LwdnSocketFactory socketFactory) {
+        return executeAsync(socketFactory, null);
+    }
+
+    public CompletableFuture<Void> executeAsync(LwdnSocketFactory socketFactory, Executor executor) {
         CompletableFuture<Void> future = new CompletableFuture<>();
         CompletableFuture.runAsync(() -> {
             try {
                 execute(socketFactory, future);
                 future.complete(null);
-            } catch (Exception e) {
+            } catch (Exception e) { // catch exceptions outside of the main calls
                 future.completeExceptionally(e);
             }
-        });
+        }, executor != null ? executor : ForkJoinPool.commonPool());
         return future;
     }
 
@@ -142,8 +202,11 @@ public class LwtpSession {
         try (LwdnSocket socket = socketFactory.openSocket()) {
             execute(socket, cancellationToken);
         } catch (IOException ex) {
-            // socket exception
+            // exception when opening socket
             finishRemainingWithException(ex);
+            if (cancellationToken != null) {
+                cancellationToken.completeExceptionally(ex);
+            }
         }
     }
 
@@ -172,6 +235,25 @@ public class LwtpSession {
         public PendingRequest(LwtpPacket request) {
             this.request = request;
             this.future = new CompletableFuture<>();
+        }
+    }
+
+    public static interface ExecutionObserver {
+
+        public default void onStartRequest(LwtpPacket request) {
+
+        }
+
+        public default void onRequestSent(LwtpPacket request) {
+
+        }
+
+        public default void onStartResponse(LwtpPacket request) {
+
+        }
+
+        public default void onResponseReceived(LwtpPacket request, LwtpPacket response) {
+
         }
     }
 }

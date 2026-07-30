@@ -1,6 +1,7 @@
 package cz.spojenka.lwtp;
 
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -14,6 +15,17 @@ public class TLSLwtpSession extends LwtpSession {
 
     public TLSLwtpSession(LwtpTLSConfig config) {
         this.config = config;
+    }
+
+    @Override
+    public TLSLwtpSession cloneAsEmpty() {
+        TLSLwtpSession newSession = new TLSLwtpSession(config);
+        cloneAsEmpty(newSession);
+        return newSession;
+    }
+
+    protected void cloneAsEmpty(TLSLwtpSession dest) {
+        super.cloneAsEmpty(dest);
     }
 
     private int startTLS(LwdnSocket socket) throws IOException {
@@ -54,17 +66,17 @@ public class TLSLwtpSession extends LwtpSession {
     }
 
     @Override
-    public void execute(LwdnSocket socket) {
+    protected void execute(LwdnSocket socket, CompletableFuture<?> cancellationToken) {
         try {
             if (config.getTlsPolicy() == LwtpTLSPolicy.IMPLICIT) {
                 if (socket instanceof TLSLwdnSocket) {
-                    super.execute(socket);
+                    super.execute(socket, cancellationToken);
                 } else {
                     // establish our own implicit connection if caller did not pass
                     // a TLS socket. this allows the caller to manage the TLS session themselves
                     // if they want to, but also allows us to transparently add TLS support if they do not.
                     TLSLwdnSocket tlsSocket = createTLSSocket(socket);
-                    super.execute(tlsSocket);
+                    super.execute(tlsSocket, cancellationToken);
                     // shutdown TLS session (close notify). we do not close the
                     // underlying socket to maintain interface consistency.
                     tlsSocket.shutdown();
@@ -73,7 +85,7 @@ public class TLSLwtpSession extends LwtpSession {
                 // this will attempt TLS connection including START_TLS command.
                 if (applyExplicitTLSPolicy(socket)) {
                     TLSLwdnSocket tlsSocket = createTLSSocket(socket);
-                    super.execute(tlsSocket);
+                    super.execute(tlsSocket, cancellationToken);
                     // again, we will explicitly send a close-notify, as the calling function
                     // does not have a reference to the TLS socket, and if we let it call the close
                     // function, it would simply close the data path without sending a close

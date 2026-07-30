@@ -1,51 +1,81 @@
 package cz.spojenka.lwt.demoapp;
 
 import android.app.Application;
+import android.util.Log;
 
+import java.security.GeneralSecurityException;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BiFunction;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.function.Function;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLException;
 
 import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.Transformations;
+import cz.spojenka.android.system.TickNotifier;
+import cz.spojenka.android.system.TimeTickReceiver;
 import cz.spojenka.android.system.livedata.LiveList;
+import cz.spojenka.android.util.AsyncUtils;
 import cz.spojenka.android.util.LiveDataUtils;
 import cz.spojenka.lwdn.LwdnScanException;
 import cz.spojenka.lwt.CommType;
 import cz.spojenka.lwt.LwtAPIClient;
 import cz.spojenka.lwt.LwtDevice;
 import cz.spojenka.lwt.LwtDeviceType;
+import cz.spojenka.lwt.PreauthorizationToken;
+import cz.spojenka.lwt.PreauthorizationTokenStatus;
 import cz.spojenka.lwt.StopReference;
 import cz.spojenka.lwt.TicketValidationInfo;
+import cz.spojenka.lwt.TokenWithExpiration;
 import cz.spojenka.lwt.TripRouteInfo;
 import cz.spojenka.lwt.TripStopInfo;
 import cz.spojenka.lwt.util.LwtTariffZones;
 import cz.spojenka.lwt.util.LwtTime;
+import cz.spojenka.lwtp.LwtpTLSConfig;
+import cz.spojenka.lwtp.LwtpTLSPolicy;
 
 public class TicketActivationViewModel extends AndroidViewModel {
 
-    private static final boolean MOCK_UNTRUSTED_SERVER = false;
+    private static final String TAG = "TicketActivation";
 
-    private DebugTicket ticket;
+    private static final boolean MOCK_UNTRUSTED_SERVER = false;
+    private static final boolean MOCK_PREAUTH_ALWAYS_OK = false;
+
+    private TicketData ticket;
 
     private final DeviceListViewModel devicesViewModel;
 
+    // we are broadcasting over a wireless radio channel to a single-threaded server, so there
+    // is no point in doing so asynchronously and, in fact, it could needlessly overload the server,
+    // so we create a single thread for doing it
+    private final Executor lwtRequestThread = Executors.newSingleThreadExecutor();
+
+    private LwtAPIClient lwtClient;
+    private LwtAPIClient secureLwtClient;
+
     private MutableLiveData<LwtDevice> selectedAutoActivationDevice = new MutableLiveData<>();
-    private LwtAPIClient autoActivationClient;
-    private CompletableFuture<Void> currentDeviceDataRequest;
+    private List<CompletableFuture<Void>> currentDeviceDataRequests = new ArrayList<>();
     private MutableLiveData<Boolean> deviceDataIsLoading = new MutableLiveData<>(false);
     private MutableLiveData<TripRouteInfo> deviceRouteInfo = new MutableLiveData<>();
     private MutableLiveData<TicketValidationInfo> deviceValidationInfo = new MutableLiveData<>();
     private MutableLiveData<Boolean> rawServerAuthenticationResult = new MutableLiveData<>();
+    private MutableLiveData<TokenWithExpiration<PreauthorizationToken>> devicePreauthToken = new MutableLiveData<>();
+    private MutableLiveData<Long> preauthExpirationSecondsLeft = new MutableLiveData<>(null);
 
     private MutableLiveData<Throwable> autoDownloadException = new MutableLiveData<>();
 
@@ -79,10 +109,14 @@ public class TicketActivationViewModel extends AndroidViewModel {
         setChosenZonesAuto();
         setActivationTimeNow(false);
 
+        TickNotifier tickNotifier = new TickNotifier(getApplication(), this::onTimeTick, 1000);
+        tickNotifier.register();
+
         addCloseable(devicesViewModel::close);
+        addCloseable(tickNotifier::unregister);
     }
 
-    public void setDebugTicket(DebugTicket ticket) {
+    public void setTicket(TicketData ticket) {
         this.ticket = ticket;
     }
 
@@ -111,10 +145,8 @@ public class TicketActivationViewModel extends AndroidViewModel {
     }
 
     private void clearAutoActivationDevice(boolean full) {
-        if (currentDeviceDataRequest != null) {
-            currentDeviceDataRequest.cancel(true);
-            currentDeviceDataRequest = null;
-        }
+        currentDeviceDataRequests.forEach(r -> r.cancel(true));
+        currentDeviceDataRequests = List.of();
 
         currentActivationStop = null;
         tviActivationStop = null;
@@ -130,6 +162,8 @@ public class TicketActivationViewModel extends AndroidViewModel {
         deviceRouteInfo.setValue(null);
         rawServerAuthenticationResult.setValue(null);
         activationStop.setValue(null);
+        devicePreauthToken.setValue(null);
+        preauthExpirationSecondsLeft.setValue(null);
 
         var chosenZones = getChosenZones().getValue();
         if (chosenZones != null && !chosenZones.isManual() && !chosenZones.zones().isEmpty()) {
@@ -161,35 +195,67 @@ public class TicketActivationViewModel extends AndroidViewModel {
 
         deviceDataIsLoading.setValue(true);
 
-        autoActivationClient = new LwtAPIClient(device.getAddress());
-        autoActivationClient.disableTLS(); // at this stage, use unencrypted connection
+        lwtClient = new LwtAPIClient(device.getAddress());
+        lwtClient.disableTLS(); // at this stage, use unencrypted connection
+        secureLwtClient = new LwtAPIClient(device.getAddress());
+        try {
+            SSLContext sslContext;
+            if (MOCK_UNTRUSTED_SERVER) {
+                // default SSL context will not trust our self-signed certs
+                sslContext = SSLContext.getDefault();
+            } else {
+                sslContext = GlobalTrustManager.getInstance(getApplication()).createSSLContext();
+            }
 
-        enqueueDataDownloadRequest(LwtAPIClient::getTicketValidationInfo, deviceValidationInfo).thenAcceptAsync(tvi -> {
+            secureLwtClient.useTLS(
+                    new LwtpTLSConfig.Builder(device.getAddress())
+                            .setTLSPolicy(LwtpTLSPolicy.EXPLICIT_REQUIRED)
+                            .setSSLContext(sslContext)
+                            .build()
+            );
+        } catch (GeneralSecurityException e) {
+            Log.e(TAG, "Failed to create SSL context for secure LWT client, fallback to insecure", e);
+            secureLwtClient = lwtClient;
+        }
+
+        List<CompletableFuture<?>> requestsForLoadingIndicator = new ArrayList<>();
+
+        requestsForLoadingIndicator.add(enqueueDataDownloadRequest(lwtClient::getTicketValidationInfo, deviceValidationInfo).thenAcceptAsync(tvi -> {
             defaultActivationTimeForTviStop = LwtTime.parseLocalTimestamp(tvi.scheduledActivationTime());
             tviActivationStop = tvi.trip().currentDepartureStop();
             forceUseTviStop |= isShouldUseTicketValidationStop(tvi);
             canNotUseTicketWithDevice = checkAllDeviceZonesNotApplicable(tvi);
             commitDefaultActivationStopIfAllData();
-        }, getApplication().getMainExecutor());
-        enqueueDataDownloadRequest(LwtAPIClient::getTripRouteInfo, deviceRouteInfo).thenAcceptAsync(tri -> {
+        }, getApplication().getMainExecutor()));
+        requestsForLoadingIndicator.add(enqueueDataDownloadRequest(lwtClient::getTripRouteInfo, deviceRouteInfo).thenAcceptAsync(tri -> {
             if (!forceUseTviStop) {
                 // tvi may overwrite this if it arrives later
                 defaultActivationStop = calcDefaultActivationStopWithPrepaid(tri);
             }
             commitDefaultActivationStopIfAllData();
-        }, getApplication().getMainExecutor());
-        if (!MOCK_UNTRUSTED_SERVER) {
-            enqueueDataDownloadRequest(
-                    (api, commType) -> api.authenticateServer(GlobalTrustManager.getInstance(getApplication()), commType),
-                    rawServerAuthenticationResult
-            );
-        } else {
-            rawServerAuthenticationResult.setValue(false);
-        }
+        }, getApplication().getMainExecutor()));
 
-        currentDeviceDataRequest = autoActivationClient.executeAsync().whenCompleteAsync((unused, throwable) -> {
-            deviceDataIsLoading.setValue(false);
+        enqueueDataDownloadRequest((commType) -> secureLwtClient.requestPreauthorizationToken(ticket.getActivationTokenHashSigned(), commType), devicePreauthToken)
+                .thenAcceptAsync(token -> updatePreauthExpirationTime(), getApplication().getMainExecutor());
+
+        CompletableFuture<Void> dataDownloadFuture = lwtClient.executeAsync(lwtRequestThread);
+        CompletableFuture<Void> secureDataDownloadFuture = secureLwtClient.executeAsync(lwtRequestThread);
+
+        secureDataDownloadFuture.whenCompleteAsync((unused, throwable) -> {
+            if (AsyncUtils.unwrapCompletionException(throwable) instanceof SSLException) {
+                rawServerAuthenticationResult.setValue(false);
+            } else {
+                rawServerAuthenticationResult.setValue(true);
+            }
         }, getApplication().getMainExecutor());
+
+        CompletableFuture<Void> loadingOffFuture = CompletableFuture
+                .allOf(requestsForLoadingIndicator.toArray(new CompletableFuture[0]))
+                .whenCompleteAsync((unused, throwable) -> {
+                    deviceDataIsLoading.setValue(false);
+                }, getApplication().getMainExecutor());
+
+        currentDeviceDataRequests = List.of(dataDownloadFuture, secureDataDownloadFuture, loadingOffFuture);
     }
 
     private void commitDefaultActivationStopIfAllData() {
@@ -205,27 +271,37 @@ public class TicketActivationViewModel extends AndroidViewModel {
         }
 
         Set<String> zones = new HashSet<>();
-        zones.addAll(LwtTariffZones.findEntryForTariffSystem(tvi.tariffZones(), ticket.tariffSystemId()).zones());
-        zones.addAll(LwtTariffZones.findEntryForTariffSystem(tvi.nextTariffZones(), ticket.tariffSystemId()).zones());
+        zones.addAll(LwtTariffZones.findEntryForTariffSystem(tvi.tariffZones(), getTariffSystemId()).zones());
+        zones.addAll(LwtTariffZones.findEntryForTariffSystem(tvi.nextTariffZones(), getTariffSystemId()).zones());
         zones.retainAll(Set.copyOf(getZoneOptions()));
 
         return zones.isEmpty();
     }
 
     public String getTariffSystemId() {
-        return ticket.tariffSystemId();
+        return ticket.getTariffSystemId();
+    }
+
+    private boolean isPID() {
+        return "PID".equals(getTariffSystemId());
     }
 
     private boolean isShouldUseTicketValidationStop(TicketValidationInfo tvi) {
-        var zones = LwtTariffZones.findEntryForTariffSystem(tvi.tariffZones(), ticket.tariffSystemId());
+        var zones = LwtTariffZones.findEntryForTariffSystem(tvi.tariffZones(), getTariffSystemId());
+        boolean hasValidZone = false;
         if (zones != null) {
             for (String idsZone : zones.zones()) {
+                if (isPID() && !isPIDZone(idsZone)) {
+                    continue;
+                }
                 if (prepaidZones.contains(idsZone)) {
                     return false;
+                } else {
+                    hasValidZone = true;
                 }
             }
         }
-        return true;
+        return hasValidZone;
     }
 
     private StopReference calcDefaultActivationStopWithPrepaid(TripRouteInfo tri) {
@@ -238,6 +314,9 @@ public class TicketActivationViewModel extends AndroidViewModel {
                 // retain only prepaid, for calcPassthroughZones
                 stopZones = new ArrayList<>(stopZones);
                 stopZones.retainAll(prepaid);
+            }
+            if (stopZones.isEmpty()) {
+                continue;
             }
             List<String> passthroughZones = List.of();
             if (i + 1 < tri.stopsLength()) {
@@ -253,8 +332,7 @@ public class TicketActivationViewModel extends AndroidViewModel {
     }
 
     private List<String> calcPassthroughZones(TripStopInfo from, TripStopInfo to, boolean includeLast) {
-        String tariffSystem = ticket.tariffSystemId();
-        if (!"PID".equals(tariffSystem)) {
+        if (!isPID()) {
             return List.of();
         }
         List<String> fromZones = getStopZonesOrEmpty(from);
@@ -278,8 +356,6 @@ public class TicketActivationViewModel extends AndroidViewModel {
     private List<String> calcPassthroughZones(List<String> fromZones, List<String> toZones, boolean includeLast) {
         fromZones = new ArrayList<>(fromZones);
         toZones = new ArrayList<>(toZones);
-        removeNonPIDZones(fromZones);
-        removeNonPIDZones(toZones);
         if (fromZones.isEmpty() || toZones.isEmpty()) {
             return List.of();
         }
@@ -341,12 +417,15 @@ public class TicketActivationViewModel extends AndroidViewModel {
     }
 
     private List<String> getStopZonesOrEmpty(TripStopInfo stop) {
-        var zones = LwtTariffZones.findEntryForTariffSystem(stop.tariffZones(), ticket.tariffSystemId());
+        var zones = LwtTariffZones.findEntryForTariffSystem(stop.tariffZones(), getTariffSystemId());
         if (zones != null) {
             List<String> zonesList = new ArrayList<>(zones.zones());
             if (getZoneOptions() != null) {
                 // exclude zones that the ticket can not cover
                 zonesList.retainAll(getZoneOptions());
+            }
+            if (isPID()) {
+                removeNonPIDZones(zonesList);
             }
             return zonesList;
         } else {
@@ -376,11 +455,16 @@ public class TicketActivationViewModel extends AndroidViewModel {
         return selectedAutoActivationDevice.getValue();
     }
 
-    private <T> CompletableFuture<T> enqueueDataDownloadRequest(BiFunction<LwtAPIClient, CommType, CompletableFuture<T>> enqueueFunc, MutableLiveData<T> resultsLiveData) {
-        return enqueueFunc.apply(autoActivationClient, CommType.ENQUEUE).whenCompleteAsync((result, throwable) -> {
+    private <T> CompletableFuture<T> enqueueDataDownloadRequest(Function<CommType, CompletableFuture<T>> enqueueFunc, MutableLiveData<T> resultsLiveData) {
+        return enqueueFunc.apply(CommType.ENQUEUE).whenCompleteAsync((result, throwable) -> {
+            if (AsyncUtils.unwrapCompletionException(throwable) instanceof CancellationException) {
+                // something upstream was cancelled
+                return;
+            }
             if (throwable == null) {
                 resultsLiveData.setValue(result);
             } else {
+                Log.e(TAG, "Failed to download data from device", throwable);
                 autoDownloadException.setValue(throwable);
             }
         }, getApplication().getMainExecutor());
@@ -388,6 +472,11 @@ public class TicketActivationViewModel extends AndroidViewModel {
 
     public LiveData<Boolean> getDeviceDataIsLoading() {
         return deviceDataIsLoading;
+    }
+
+    public boolean isDeviceDataLoading() {
+        Boolean loading = deviceDataIsLoading.getValue();
+        return loading != null && loading;
     }
 
     public LiveData<Boolean> getRawServerAuthenticationResult() {
@@ -402,6 +491,10 @@ public class TicketActivationViewModel extends AndroidViewModel {
                 return null;
             }
         });
+    }
+
+    public boolean isDeviceTrustDecided() {
+        return getRawServerAuthenticationResult().getValue() != null;
     }
 
     public boolean isCurrentDeviceTrusted() {
@@ -445,15 +538,15 @@ public class TicketActivationViewModel extends AndroidViewModel {
     }
 
     public int getMaxZones() {
-        return ticket.numZones();
+        return ticket.getNumZones();
     }
 
     public List<String> getZoneOptions() {
-        return ticket.zoneOptions();
+        return ticket.getZoneOptions();
     }
 
     public Duration getTicketValidityPeriod() {
-        return ticket.validityPeriod();
+        return ticket.getValidityPeriod();
     }
 
     public LiveData<ActivationTime> getActivationTime() {
@@ -728,7 +821,7 @@ public class TicketActivationViewModel extends AndroidViewModel {
     }
 
     private LocalDateTime resolveValidityEndTime(LocalDateTime start) {
-        return start.plus(ticket.validityPeriod());
+        return start.plus(ticket.getValidityPeriod());
     }
 
     private void updateValidityEndStop(StopReference startStop, LocalDateTime validityStartTime) {
@@ -792,13 +885,22 @@ public class TicketActivationViewModel extends AndroidViewModel {
         return new ActivationInfo(time.time(), zones.zones());
     }
 
-    public static record DebugTicket(
-            String tariffSystemId,
-            int numZones,
-            List<String> zoneOptions,
-            Duration validityPeriod
-    ) {
+    private void onTimeTick() {
+        updatePreauthExpirationTime();
+    }
 
+    private void updatePreauthExpirationTime() {
+        var token = devicePreauthToken.getValue();
+        if (token == null || (token.token().status() != PreauthorizationTokenStatus.Ok && !MOCK_PREAUTH_ALWAYS_OK)) {
+            preauthExpirationSecondsLeft.setValue(null);
+        } else {
+            long secondsLeft = ChronoUnit.SECONDS.between(Instant.now(), token.expiresAt());
+            preauthExpirationSecondsLeft.setValue(secondsLeft);
+        }
+    }
+
+    public LiveData<Long> getPreauthExpirationSecondsLeft() {
+        return preauthExpirationSecondsLeft;
     }
 
     public static record ZoneChoice(boolean isManual, List<String> zones) {

@@ -68,4 +68,7 @@
     <string name="list_format_separator" translatable="false">", "</string>
     <string name="list_format_last_separator">" and "</string>
     <string name="list_format_serial_comma_policy">OXFORD</string>
+    <string name="fast_activation_countdown_time_format" translatable="false">%d:%02d</string>
+    <string name="fast_activation_infobox_title">Accelerated activation</string>
+    <string name="fast_activation_infobox_message">Within the displayed time period, a ticket can be activated for the selected line without a security delay - it will become valid right away.</string>
 </resources>

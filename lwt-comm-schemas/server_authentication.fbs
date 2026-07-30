@@ -24,10 +24,10 @@ really be defeated by means other than a baseball bat.
 */
 
 table ServerAuthenticationRequest {
-    /// Random 32-byte string used by the client to authenticate that the server
+    /// Random byte string used by the client to authenticate that the server
     /// is able to sign using the key pair used in the certificate.
-    /// The 32-byte requirement stems from the fact that it is assumed to be a
-    /// SHA-256 message digest internally.
+    /// The byte string will be prefixed with the text "LwtServerAuthentication"
+    /// (in ASCII) and then hashed using SHA256 to prevent CPAs.
     challenge: [ubyte] (required);
 }
 

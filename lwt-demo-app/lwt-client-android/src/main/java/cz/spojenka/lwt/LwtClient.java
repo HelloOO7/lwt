@@ -9,7 +9,14 @@ import java.lang.reflect.Proxy;
 import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.BiConsumer;
 
 import cz.spojenka.lwdn.LwdnAddress;
 import cz.spojenka.lwdn.LwdnSocketFactory;
@@ -26,12 +33,19 @@ public class LwtClient {
     private static final Object[] EMPTY_ARGS = new Object[]{ByteBuffer.allocate(0)};
 
     private final LwdnAddress address;
+    private final LwdnSocketFactory baseSocketFactory;
+
     private LwtpSession lwtpSession = new LwtpSession();
     private LwdnSocketFactory socketFactory;
 
+    private WeakHashMap<LwtpPacket, CompletableFuture<?>> packetToResultMap = new WeakHashMap<>();
+
+    private final List<ExecutionObserver> observers = new ArrayList<>();
+
     public LwtClient(LwdnAddress address) {
         this.address = address;
-        this.socketFactory = LwdnSocketFactory.create(address);
+        this.baseSocketFactory = LwdnSocketFactory.create(address);
+        this.socketFactory = baseSocketFactory;
     }
 
     public LwdnAddress getPeerAddress() {
@@ -48,15 +62,16 @@ public class LwtClient {
 
     public void useTLS(LwtpTLSConfig tlsConfig) {
         if (tlsConfig == null || tlsConfig.getTlsPolicy() == LwtpTLSPolicy.UNSECURED) {
+            socketFactory = baseSocketFactory;
             changeSession(new LwtpSession());
         } else {
             if (tlsConfig.getTlsPolicy() == LwtpTLSPolicy.IMPLICIT) {
                 // wrap the socket factory with a TLS layer here.
                 // we could delegate this to TLSLwtpSession, but it is better to do it here,
                 // as it transfers control of close notification to us
-                if (!(socketFactory instanceof TLSLwdnSocketFactory)) {
-                    socketFactory = new TLSLwdnSocketFactory(socketFactory, tlsConfig.getSslContext(), tlsConfig.getPeerAddress());
-                }
+                socketFactory = new TLSLwdnSocketFactory(baseSocketFactory, tlsConfig.getSslContext(), tlsConfig.getPeerAddress());
+            } else {
+                socketFactory = baseSocketFactory;
             }
             changeSession(new TLSLwtpSession(tlsConfig));
         }
@@ -66,10 +81,50 @@ public class LwtClient {
         useTLS(null);
     }
 
+    public synchronized void addExecutionObserver(ExecutionObserver observer) {
+        if (!observers.contains(observer)) {
+            observers.add(observer);
+        }
+    }
+
+    public synchronized void removeExecutionObserver(ExecutionObserver observer) {
+        observers.remove(observer);
+    }
+
     private void changeSession(LwtpSession newSession) {
         Duration wdTimeout = lwtpSession.getWatchdogTimeout();
         lwtpSession = newSession;
         lwtpSession.setWatchdogTimeout(wdTimeout);
+        lwtpSession.addObserver(new LwtpSession.ExecutionObserver() {
+            @Override
+            public void onStartRequest(LwtpPacket request) {
+                invokeObservers(request, ExecutionObserver::onStartRequest);
+            }
+
+            @Override
+            public void onRequestSent(LwtpPacket request) {
+                invokeObservers(request, ExecutionObserver::onRequestSent);
+            }
+
+            @Override
+            public void onStartResponse(LwtpPacket request) {
+                invokeObservers(request, ExecutionObserver::onStartResponse);
+            }
+
+            @Override
+            public void onResponseReceived(LwtpPacket request, LwtpPacket response) {
+                invokeObservers(request, ExecutionObserver::onResponseReceived);
+            }
+        });
+    }
+
+    private synchronized void invokeObservers(LwtpPacket key, BiConsumer<ExecutionObserver, CompletableFuture<?>> action) {
+        CompletableFuture<?> future = packetToResultMap.get(key);
+        if (future != null) {
+            for (ExecutionObserver observer : observers) {
+                action.accept(observer, future);
+            }
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -92,7 +147,9 @@ public class LwtClient {
                         ByteBuffer req = createRequestFlatbuffer(opAnnot.value(), bb);
                         LwtpPacket lwtpReq = new LwtpPacket(req);
                         CompletableFuture<LwtpPacket> baseFuture = lwtpSession.add(lwtpReq);
-                        return createResponseFuture(baseFuture, getResponseType(method));
+                        CompletableFuture<?> responseFuture = createResponseFuture(baseFuture, getResponseType(method));
+                        packetToResultMap.put(lwtpReq, responseFuture);
+                        return responseFuture;
                     } else {
                         throw new IllegalArgumentException("Method " + method + " must have exactly one non-null argument of type ByteBuffer (returned from FlatBufferBuilder)");
                     }
@@ -102,11 +159,29 @@ public class LwtClient {
     }
 
     public void execute() {
-        lwtpSession.execute(socketFactory);
+        LwtpSession execSession = lwtpSession;
+        lwtpSession = lwtpSession.cloneAsEmpty();
+        execSession.execute(socketFactory);
+    }
+
+    /**
+     * Execute all pending requests asynchronously. After this is called, the client
+     * can be reused for configuring new sessions even while the previous session is
+     * still being executed.
+     *
+     * @param executor the executor to run the execution on. If null, the default executor will be used.
+     *
+     * @return Future that will be completed when all requests finish,
+     * and which can be used to cancel all execution.
+     */
+    public CompletableFuture<Void> executeAsync(Executor executor) {
+        LwtpSession execSession = lwtpSession;
+        lwtpSession = lwtpSession.cloneAsEmpty();
+        return execSession.executeAsync(socketFactory, executor);
     }
 
     public CompletableFuture<Void> executeAsync() {
-        return lwtpSession.executeAsync(socketFactory);
+        return executeAsync(null);
     }
 
     private <T> CompletableFuture<T> createResponseFuture(CompletableFuture<LwtpPacket> baseFuture, Class<T> responseType) {
@@ -154,5 +229,24 @@ public class LwtClient {
             }
         }
         throw new IllegalArgumentException("Method " + method + " must return CompletableFuture<T> for some T");
+    }
+
+    public static interface ExecutionObserver {
+
+        public default void onStartRequest(CompletableFuture<?> future) {
+
+        }
+
+        public default void onRequestSent(CompletableFuture<?> future) {
+
+        }
+
+        public default void onStartResponse(CompletableFuture<?> future) {
+
+        }
+
+        public default void onResponseReceived(CompletableFuture<?> future) {
+
+        }
     }
 }

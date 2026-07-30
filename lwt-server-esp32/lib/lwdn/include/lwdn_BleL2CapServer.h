@@ -24,8 +24,7 @@ namespace lwdn {
     private:
         struct Channel {
             SocketHandle m_SocketHandle;
-            uint16_t m_ConnHandle;
-            ble_l2cap_chan* m_Chan{ nullptr };
+            ble_l2cap_chan* m_Chan;
             bool m_TxIssued{ false };
             bool m_Closed{ false };
 
@@ -45,7 +44,7 @@ namespace lwdn {
 
             std::condition_variable m_TxUnstalled;
 
-            Channel(SocketHandle socketHandle, uint16_t connHandle, uint16_t mtu, uint16_t chunkSize);
+            Channel(SocketHandle socketHandle, ble_l2cap_chan* nativeChan, uint16_t mtu, uint16_t chunkSize);
         };
     private:
         uint16_t m_Psm;
@@ -68,9 +67,9 @@ namespace lwdn {
         std::unique_ptr<Socket> Accept() override;
 
     private:
-        Channel* FindChannel(uint16_t connHandle, bool createIfNotFound = false);
+        Channel* FindChannel(ble_l2cap_chan* nativeChan, bool createIfNotFound = false);
         Channel* FindChannelBySocket(SocketHandle socketHandle);
-        void OnChannelClosed(uint16_t connHandle);
+        void OnChannelClosed(ble_l2cap_chan* nativeChan);
 
         int CloseChannel(Channel* channel);
         int CloseChannelNoLock(Channel* channel, bool force = false);

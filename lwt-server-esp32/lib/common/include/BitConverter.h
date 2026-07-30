@@ -1,9 +1,10 @@
 #pragma once
 
-#include "machine/endian.h"
+#include <bit>
 #include <cstring>
+#include <span>
 
-template<int TOrder>
+template<std::endian TOrder>
 class BitConverter {
 public:
     static uint8_t ToUInt8(const uint8_t* bytes) {
@@ -90,7 +91,7 @@ private:
     template<typename T>
     static T ConvertTo(const uint8_t* bytes, size_t size = sizeof(T)) {
         T value = 0;
-        if constexpr (TOrder == BIG_ENDIAN) {
+        if constexpr (TOrder == std::endian::big) {
             for (size_t i = 0; i < size; ++i) {
                 value |= static_cast<T>(bytes[i]) << ((size - 1 - i) * 8);
             }
@@ -103,7 +104,7 @@ private:
 
     template<typename T>
     static void ConvertFrom(T value, uint8_t* bytes, size_t size = sizeof(T)) {
-        if constexpr (TOrder == BIG_ENDIAN) {
+        if constexpr (TOrder == std::endian::big) {
             for (size_t i = 0; i < size; ++i) {
                 bytes[i] = (value >> ((size - 1 - i) * 8)) & 0xFF;
             }
@@ -160,6 +161,19 @@ public:
             return Read<int64_t>();
         }
 
+        std::span<const uint8_t> ReadBytes(size_t size) {
+            std::span<const uint8_t> bytes(m_Data, size);
+            m_Data += size;
+            return bytes;
+        }
+
+        template<size_t N>
+        std::span<const uint8_t, N> ReadBytes() {
+            std::span<const uint8_t, N> bytes(m_Data, N);
+            m_Data += N;
+            return bytes;
+        }
+
     private:
         template<typename T>
         T Read(size_t size = sizeof(T)) {
@@ -213,6 +227,15 @@ public:
 
         void WriteInt64(int64_t value) {
             Write<int64_t>(value);
+        }
+
+        void WriteBytes(const uint8_t* bytes, size_t size) {
+            std::memcpy(m_Data, bytes, size);
+            m_Data += size;
+        }
+
+        void WriteBytes(const std::span<const uint8_t>& bytes) {
+            WriteBytes(bytes.data(), bytes.size());
         }
 
     private:
