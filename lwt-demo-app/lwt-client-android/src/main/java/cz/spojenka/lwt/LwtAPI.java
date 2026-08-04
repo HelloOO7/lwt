@@ -22,4 +22,7 @@ public interface LwtAPI {
 
     @LwtOperation(Operation.CreatePreauthorizationToken)
     public CompletableFuture<PreauthorizationTokenResponse> createPreauthorizationToken(ByteBuffer request);
+
+    @LwtOperation(Operation.ActivateTicket)
+    public CompletableFuture<TicketActivationResponse> activateTicket(ByteBuffer request);
 }

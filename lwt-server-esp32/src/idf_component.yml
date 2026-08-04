@@ -1,2 +1,3 @@
 dependencies:
-  espressif/ethernet_init: "==1.3.0"
+  espressif/ethernet_init: "==1.4.1"
+  johboh/nlohmann-json: "^3.12.0"

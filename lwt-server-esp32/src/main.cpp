@@ -25,6 +25,7 @@
 #include "lwt_TripInfoAdvertiser.h"
 #include "lwt_PreauthorizationTokenManager.h"
 #include "lwt_TicketSignatureVerifier.h"
+#include "lwt_MosClient.h"
 #include "BitConverter.h"
 #include "operations_generated.h"
 #include "esp_event.h"
@@ -61,6 +62,7 @@ private:
     lwt::TripInformationService m_TripInfoService;
     lwt::PreauthorizationTokenManager m_PreauthTokenManager;
     lwt::TicketSignatureVerifier m_TicketVerifier;
+    lwt::MOSClient m_MOSClient;
     lwt::TicketValidationService m_TicketService;
 
     lwdn::BleAdvertiser m_BLETripAdvertiserLegacy;
@@ -89,7 +91,8 @@ public:
         m_TripInfoService(m_CISSubscriber),
         m_PreauthTokenManager(LoadOrCreateHmacKey(m_TlsCredentials.ctr_drbg, "pat_hmac_key", 32)),
         m_TicketVerifier(),
-        m_TicketService(TICKETING_CONFIG, m_PreauthTokenManager, m_TicketVerifier, m_TripInfoService, &m_TVSSubscriber), //TVS not yet implemented
+        m_MOSClient("https://ticketing.mos.ropid:8080", {get_debug_device_crt_start(), get_debug_device_crt_end()}, {TLS_LWT_SERVER_KEY_DEBUG_START, TLS_LWT_SERVER_KEY_DEBUG_END}),
+        m_TicketService(TICKETING_CONFIG, m_PreauthTokenManager, m_TicketVerifier, m_MOSClient, m_TripInfoService, &m_TVSSubscriber), //TVS not yet implemented
         m_BLETripAdvertiserLegacy(0, BLE_SERVICE_UUID_VEHICLE, lwdn::BleAdvertiser::Flags::INCLUDE_DEVICE_NAME | lwdn::BleAdvertiser::Flags::USE_LEGACY_ADVERTISING),
         m_BLETripAdvertiserExt(1, BLE_SERVICE_UUID_VEHICLE_EXTENDED, lwdn::BleAdvertiser::Flags::INCLUDE_DEVICE_NAME),
         m_TripInfoAdvertiser(m_CISSubscriber, { &m_BLETripAdvertiserLegacy, &m_BLETripAdvertiserExt })
@@ -103,7 +106,7 @@ public:
         m_ServiceRegistry.RegisterServices(m_PingService, m_ServerAuthService, m_TripInfoService, m_TicketService);
 
         m_AppServer.AddInterceptor(std::make_unique<lwtp::StartTLSInterceptor>(m_MbedTlsConfig));
-        m_AppServer.AddSocket(&m_BLEServer);
+        m_AppServer.AddSocket(&m_BLEServer, 1, 6144);
     }
 
     void StartAdvertising() {

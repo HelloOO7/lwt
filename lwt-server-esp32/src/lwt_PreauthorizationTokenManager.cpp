@@ -16,7 +16,7 @@ namespace lwt {
 
     using BitConverter = ::BitConverter<std::endian::native>;
 
-    PreauthorizationTokenBlob PreauthorizationTokenManager::CreatePreauthorizationToken(const std::span<const uint8_t>& activationTokenHash, int64_t expiresAt)
+    PreauthorizationTokenBlob PreauthorizationTokenManager::CreatePreauthorizationToken(const ByteSpan& activationTokenHash, int64_t expiresAt)
     {
         PreauthorizationTokenBlob data(sizeof(uint16_t) + sizeof(uint8_t) + activationTokenHash.size() + sizeof(int64_t) + HMAC{}.size());
 
@@ -32,14 +32,14 @@ namespace lwt {
         return data;
     }
 
-    PreauthorizationTokenManager::VerificationResult PreauthorizationTokenManager::VerifyPreauthorizationToken(const std::span<const uint8_t>& tokenBlob, const std::span<const uint8_t>& activationTokenHash, int64_t currentClock)
+    PreauthorizationTokenManager::VerificationResult PreauthorizationTokenManager::VerifyPreauthorizationToken(const ByteSpan& tokenBlob, const ByteSpan& activationTokenHash, int64_t currentClock)
     {
         if (tokenBlob.size() < sizeof(uint8_t) + HMAC{}.size()) {
             return VerificationResult::TOKEN_CORRUPTED;
         }
 
-        std::span<const uint8_t> innerData(tokenBlob.data(), tokenBlob.size() - HMAC{}.size());
-        std::span<const uint8_t> hmac(tokenBlob.data() + innerData.size(), HMAC{}.size());
+        ByteSpan innerData(tokenBlob.data(), tokenBlob.size() - HMAC{}.size());
+        ByteSpan hmac(tokenBlob.data() + innerData.size(), HMAC{}.size());
 
         HMAC expectedHMAC = HMACMessage(innerData);
         if (!std::equal(hmac.begin(), hmac.end(), expectedHMAC.begin())) {
@@ -70,7 +70,7 @@ namespace lwt {
         return VerificationResult::OK;
     }
 
-    PreauthorizationTokenManager::HMAC PreauthorizationTokenManager::HMACMessage(const std::span<const uint8_t>& message)
+    PreauthorizationTokenManager::HMAC PreauthorizationTokenManager::HMACMessage(const ByteSpan& message)
     {
         int err = mbedtls_md_hmac_starts(&m_HMACCtx, m_HMACKey.data(), m_HMACKey.size());
         assert(err == 0);

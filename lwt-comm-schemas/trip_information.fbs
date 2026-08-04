@@ -1,3 +1,5 @@
+include "datetime.fbs";
+
 namespace lwt;
 
 enum LineType : ubyte {
@@ -80,12 +82,12 @@ table TripStateInfo {
 table TripStopInfo {
     /// ID and name of the stop.
     stop_ref: StopReference (required);
-    /// Time of arrival at the stop (scheduled, absolute). Can be -1 if not present.
+    /// Time of arrival at the stop (scheduled, absolute). Can be null if not present.
     /// The value is an Unix timestamp in the time zone of the stop (number of seconds since 1. 1. 1970).
-    arr_time: long = -1;
-    /// Time of departure from the stop (scheduled, absolute). Can be -1 if not present.
+    arr_time: LwtLocalDateTime;
+    /// Time of departure from the stop (scheduled, absolute). Can be null if not present.
     /// The value is an Unix timestamp in the time zone of the stop (number of seconds since 1. 1. 1970).
-    dep_time: long = -1;
+    dep_time: LwtLocalDateTime;
     /// List of tariff zones at the stop. These only contain the zones valid for the current
     /// line and the transport authority operating the LWT module. String is comma separated for
     /// memory efficiency (avoid 32bit flatbuffer pointers). If there are multiple transport networks

@@ -9,6 +9,8 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "BitConverter.h"
+#include "mbedtls/sha256.h"
+#include <cassert>
 
 namespace lwt {
 
@@ -16,11 +18,19 @@ namespace lwt {
 
     using namespace vdv301;
 
-    TicketValidationService::TicketValidationService(const TicketValidationConfig& config, PreauthorizationTokenManager& tokenManager, TicketSignatureVerifier& ticketVerifier, TripInformationService& tripInfoService, SubscriberTVS* tvsOpt) :
+    using BC = BitConverter<std::endian::big>;
+
+    TicketValidationService::TicketValidationService(
+        const TicketValidationConfig& config,
+        PreauthorizationTokenManager& tokenManager, TicketSignatureVerifier& ticketVerifier,
+        MOSClient& mosClient,
+        TripInformationService& tripInfoService, SubscriberTVS* tvsOpt
+    ) :
         m_Config{ config },
         m_TokenManager{ tokenManager },
         m_PreauthRateLimiter(1000, 45LL * 60 * 1000 * 1000), // 1000 entries, 45 minutes max age
         m_TicketVerifier{ ticketVerifier },
+        m_MOSClient{ mosClient },
         m_TripInfoService{ tripInfoService },
         m_TVS{ tvsOpt }
     {
@@ -39,6 +49,14 @@ namespace lwt {
         }
     }
 
+    LocalDateTime GetDateTimeFromRequest(const LwtLocalDateTime& dt) {
+        return LocalDateTime::of_epoch_seconds(dt.local_instant());
+    }
+
+    LwtOffsetDateTime CreateDateTimeForResponse(const OffsetDateTime& dt) {
+        return LwtOffsetDateTime(LwtLocalDateTime(dt.date_time.to_epoch_seconds()), dt.offset_seconds);
+    }
+
     void TicketValidationService::Register(ServiceRegistry& registry)
     {
         registry.RegisterServiceCallback(
@@ -51,6 +69,7 @@ namespace lwt {
                 return OperationResult(200, SerializeFlatBuffer(m_ValidationInfoFBB));
             }
         );
+
         registry.RegisterServiceCallback(
             Operation_CreatePreauthorizationToken,
             ApplicationServer::CreateOperationServiceFunc<PreauthorizationTokenRequest>(
@@ -62,56 +81,44 @@ namespace lwt {
 
                     std::lock_guard lock(m_TokenGeneratorMutex);
 
-                    constexpr size_t ACTIVATION_TOKEN_HASH_SIZE = 32;
-                    constexpr size_t ACTIVATION_TOKEN_MIN_SIZE = sizeof(uint16_t) + ACTIVATION_TOKEN_HASH_SIZE + sizeof(uint32_t) + sizeof(uint16_t);
-
                     auto currentTime = esp_timer_get_time();
                     auto expiryTime = currentTime + m_Config.PreauthorizationGracePeriodUs;
 
-                    std::vector<SHA256HashView> tokenHashes; // can be a view, as it looks inside the request flatbuffer
+                    std::vector<SHA256Hash> tokenHashes; // can be a view, as it looks inside the request flatbuffer
 
                     // validate and create input set of hashes
 
-                    for (auto&& activationTokenHash : *request.activation_token_hashes()) {
-                        auto&& data = activationTokenHash->data();
-                        if (data->size() < ACTIVATION_TOKEN_MIN_SIZE) {
-                            ESP_LOGW(TAG, "Invalid activation token hash size: %zu (expected at least %zu)", data->size(), ACTIVATION_TOKEN_MIN_SIZE);
+                    for (auto&& activationToken : *request.activation_tokens()) {
+                        if (!OpenActivationToken(*activationToken)) {
+                            ESP_LOGW(TAG, "Activation token is malformed or incompatible");
                             return 400;
                         }
 
-                        BitConverter<std::endian::big>::InputStream in(data->data());
+                        ByteSpan tokenData;
+                        ByteSpan tokenSignature;
+                        uint32_t keyId;
+                        ReadActivationTokenSignature(*activationToken, &tokenData, &tokenSignature, &keyId);
 
-                        uint16_t tokenVersion = in.ReadUInt16();
-                        if (tokenVersion > 0) {
-                            ESP_LOGW(TAG, "Unsupported activation token version: %u", tokenVersion);
-                            return 400;
+                        SHA256Hash tokenHash = HashActivationToken(tokenData);
+
+                        if (!m_TicketVerifier.VerifyHashSignature(tokenHash, MBEDTLS_MD_SHA256, tokenSignature, keyId)) {
+                            return 403;
                         }
-
-                        SHA256HashView tokenHash = in.ReadBytes<ACTIVATION_TOKEN_HASH_SIZE>();
-                        uint32_t keyId = in.ReadUInt32();
-                        uint16_t signatureLength = in.ReadUInt16();
-
-                        if (ACTIVATION_TOKEN_MIN_SIZE + signatureLength != data->size()) {
-                            ESP_LOGW(TAG, "Invalid activation token hash size: %zu (expected %zu for signature length %u)", data->size(), ACTIVATION_TOKEN_MIN_SIZE + signatureLength, signatureLength);
-                            return 400;
-                        }
-
-                        auto tokenSignature = in.ReadBytes(signatureLength);
-
-                        if (!m_TicketVerifier.VerifySignature(tokenHash, MBEDTLS_MD_SHA256, tokenSignature, keyId)) {
+                        if (ParseActivationToken(tokenData).Flags & ParsedActivationToken::FLAG_DISALLOW_PREAUTH) {
+                            ESP_LOGW(TAG, "Activation token explicitly disallows preauthorization");
                             return 403;
                         }
 
                         tokenHashes.push_back(tokenHash);
                     }
 
-                    std::vector<flatbuffers::Offset<PreauthorizationToken>> tokenOffsets;
+                    std::vector<flatbuffers::Offset<PreauthorizationTokenResult>> tokenOffsets;
 
                     for (auto&& tokenHash : tokenHashes) {
                         if (!m_PreauthRateLimiter.IsTokenHashAllowed(tokenHash, currentTime)) {
                             ESP_LOGW(TAG, "Activation token hash has already been used recently, refusing to create preauthorization token");
 
-                            tokenOffsets.push_back(CreatePreauthorizationToken(
+                            tokenOffsets.push_back(CreatePreauthorizationTokenResult(
                                 fbb,
                                 PreauthorizationTokenStatus_RequestedTooOften
                             ));
@@ -121,10 +128,10 @@ namespace lwt {
 
                             auto preauthTokenBlob = m_TokenManager.CreatePreauthorizationToken(tokenHash, expiryTime);
 
-                            tokenOffsets.push_back(CreatePreauthorizationToken(
+                            tokenOffsets.push_back(CreatePreauthorizationTokenResult(
                                 fbb,
                                 PreauthorizationTokenStatus_Ok,
-                                fbb.CreateVector(preauthTokenBlob)
+                                CreatePreauthorizationToken(fbb, fbb.CreateVector(preauthTokenBlob))
                             ));
                         }
                     }
@@ -135,6 +142,88 @@ namespace lwt {
                     auto halfTime = currentTime + (finishedTime - currentTime) / 2;
 
                     fbb.Finish(CreatePreauthorizationTokenResponseDirect(fbb, halfTime / 1000, expiryTime / 1000, &tokenOffsets));
+
+                    return 200;
+                }
+            )
+        );
+
+        registry.RegisterServiceCallback(
+            Operation_ActivateTicket,
+            ApplicationServer::CreateOperationServiceFunc<TicketActivationRequest>(
+                [&](const TicketActivationRequest& request, flatbuffers::FlatBufferBuilder& fbb) -> ResponseStatus {
+                    const ActivationToken* activationToken = request.activation_token();
+
+                    if (!OpenActivationToken(*activationToken)) {
+                        ESP_LOGW(TAG, "Activation token is malformed or incompatible");
+                        return 400;
+                    }
+
+                    ByteSpan tokenData;
+                    ByteSpan tokenSignature;
+                    uint32_t keyId;
+                    ReadActivationTokenSignature(*activationToken, &tokenData, &tokenSignature, &keyId);
+
+                    auto tokenHash = HashActivationToken(tokenData);
+
+                    if (!m_TicketVerifier.VerifyHashSignature(tokenHash, MBEDTLS_MD_SHA256, tokenSignature, keyId)) {
+                        return 403;
+                    }
+
+                    bool preauthTokenValid = false;
+                    if (request.preauthorization_token()) {
+                        auto preauthTokenBlob = request.preauthorization_token()->data();
+                        auto preauthResult = m_TokenManager.VerifyPreauthorizationToken(ByteSpan(preauthTokenBlob->data(), preauthTokenBlob->size()), tokenHash, esp_timer_get_time());
+                        if (preauthResult == PreauthorizationTokenManager::VerificationResult::OK) {
+                            preauthTokenValid = true;
+                        }
+                        else if (preauthResult == PreauthorizationTokenManager::VerificationResult::TOKEN_EXPIRED) {
+                            ESP_LOGW(TAG, "Preauthorization token has expired");
+                        }
+                        else {
+                            ESP_LOGW(TAG, "Preauthorization token verification failed: %d", static_cast<int>(preauthResult));
+                            return 403;
+                        }
+                    }
+
+                    auto parsedToken = ParseActivationToken(tokenData);
+
+                    MOSTicketActivationParams activationParams{
+                        .ActivateNowIfEarlier = request.activate_now_if_earlier(),
+                        .ClientIntegrityAttested = preauthTokenValid,
+                        .Zones = request.activation_zones() ? request.activation_zones()->str() : "",
+                        .ClientAppID = request.activation_app_id()->str()
+                    };
+
+                    if (request.activation_time()) {
+                        activationParams.Time = GetDateTimeFromRequest(*request.activation_time());;
+                    }
+
+                    {
+                        std::lock_guard lock(m_DataMutex);
+                        activationParams.LwtMetadata = "TK:" + GetCurrentTripKey();
+                    }
+
+                    MOSTicket activatedTicket;
+
+                    int mosResult = m_MOSClient.ActivateTicket(parsedToken.TicketId, activationParams, &activatedTicket);
+                    if (mosResult != 200) {
+                        ESP_LOGW(TAG, "MOS ticket activation failed with HTTP status %d", mosResult);
+                        return mosResult;
+                    }
+
+                    LwtOffsetDateTime validSince = CreateDateTimeForResponse(activatedTicket.ValidSince);
+                    LwtOffsetDateTime validUntil = CreateDateTimeForResponse(activatedTicket.ValidUntil);
+                    LwtOffsetDateTime activatedAt = CreateDateTimeForResponse(activatedTicket.ActivationTime);
+
+                    fbb.Finish(CreateTicketActivationResponse(
+                        fbb,
+                        fbb.CreateString(activatedTicket.Payload.ETD),
+                        fbb.CreateString(activatedTicket.Payload.TOTPSeed),
+                        &validSince,
+                        &validUntil,
+                        &activatedAt
+                    ));
 
                     return 200;
                 }
@@ -161,7 +250,13 @@ namespace lwt {
                 // if we do not have a TVS subscription or TVS is not supported, we must generate this data from TripRouteInfo
                 auto curStop = result->stops()->Get(result->trip()->current_departure_stop()->sequence_id());
 
-                m_TimeForTicketValidityStart = curStop->dep_time() + m_CurTripDelay * 60;
+                if (curStop->dep_time()) {
+                    m_TimeForTicketValidityStart = curStop->dep_time()->local_instant() + m_CurTripDelay * 60;
+                }
+                else {
+                    ESP_LOGE(TAG, "Current stop has no dep. time, cannot determine ticket validity start time");
+                    m_TimeForTicketValidityStart = 0;
+                }
                 if (curStop->tariff_zones()) {
                     m_TariffZonesForValidation = GetTariffZonesOnlyMyTariffSystem(curStop->tariff_zones()->str());
                 }
@@ -274,15 +369,24 @@ namespace lwt {
         ResetValidationInfo();
 
         auto tsi = m_TripInfoService.GetTripStateInfo(m_ValidationInfoFBB);
+        
+        if (tsi.IsNull()) {
+            ESP_LOGW(TAG, "TripStateInfo is null, cannot update ticket validation info");
+        }
+        if (m_TimeForTicketValidityStart == 0) {
+            ESP_LOGW(TAG, "Time for ticket validity start not set, cannot update ticket validation info");
+        }
 
         if (tsi.IsNull() || m_TimeForTicketValidityStart == 0) {
             return;
         }
 
+        LwtLocalDateTime validityStart(m_TimeForTicketValidityStart);
+
         FinishValidationInfo(CreateTicketValidationInfo(
             m_ValidationInfoFBB,
             tsi,
-            m_TimeForTicketValidityStart,
+            &validityStart,
             m_ValidationInfoFBB.CreateString(m_TariffZonesForValidation),
             m_ValidationInfoFBB.CreateString(m_NextTariffZonesForValidation),
             m_IsRazzia
@@ -371,5 +475,75 @@ namespace lwt {
         newEntry.TimestampUs = currentTime;
 
         m_Entries.push_back(std::move(newEntry));
+    }
+
+    bool TicketValidationService::OpenActivationToken(const ActivationToken& activationToken, uint16_t* pVersion)
+    {
+        constexpr size_t ACTIVATION_TOKEN_MIN_SIZE = sizeof(uint16_t) + sizeof(uint16_t);
+
+        auto&& data = activationToken.data();
+        if (data->size() < ACTIVATION_TOKEN_MIN_SIZE) {
+            ESP_LOGW(TAG, "Invalid activation token hash size: %zu (expected at least %zu)", data->size(), ACTIVATION_TOKEN_MIN_SIZE);
+            return 400;
+        }
+
+        auto dataStart = data->data();
+        auto dataEnd = dataStart + data->size();
+
+        uint16_t tokenVersion = BC::ToUInt16(dataStart);
+        if (tokenVersion > 1) {
+            ESP_LOGW(TAG, "Unsupported activation token version: %u", tokenVersion);
+            return 400;
+        }
+
+        uint16_t signatureLength = BC::ToUInt16(dataEnd - sizeof(uint16_t));
+        // sig + key id
+        if (signatureLength + sizeof(uint32_t) > data->size() - sizeof(uint16_t) - sizeof(uint16_t)) {
+            ESP_LOGW(TAG, "Invalid activation token signature length: %u (token size: %zu)", signatureLength, data->size());
+            return 400;
+        }
+
+        if (pVersion) {
+            *pVersion = tokenVersion;
+        }
+
+        return true;
+    }
+
+    void TicketValidationService::ReadActivationTokenSignature(const ActivationToken& activationToken, ByteSpan* pData, ByteSpan* pSignature, uint32_t* pKeyId)
+    {
+        auto data = activationToken.data();
+        auto dataStart = data->data();
+        auto dataEnd = dataStart + data->size();
+
+        uint16_t signatureLength = BC::ToUInt16(dataEnd - sizeof(uint16_t));
+
+        auto signatureStart = dataEnd - sizeof(signatureLength) - signatureLength;
+        uint32_t keyId = BC::ToUInt32(signatureStart - sizeof(uint32_t));
+
+        // keyId is also signed, so do not subtract its size from the token length here
+        *pData = ByteSpan(dataStart, signatureStart);
+        *pSignature = ByteSpan(signatureStart, signatureLength);
+        *pKeyId = keyId;
+    }
+
+    SHA256Hash TicketValidationService::HashActivationToken(const ByteSpan& token)
+    {
+        SHA256Hash hash;
+        assert(mbedtls_sha256(token.data(), token.size(), hash.data(), false) == 0);
+        return hash;
+    }
+
+    TicketValidationService::ParsedActivationToken TicketValidationService::ParseActivationToken(const ByteSpan& tokenData)
+    {
+        BC::InputStream in(tokenData.data());
+
+        in.ReadUInt16(); // version, currently not used here
+
+        ParsedActivationToken parsed;
+        parsed.TicketId = in.ReadUInt64();
+        parsed.Flags = in.ReadUInt32();
+
+        return parsed;
     }
 }

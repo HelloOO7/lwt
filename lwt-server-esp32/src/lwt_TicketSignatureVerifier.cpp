@@ -1,11 +1,12 @@
 #include "lwt_TicketSignatureVerifier.h"
 #include "esp_log.h"
+#include "lwt_CryptoTypes.h"
 
 namespace lwt {
 
     static constexpr const char* TAG = "TicketSignatureVerifier";
 
-    void TicketSignatureVerifier::RegisterPublicKey(uint32_t keyId, const std::span<const uint8_t>& publicKeyPem) {
+    void TicketSignatureVerifier::RegisterPublicKey(uint32_t keyId, const ByteSpan& publicKeyPem) {
         mbedtls_pk_context pk;
         mbedtls_pk_init(&pk);
         int rc = mbedtls_pk_parse_public_key(&pk, publicKeyPem.data(), publicKeyPem.size());
@@ -18,7 +19,7 @@ namespace lwt {
         }
     }
 
-    bool TicketSignatureVerifier::VerifySignature(const std::span<const uint8_t>& digest, mbedtls_md_type_t digestType, const std::span<const uint8_t>& signature, uint32_t keyId) {
+    bool TicketSignatureVerifier::VerifyHashSignature(const ByteSpan& digest, mbedtls_md_type_t digestType, const ByteSpan& signature, uint32_t keyId) {
         auto it = m_PublicKeys.find(keyId);
         if (it == m_PublicKeys.end()) {
             ESP_LOGW(TAG, "Public key ID not found: %u", keyId);

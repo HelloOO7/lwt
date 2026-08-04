@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <map>
 #include "mbedtls/pk.h"
+#include "lwt_CommonTypes.h"
 
 namespace lwt {
 
@@ -12,8 +13,8 @@ namespace lwt {
         std::map<uint32_t, mbedtls_pk_context> m_PublicKeys;
 
     public:
-        void RegisterPublicKey(uint32_t keyId, const std::span<const uint8_t>& publicKeyPem);
+        void RegisterPublicKey(uint32_t keyId, const ByteSpan& publicKeyPem);
 
-        bool VerifySignature(const std::span<const uint8_t>& digest, mbedtls_md_type_t digestType, const std::span<const uint8_t>& signature, uint32_t keyId);
+        bool VerifyHashSignature(const ByteSpan& digest, mbedtls_md_type_t digestType, const ByteSpan& signature, uint32_t keyId);
     };
 }

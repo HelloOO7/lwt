@@ -35,13 +35,10 @@ namespace lwt {
         );
     }
 
-    int64_t ConvertOptDateTime(xsd::optional<IBIS_IP_dateTime> optDateTime)
+    LwtLocalDateTime ConvertDateTime(const IBIS_IP_dateTime& dateTime)
     {
-        if (!optDateTime) {
-            return -1;
-        }
-        auto dt = LocalDateTime::parse(optDateTime->Value);
-        return dt.to_epoch_seconds();
+        auto dt = LocalDateTime::parse(dateTime.Value);
+        return LwtLocalDateTime(dt.to_epoch_seconds());
     }
 
     auto BuildTripStopInfo(flatbuffers::FlatBufferBuilder& fbb, const TripInformationStructure& tripInfo, const StopInformationStructure& stopInfo)
@@ -50,11 +47,26 @@ namespace lwt {
         bool isFirstStop = stopInfo.StopIndex.Value == tripInfo.StopSequence.StopPoint.front().StopIndex.Value;
         bool isLastStop = stopInfo.StopIndex.Value == tripInfo.StopSequence.StopPoint.back().StopIndex.Value;
 
+        LwtLocalDateTime arrTime;
+        LwtLocalDateTime depTime;
+
+        LwtLocalDateTime* pArrTime = nullptr;
+        LwtLocalDateTime* pDepTime = nullptr;
+
+        if (!isFirstStop && stopInfo.ArrivalScheduled) {
+            arrTime = ConvertDateTime(*stopInfo.ArrivalScheduled);
+            pArrTime = &arrTime;
+        }
+        if (!isLastStop && stopInfo.DepartureScheduled) {
+            depTime = ConvertDateTime(*stopInfo.DepartureScheduled);
+            pDepTime = &depTime;
+        }
+
         return CreateTripStopInfo(
             fbb,
             BuildStopReference(fbb, stopInfo),
-            !isFirstStop ? ConvertOptDateTime(stopInfo.ArrivalScheduled) : -1,
-            !isLastStop ? ConvertOptDateTime(stopInfo.DepartureScheduled) : -1,
+            pArrTime,
+            pDepTime,
             fbb.CreateString(TripInformationService::BuildTariffZonesString(stopInfo)),
             NAN // PID does not send this data, skip for now
         );

@@ -5,6 +5,7 @@ import android.animation.LayoutTransition;
 import android.animation.ValueAnimator;
 import android.content.Intent;
 import android.content.res.ColorStateList;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.ShapeDrawable;
 import android.os.Bundle;
@@ -70,6 +71,9 @@ public class TicketActivationActivity extends BaseActivity {
     private DeviceListViewModel devicesViewModel;
 
     private PillPopoutAnimation currentFastPillAnim;
+
+    private EdgeSpinnerDrawable activationSpinner;
+    private ViewUtils.ViewEnabledSaveState enabledStateBeforeActivation;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -143,8 +147,8 @@ public class TicketActivationActivity extends BaseActivity {
         });
 
         binding.llContent.getLayoutTransition().enableTransitionType(LayoutTransition.CHANGING);
-        LayoutTransition headerLayoutAnim = binding.llHeader.getLayoutTransition();
-        headerLayoutAnim.enableTransitionType(LayoutTransition.CHANGING);
+        binding.llHeader.getLayoutTransition().enableTransitionType(LayoutTransition.CHANGING);
+        binding.getRoot().getLayoutTransition().enableTransitionType(LayoutTransition.CHANGING);
 
         binding.llActivationTime.setOnClickListener(v -> showActivationTimeTypeDialog());
 
@@ -264,6 +268,48 @@ public class TicketActivationActivity extends BaseActivity {
         binding.tvFastActivationTimer.setOnClickListener(v -> {
             CommonDialogs.newInfoDialog(this, R.string.fast_activation_infobox_title, R.string.fast_activation_infobox_message)
                     .show();
+        });
+
+        activationSpinner = new EdgeSpinnerDrawable(binding.fabConfirm.getShapeAppearanceModel());
+        activationSpinner.setTintList(binding.fabConfirm.getTextColors());
+        activationSpinner.setDuration(1500);
+
+        Drawable defaultBtnActivateIcon = binding.fabConfirm.getIcon();
+
+        viewModel.getIsActivationInProgress().observe(this, inProgress -> {
+            if (inProgress) {
+                if (enabledStateBeforeActivation == null) {
+                    enabledStateBeforeActivation = ViewUtils.setViewsEnabledRecursive(binding.llActivationFormWrapper, false);
+                }
+                binding.fabConfirm.setText(R.string.ticket_activation_confirm_in_progress);
+                binding.fabConfirm.setIcon(null);
+                binding.fabConfirm.setForeground(activationSpinner);
+                binding.fabConfirm.setClickable(false);
+            } else {
+                if (enabledStateBeforeActivation != null) {
+                    ViewUtils.restoreViewEnabledState(binding.llActivationFormWrapper, enabledStateBeforeActivation, true);
+                    enabledStateBeforeActivation = null;
+                }
+                binding.fabConfirm.setText(R.string.ticket_activation_confirm);
+                binding.fabConfirm.setIcon(defaultBtnActivateIcon);
+                binding.fabConfirm.setForeground(null);
+                binding.fabConfirm.setClickable(true);
+            }
+        });
+
+        viewModel.getActivationError().observe(this, error -> {
+            if (error != null) {
+                viewModel.ackActivationError();
+                CommonDialogs.newInfoDialog(this, getString(R.string.ticket_activation_error_title), error.getMessage())
+                        .show();
+            }
+        });
+
+        viewModel.getActivationResult().observe(this, result -> {
+            if (result != null) {
+                Log.i(TAG, "Activated ticket; etd=" + result.signedEtd() + "; totp=" + result.totpSeed());
+                finish();
+            }
         });
     }
 
@@ -471,9 +517,13 @@ public class TicketActivationActivity extends BaseActivity {
         new MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.ticket_activation_confirm_title)
                 .setMessage(getString(R.string.ticket_activation_confirm_message, mainText))
-                .setPositiveButton(R.string.ticket_activation_confirm_yes, (dialog, which) -> finish())
+                .setPositiveButton(R.string.ticket_activation_confirm_yes, (dialog, which) -> performActivateTicket())
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
+    }
+
+    private void performActivateTicket() {
+        viewModel.startActivateViaLwt();
     }
 
     private static class PillPopoutAnimation {

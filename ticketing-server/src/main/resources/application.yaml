@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: ticketing-server
+  jackson:
+    time-zone: 'Europe/Prague'
+  jpa:
+    hibernate:
+      ddl-auto: update
+  web:
+    error:
+      include-message: always
+      include-binding-errors: always
+server:
+  ssl:
+    enabled: true
+    client-auth: want
+security:
+  require-ssl: true
+tickets:
+  issuer: "DPP"
+  activation-protection: 60

@@ -141,7 +141,7 @@ public class ConnectionRoutePointViewModel {
     public LiveData<Boolean> getIsShowNodeLiveData() {
         return Transformations.map(
                 getPointLiveData(),
-                point -> point.arrTime() >= 0 || point.depTime() >= 0
+                point -> point.arrTime() != null || point.depTime() != null
         );
     }
 

@@ -297,12 +297,12 @@ public class ConnectionRoutePointView {
     }
 
     private LocalTime getPointArrTime(TripStopInfo point) {
-        LocalDateTime ts = LwtTime.parseLocalTimestamp(point.arrTime());
+        LocalDateTime ts = LwtTime.convertLocalDateTime(point.arrTime());
         return ts != null ? ts.toLocalTime() : null;
     }
 
     private LocalTime getPointDepTime(TripStopInfo point) {
-        LocalDateTime ts = LwtTime.parseLocalTimestamp(point.depTime());
+        LocalDateTime ts = LwtTime.convertLocalDateTime(point.depTime());
         return ts != null ? ts.toLocalTime() : null;
     }
 }

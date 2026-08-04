@@ -6,6 +6,7 @@ import android.content.Intent;
 import androidx.activity.result.contract.ActivityResultContract;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.IntentCompat;
 import cz.spojenka.lwt.LwtDevice;
 import cz.spojenka.lwt.LwtDeviceType;
 
@@ -23,7 +24,7 @@ public class DevicePickerActivity extends DeviceListActivity {
         @Override
         public LwtDevice parseResult(int resultCode, @Nullable Intent intent) {
             if (resultCode == RESULT_OK && intent != null) {
-                return intent.getParcelableExtra(RESULT_EXTRA_SELECTED_DEVICE);
+                return IntentCompat.getParcelableExtra(intent, RESULT_EXTRA_SELECTED_DEVICE, LwtDevice.class);
             }
             return null;
         }

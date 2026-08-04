@@ -11,13 +11,9 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
-import android.widget.Button;
 import android.widget.Toast;
 
-import java.io.IOException;
-import java.security.GeneralSecurityException;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 
 import javax.net.ssl.SSLContext;
@@ -29,7 +25,7 @@ import cz.spojenka.lwdn.LwdnScanConfig;
 import cz.spojenka.lwdn.LwdnScanException;
 import cz.spojenka.lwt.*;
 import cz.spojenka.lwt.demoapp.databinding.ActivityMainBinding;
-import cz.spojenka.lwt.util.TLSTrustManager;
+import cz.spojenka.lwt.util.LwtTime;
 import cz.spojenka.lwtp.LwtpTLSConfig;
 import cz.spojenka.lwtp.LwtpTLSPolicy;
 
@@ -102,8 +98,7 @@ public class MainActivity extends BaseActivity {
                                             numZones,
                                             List.of("P", "0", "B", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"),
                                             Duration.ofMinutes(validityMinutes),
-                                            TestingTicketData.ACTIVATION_TOKEN,
-                                            TestingTicketData.ACTIVATION_TOKEN_SIGNED_HASH
+                                            TestingTicketData.SIGNED_ACTIVATION_TOKEN
                                     )
                             )
                             .putExtra(
@@ -197,7 +192,7 @@ public class MainActivity extends BaseActivity {
             return null;
         });
         client.getTicketValidationInfo(CommType.ENQUEUE).thenAccept(tvi -> {
-            Log.i(TAG, "Ticket validation info received: zone " + tvi.tariffZones() + ", act. time=" + Instant.ofEpochSecond(tvi.scheduledActivationTime()));
+            Log.i(TAG, "Ticket validation info received: zone " + tvi.tariffZones() + ", act. time=" + LwtTime.convertLocalDateTime(tvi.scheduledActivationTime()));
         }).exceptionally(ex -> {
             Log.e(TAG, "LWT operation failed", ex);
             return null;

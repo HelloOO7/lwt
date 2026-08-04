@@ -21,8 +21,8 @@ import java.util.function.Function;
 
 import cz.spojenka.lwdn.BluetoothLwdnAddress;
 import cz.spojenka.lwdn.LwdnAddress;
-import cz.spojenka.lwdn.LwdnSocketFactory;
 import cz.spojenka.lwt.util.ByteBufferUtils;
+import cz.spojenka.lwt.util.LwtTime;
 import cz.spojenka.lwt.util.RTTExecutionObserver;
 import cz.spojenka.lwt.util.RemoteTime;
 import cz.spojenka.lwt.util.TLSTrustManager;
@@ -172,28 +172,28 @@ public class LwtAPIClient extends LwtClient {
 
     private ByteBuffer createPreauthorizationTokensRequest(List<byte[]> activationTokenHashes) {
         FlatBufferBuilder builder = new FlatBufferBuilder();
-        int[] activationTokenHashesOffsets = new int[activationTokenHashes.size()];
+        int[] activationTokensOffsets = new int[activationTokenHashes.size()];
         for (int i = 0; i < activationTokenHashes.size(); i++) {
-            activationTokenHashesOffsets[i] = ActivationTokenHash.createActivationTokenHash(builder, ActivationTokenHash.createDataVector(builder, activationTokenHashes.get(i)));
+            activationTokensOffsets[i] = ActivationToken.createActivationToken(builder, ActivationToken.createDataVector(builder, activationTokenHashes.get(i)));
         }
         builder.finish(
                 PreauthorizationTokenRequest.createPreauthorizationTokenRequest(
                         builder,
-                        PreauthorizationTokenRequest.createActivationTokenHashesVector(builder, activationTokenHashesOffsets)
+                        PreauthorizationTokenRequest.createActivationTokensVector(builder, activationTokensOffsets)
                 )
         );
         return builder.dataBuffer();
     }
 
-    public CompletableFuture<TokenWithExpiration<Map<byte[], PreauthorizationToken>>> requestPreauthorizationTokens(List<byte[]> activationTokenHashes, CommType comm) {
+    public CompletableFuture<TokenWithExpiration<Map<byte[], PreauthorizationTokenResult>>> requestPreauthorizationTokens(List<byte[]> activationTokenHashes, CommType comm) {
         CompletableFuture<PreauthorizationTokenResponse> responseFuture = enqueueOrCall(LwtAPI::createPreauthorizationToken, createPreauthorizationTokensRequest(activationTokenHashes), comm);
         RTTExecutionObserver rtt = new RTTExecutionObserver(responseFuture);
         addExecutionObserver(rtt);
         responseFuture.whenCompleteAsync((r, e) -> removeExecutionObserver(rtt));
         return responseFuture.thenApply(response -> {
-            Map<byte[], PreauthorizationToken> tokenMap = new HashMap<>();
+            Map<byte[], PreauthorizationTokenResult> tokenMap = new HashMap<>();
             for (int i = 0; i < response.tokensLength(); i++) {
-                PreauthorizationToken token = response.tokens(i);
+                PreauthorizationTokenResult token = response.tokens(i);
                 if (token != null) {
                     tokenMap.put(activationTokenHashes.get(i), token);
                 }
@@ -209,10 +209,34 @@ public class LwtAPIClient extends LwtClient {
         });
     }
 
-    public CompletableFuture<TokenWithExpiration<PreauthorizationToken>> requestPreauthorizationToken(byte[] activationTokenHash, CommType comm) {
-        return requestPreauthorizationTokens(List.of(activationTokenHash), comm)
+    public CompletableFuture<TokenWithExpiration<PreauthorizationTokenResult>> requestPreauthorizationToken(byte[] activationToken, CommType comm) {
+        return requestPreauthorizationTokens(List.of(activationToken), comm)
                 .thenApply(tokenMap -> new TokenWithExpiration<>(
-                        tokenMap.issuedAt(), tokenMap.expiresAt(), tokenMap.token().get(activationTokenHash)
+                        tokenMap.issuedAt(), tokenMap.expiresAt(), tokenMap.token().get(activationToken)
                 ));
+    }
+
+    public CompletableFuture<TicketActivationResponse> activateTicket(TicketActivationParams params, CommType comm) {
+        FlatBufferBuilder builder = new FlatBufferBuilder();
+        int activationTokenOffset = ActivationToken.createActivationToken(builder, ActivationToken.createDataVector(builder, params.getActivationToken()));
+        int zonesOffset = params.getActivationZones() != null ? builder.createString(String.join(",", params.getActivationZones())) : -1;
+        int appIdOffset = builder.createString(params.getActivationAppId());
+        int preauthTokenOffset = params.getPreauthorizationToken() != null ? PreauthorizationToken.createPreauthorizationToken(builder, PreauthorizationToken.createDataVector(builder, params.getPreauthorizationToken())) : -1;
+        TicketActivationRequest.startTicketActivationRequest(builder);
+        TicketActivationRequest.addActivationToken(builder, activationTokenOffset);
+        if (params.getActivationTime() != null) {
+            TicketActivationRequest.addActivationTime(builder, LwtTime.createLocalDateTime(builder, params.getActivationTime()));
+        }
+        TicketActivationRequest.addActivateNowIfEarlier(builder, params.isActivateNowIfEarlier());
+        if (zonesOffset >= 0) {
+            TicketActivationRequest.addActivationZones(builder, zonesOffset);
+        }
+        TicketActivationRequest.addActivationAppId(builder, appIdOffset);
+        if (preauthTokenOffset >= 0) {
+            TicketActivationRequest.addPreauthorizationToken(builder, preauthTokenOffset);
+        }
+        builder.finish(TicketActivationRequest.endTicketActivationRequest(builder));
+
+        return enqueueOrCall(LwtAPI::activateTicket, builder.dataBuffer(), comm);
     }
 }

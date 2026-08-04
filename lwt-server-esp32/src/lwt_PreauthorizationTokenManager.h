@@ -8,6 +8,7 @@
 #include <climits>
 #include <span>
 #include "lwt_CryptoTypes.h"
+#include "lwt_CommonTypes.h"
 
 namespace lwt {
 
@@ -34,10 +35,10 @@ namespace lwt {
     public:
         PreauthorizationTokenManager(const std::vector<uint8_t>& hmacKey);
 
-        PreauthorizationTokenBlob CreatePreauthorizationToken(const std::span<const uint8_t>& activationTokenHash, int64_t expiresAt);
-        VerificationResult VerifyPreauthorizationToken(const std::span<const uint8_t>& tokenBlob, const std::span<const uint8_t>& activationTokenHash, int64_t currentClock);
+        PreauthorizationTokenBlob CreatePreauthorizationToken(const ByteSpan& activationTokenHash, int64_t expiresAt);
+        VerificationResult VerifyPreauthorizationToken(const ByteSpan& tokenBlob, const ByteSpan& activationTokenHash, int64_t currentClock);
 
     private:
-        HMAC HMACMessage(const std::span<const uint8_t>& message);
+        HMAC HMACMessage(const ByteSpan& message);
     };
 }

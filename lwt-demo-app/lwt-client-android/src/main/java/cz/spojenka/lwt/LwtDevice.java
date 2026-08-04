@@ -6,6 +6,7 @@ import android.os.Parcelable;
 import java.io.IOException;
 
 import androidx.annotation.NonNull;
+import androidx.core.os.ParcelCompat;
 import cz.spojenka.lwdn.LwdnAddress;
 import cz.spojenka.lwdn.LwdnScanResult;
 
@@ -72,7 +73,7 @@ public sealed abstract class LwtDevice implements Parcelable permits LwtDevice.V
         static final Parcelable.Creator<Vehicle> CREATOR = new Parcelable.Creator<>() {
             @Override
             public Vehicle createFromParcel(Parcel source) {
-                LwdnScanResult scanResult = source.readParcelable(LwdnScanResult.class.getClassLoader());
+                LwdnScanResult scanResult = ParcelCompat.readParcelable(source, LwdnScanResult.class.getClassLoader(), LwdnScanResult.class);
                 byte[] advDataBytes = source.createByteArray();
                 TripAdvertisementData advData;
                 try {

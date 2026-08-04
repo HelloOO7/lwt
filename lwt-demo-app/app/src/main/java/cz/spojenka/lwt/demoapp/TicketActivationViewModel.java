@@ -28,7 +28,6 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.Transformations;
 import cz.spojenka.android.system.TickNotifier;
-import cz.spojenka.android.system.TimeTickReceiver;
 import cz.spojenka.android.system.livedata.LiveList;
 import cz.spojenka.android.util.AsyncUtils;
 import cz.spojenka.android.util.LiveDataUtils;
@@ -38,14 +37,19 @@ import cz.spojenka.lwt.LwtAPIClient;
 import cz.spojenka.lwt.LwtDevice;
 import cz.spojenka.lwt.LwtDeviceType;
 import cz.spojenka.lwt.PreauthorizationToken;
+import cz.spojenka.lwt.PreauthorizationTokenResult;
 import cz.spojenka.lwt.PreauthorizationTokenStatus;
 import cz.spojenka.lwt.StopReference;
+import cz.spojenka.lwt.TicketActivationParams;
+import cz.spojenka.lwt.TicketActivationResponse;
 import cz.spojenka.lwt.TicketValidationInfo;
 import cz.spojenka.lwt.TokenWithExpiration;
 import cz.spojenka.lwt.TripRouteInfo;
 import cz.spojenka.lwt.TripStopInfo;
+import cz.spojenka.lwt.util.ByteBufferUtils;
 import cz.spojenka.lwt.util.LwtTariffZones;
 import cz.spojenka.lwt.util.LwtTime;
+import cz.spojenka.lwtp.LwtpLoggingObserver;
 import cz.spojenka.lwtp.LwtpTLSConfig;
 import cz.spojenka.lwtp.LwtpTLSPolicy;
 
@@ -74,7 +78,7 @@ public class TicketActivationViewModel extends AndroidViewModel {
     private MutableLiveData<TripRouteInfo> deviceRouteInfo = new MutableLiveData<>();
     private MutableLiveData<TicketValidationInfo> deviceValidationInfo = new MutableLiveData<>();
     private MutableLiveData<Boolean> rawServerAuthenticationResult = new MutableLiveData<>();
-    private MutableLiveData<TokenWithExpiration<PreauthorizationToken>> devicePreauthToken = new MutableLiveData<>();
+    private MutableLiveData<TokenWithExpiration<PreauthorizationTokenResult>> devicePreauthToken = new MutableLiveData<>();
     private MutableLiveData<Long> preauthExpirationSecondsLeft = new MutableLiveData<>(null);
 
     private MutableLiveData<Throwable> autoDownloadException = new MutableLiveData<>();
@@ -97,6 +101,11 @@ public class TicketActivationViewModel extends AndroidViewModel {
     private MutableLiveData<StopReference> activationStop = new MutableLiveData<>();
     private MutableLiveData<StopReference> validityEndStop = new MutableLiveData<>();
     private List<String> activationStopTicketZones = List.of();
+
+    private CompletableFuture<?> currentActivationCall;
+    private MutableLiveData<Throwable> activationError = new MutableLiveData<>();
+    private MutableLiveData<TicketActivationResponse> activationResult = new MutableLiveData<>();
+    private MutableLiveData<Boolean> isActivationInProgress = new MutableLiveData<>(false);
 
     public TicketActivationViewModel(@NonNull Application application) {
         super(application);
@@ -197,6 +206,7 @@ public class TicketActivationViewModel extends AndroidViewModel {
 
         lwtClient = new LwtAPIClient(device.getAddress());
         lwtClient.disableTLS(); // at this stage, use unencrypted connection
+        //lwtClient.addSessionExecutionObserver(new LwtpLoggingObserver());
         secureLwtClient = new LwtAPIClient(device.getAddress());
         try {
             SSLContext sslContext;
@@ -221,7 +231,7 @@ public class TicketActivationViewModel extends AndroidViewModel {
         List<CompletableFuture<?>> requestsForLoadingIndicator = new ArrayList<>();
 
         requestsForLoadingIndicator.add(enqueueDataDownloadRequest(lwtClient::getTicketValidationInfo, deviceValidationInfo).thenAcceptAsync(tvi -> {
-            defaultActivationTimeForTviStop = LwtTime.parseLocalTimestamp(tvi.scheduledActivationTime());
+            defaultActivationTimeForTviStop = LwtTime.convertLocalDateTime(tvi.scheduledActivationTime());
             tviActivationStop = tvi.trip().currentDepartureStop();
             forceUseTviStop |= isShouldUseTicketValidationStop(tvi);
             canNotUseTicketWithDevice = checkAllDeviceZonesNotApplicable(tvi);
@@ -235,13 +245,18 @@ public class TicketActivationViewModel extends AndroidViewModel {
             commitDefaultActivationStopIfAllData();
         }, getApplication().getMainExecutor()));
 
-        enqueueDataDownloadRequest((commType) -> secureLwtClient.requestPreauthorizationToken(ticket.getActivationTokenHashSigned(), commType), devicePreauthToken)
+        enqueueDataDownloadRequest((commType) -> secureLwtClient.requestPreauthorizationToken(ticket.getActivationToken(), commType), devicePreauthToken)
                 .thenAcceptAsync(token -> updatePreauthExpirationTime(), getApplication().getMainExecutor());
 
+        Log.d(TAG, "Starting async data download from device " + device.getAddress());
         CompletableFuture<Void> dataDownloadFuture = lwtClient.executeAsync(lwtRequestThread);
         CompletableFuture<Void> secureDataDownloadFuture = secureLwtClient.executeAsync(lwtRequestThread);
 
+        dataDownloadFuture.whenCompleteAsync((unused, throwable) -> {
+            Log.d(TAG, "Cleartext data download completed.");
+        }, getApplication().getMainExecutor());
         secureDataDownloadFuture.whenCompleteAsync((unused, throwable) -> {
+            Log.d(TAG, "Secure data download completed.");
             if (AsyncUtils.unwrapCompletionException(throwable) instanceof SSLException) {
                 rawServerAuthenticationResult.setValue(false);
             } else {
@@ -590,6 +605,13 @@ public class TicketActivationViewModel extends AndroidViewModel {
         return currentActivationStop;
     }
 
+    public boolean isActivationFromCurrentStop() {
+        if (currentActivationStop != null && tviActivationStop != null) {
+            return currentActivationStop.sequenceId() == tviActivationStop.sequenceId();
+        }
+        return false;
+    }
+
     public void setActivationStop(StopReference stop) {
         currentActivationStop = stop;
         activationStopTicketZones = calcZonesFromActivationStop(stop, false);
@@ -685,7 +707,7 @@ public class TicketActivationViewModel extends AndroidViewModel {
         if (tripInfo != null) {
             if (stop != null) {
                 if (stop.sequenceId() != tripInfo.trip().currentDepartureStop().sequenceId()) {
-                    return LwtTime.parseLocalTimestamp(tripInfo.stops(stop.sequenceId()).depTime());
+                    return LwtTime.convertLocalDateTime(tripInfo.stops(stop.sequenceId()).depTime());
                 }
             }
             return defaultActivationTimeForTviStop;
@@ -844,7 +866,7 @@ public class TicketActivationViewModel extends AndroidViewModel {
 
         for (int i = startStop.sequenceId(); i < route.stopsLength(); ++i) {
             TripStopInfo stop = route.stops(i);
-            LocalDateTime arrTime = LwtTime.parseLocalTimestamp(stop.arrTime());
+            LocalDateTime arrTime = LwtTime.convertLocalDateTime(stop.arrTime());
             if (arrTime != null && arrTime.isAfter(validityEndTime)) {
                 break;
             }
@@ -882,7 +904,13 @@ public class TicketActivationViewModel extends AndroidViewModel {
         if (time == null || zones == null || zones.zones().isEmpty()) {
             throw new IllegalStateException("Must only call this if getCanActivateTicket() is true");
         }
-        return new ActivationInfo(time.time(), zones.zones());
+        var preauth = devicePreauthToken.getValue();
+        return new ActivationInfo(
+                time.time(),
+                isActivationFromCurrentStop(),
+                zones.zones(),
+                (preauth != null && preauth.token().status() == PreauthorizationTokenStatus.Ok) ? ByteBufferUtils.toByteArray(preauth.token().preauthorizationToken().dataAsByteBuffer()) : null
+        );
     }
 
     private void onTimeTick() {
@@ -903,6 +931,50 @@ public class TicketActivationViewModel extends AndroidViewModel {
         return preauthExpirationSecondsLeft;
     }
 
+    public void startActivateViaLwt() {
+        isActivationInProgress.setValue(true);
+        ActivationInfo info = finishActivationInfo();
+
+        var resultFuture = secureLwtClient.activateTicket(
+                new TicketActivationParams.Builder(ticket.getActivationToken(), "cafebabe")
+                        .setActivationTime(info.time())
+                        .setActivateNowIfEarlier(info.isCurrentStop())
+                        .setActivationZones(info.zones())
+                        .setPreauthorizationToken(info.preauthorizationToken())
+                        .build(),
+                CommType.ENQUEUE
+        );
+        currentActivationCall = resultFuture;
+        resultFuture.whenCompleteAsync((result, throwable) -> {
+            isActivationInProgress.setValue(false);
+            currentActivationCall = null;
+            if (throwable != null) {
+                Log.e(TAG, "Failed to activate ticket via LWT", throwable);
+                activationError.setValue(throwable);
+            } else {
+                activationResult.setValue(result);
+            }
+        }, getApplication().getMainExecutor());
+
+        secureLwtClient.executeAsync(lwtRequestThread);
+    }
+
+    public LiveData<Boolean> getIsActivationInProgress() {
+        return isActivationInProgress;
+    }
+
+    public LiveData<TicketActivationResponse> getActivationResult() {
+        return activationResult;
+    }
+
+    public LiveData<Throwable> getActivationError() {
+        return activationError;
+    }
+
+    public void ackActivationError() {
+        activationError.setValue(null);
+    }
+
     public static record ZoneChoice(boolean isManual, List<String> zones) {
 
     }
@@ -914,7 +986,7 @@ public class TicketActivationViewModel extends AndroidViewModel {
         }
     }
 
-    public static record ActivationInfo(LocalDateTime time, List<String> zones) {
+    public static record ActivationInfo(LocalDateTime time, boolean isCurrentStop, List<String> zones, byte[] preauthorizationToken) {
 
     }
 }

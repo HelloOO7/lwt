@@ -91,6 +91,14 @@ public class LwtClient {
         observers.remove(observer);
     }
 
+    public synchronized void addSessionExecutionObserver(LwtpSession.ExecutionObserver observer) {
+        lwtpSession.addObserver(observer);
+    }
+
+    public synchronized void removeSessionExecutionObserver(LwtpSession.ExecutionObserver observer) {
+        lwtpSession.removeObserver(observer);
+    }
+
     private void changeSession(LwtpSession newSession) {
         Duration wdTimeout = lwtpSession.getWatchdogTimeout();
         lwtpSession = newSession;

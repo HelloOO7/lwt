@@ -30,15 +30,13 @@ public class TicketData implements Parcelable {
     private List<String> chosenZones;
 
     private final byte[] activationToken;
-    private final byte[] activationTokenHashSigned;
 
-    public TicketData(String tariffSystemId, int numZones, List<String> zoneOptions, Duration validityPeriod, byte[] activationToken, byte[] activationTokenHashSigned) {
+    public TicketData(String tariffSystemId, int numZones, List<String> zoneOptions, Duration validityPeriod, byte[] activationToken) {
         this.tariffSystemId = tariffSystemId;
         this.numZones = numZones;
         this.zoneOptions = zoneOptions;
         this.validityPeriod = validityPeriod;
         this.activationToken = activationToken;
-        this.activationTokenHashSigned = activationTokenHashSigned;
     }
 
     protected TicketData(Parcel in) {
@@ -48,7 +46,6 @@ public class TicketData implements Parcelable {
         validityPeriod = Duration.ofMillis(in.readLong());
         chosenZones = in.createStringArrayList();
         activationToken = in.createByteArray();
-        activationTokenHashSigned = in.createByteArray();
     }
 
     public String getTariffSystemId() {
@@ -75,10 +72,6 @@ public class TicketData implements Parcelable {
         return activationToken;
     }
 
-    public byte[] getActivationTokenHashSigned() {
-        return activationTokenHashSigned;
-    }
-
     @Override
     public int describeContents() {
         return 0;
@@ -92,6 +85,5 @@ public class TicketData implements Parcelable {
         dest.writeLong(validityPeriod.toMillis());
         dest.writeStringList(chosenZones);
         dest.writeByteArray(activationToken);
-        dest.writeByteArray(activationTokenHashSigned);
     }
 }

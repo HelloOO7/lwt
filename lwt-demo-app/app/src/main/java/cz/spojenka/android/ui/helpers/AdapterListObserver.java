@@ -31,19 +31,16 @@ public class AdapterListObserver<T> implements LiveList.UpdateObserver<T>, Obser
 
     @Override
     public void onInserted(int start, List<T> items) {
-        System.out.println("onInserted: start=" + start + ", items=" + items + "; " + this);
         adapter.addAll(start, items);
     }
 
     @Override
     public void onRemoved(int start, int count) {
-        System.out.println("onRemoved: start=" + start + ", count=" + count + "; " + this);
         adapter.removeRange(start, count);
     }
 
     @Override
     public void onModified(int start, List<T> items) {
-        System.out.println("onModified: start=" + start + ", items=" + items + "; " + this);
         adapter.setRange(start, items);
     }
 

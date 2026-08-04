@@ -9,6 +9,7 @@
 #include "lwt_ServiceRegistry.h"
 #include "lwt_PreauthorizationTokenManager.h"
 #include "lwt_TicketSignatureVerifier.h"
+#include "lwt_MosClient.h"
 #include "PSRAMAllocator.h"
 
 namespace lwt {
@@ -45,10 +46,19 @@ namespace lwt {
     class TicketValidationService : Observer<TripRouteInfo>, Observer<vdv301::SubscriberTVS::CurrentTariffStop>, Observer<vdv301::SubscriberTVS::RazziaState>
     {
     private:
+        struct ParsedActivationToken {
+            static constexpr uint32_t FLAG_DISALLOW_PREAUTH = (1 << 0);
+
+            uint64_t TicketId;
+            uint32_t Flags;
+        };
+
+    private:
         TicketValidationConfig m_Config;
         PreauthorizationTokenManager& m_TokenManager;
         TicketPreauthRateLimiter m_PreauthRateLimiter;
         TicketSignatureVerifier& m_TicketVerifier;
+        MOSClient& m_MOSClient;
         TripInformationService& m_TripInfoService;
         vdv301::SubscriberTVS* m_TVS;
 
@@ -68,7 +78,12 @@ namespace lwt {
         std::mutex m_TokenGeneratorMutex;
 
     public:
-        TicketValidationService(const TicketValidationConfig& config, PreauthorizationTokenManager& tokenManager, TicketSignatureVerifier& ticketVerifier, TripInformationService& tripInfoService, vdv301::SubscriberTVS* tvsOpt = nullptr);
+        TicketValidationService(
+            const TicketValidationConfig& config,
+            PreauthorizationTokenManager& tokenManager, TicketSignatureVerifier& ticketVerifier,
+            MOSClient& mosClient,
+            TripInformationService& tripInfoService, vdv301::SubscriberTVS* tvsOpt = nullptr
+        );
         virtual ~TicketValidationService() override;
 
         void Register(ServiceRegistry& registry);
@@ -88,5 +103,10 @@ namespace lwt {
         std::string GetTariffZonesOnlyMyTariffSystem(const std::string& tariffZones) const;
 
         static std::string ReduceNextTariffZones(const std::vector<std::string>& nextTariffZones, const std::string& curTariffZones);
+
+        bool OpenActivationToken(const ActivationToken& token, uint16_t* pVersion = nullptr);
+        void ReadActivationTokenSignature(const ActivationToken& activationToken, ByteSpan* pData, ByteSpan* pSignature, uint32_t* pKeyId);
+        SHA256Hash HashActivationToken(const ByteSpan& token);
+        ParsedActivationToken ParseActivationToken(const ByteSpan& tokenData);
     };
 }

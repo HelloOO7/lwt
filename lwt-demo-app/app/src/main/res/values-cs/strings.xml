@@ -70,4 +70,5 @@
     <string name="list_format_serial_comma_policy">NORMAL</string>
     <string name="fast_activation_infobox_title">Zrychlená aktivace</string>
     <string name="fast_activation_infobox_message">Aktivace jízdenky pro zvolený spoj v uvedeném časovém okně nepodléhá ochranné lhůtě - jízdenka začne platit okamžitě.</string>
+    <string name="ticket_activation_confirm_in_progress">Probíhá aktivace</string>
 </resources>

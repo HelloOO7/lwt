@@ -2,12 +2,15 @@ package cz.spojenka.lwdn;
 
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
+import android.util.Log;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
 public class BluetoothLwdnSocket implements LwdnSocket {
+
+    private static final String TAG = "BluetoothLwdnSocket";
 
     private final BluetoothSocket socket;
     private boolean connectInvoked = false;
@@ -23,8 +26,28 @@ public class BluetoothLwdnSocket implements LwdnSocket {
     private void ensureConnected() throws IOException {
         if (!connectInvoked) {
             // do not use socket.isConnected(), as it returns true for a closed socket too
-            socket.connect();
+            IOException connectError = null;
+            int numRetries = 0;
+            for (int i = 0; i < 3; i++) {
+                try {
+                    socket.connect();
+                    Thread.sleep(50);
+                    connectError = null;
+                    numRetries = i;
+                    break;
+                } catch (IOException e) {
+                    connectError = e;
+                } catch (InterruptedException ignored) {
+                    break;
+                }
+            }
             connectInvoked = true;
+            if (connectError != null) {
+                throw connectError;
+            }
+            if (numRetries > 0) {
+                Log.w(TAG, "Needed to retry socket.connect() " + numRetries + " times for successful connection to " + socket.getRemoteDevice().getAddress());
+            }
         }
     }
 

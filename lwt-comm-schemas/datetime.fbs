@@ -1,0 +1,14 @@
+namespace lwt;
+
+struct LwtLocalDateTime {
+    /// Instant in seconds of local time (since 1. 1. 1970).
+    /// Non-positive values should be treated as null.
+    local_instant: long;
+}
+
+struct LwtOffsetDateTime {
+    /// Local time.
+    local_time: LwtLocalDateTime;
+    /// Zone offset in seconds.
+    zone_offset: int;
+}

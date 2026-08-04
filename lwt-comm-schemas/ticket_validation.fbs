@@ -1,4 +1,5 @@
 include "trip_information.fbs";
+include "datetime.fbs";
 
 namespace lwt;
 
@@ -8,7 +9,7 @@ table TicketValidationInfo {
     /// The time at which a ticket should be activated to be valid for departure from the given stop.
     /// This can sometimes be in the past, such as when activation is started in the grace period after entry.
     /// This time includes delay.
-    scheduled_activation_time: long;
+    scheduled_activation_time: LwtLocalDateTime (required);
     /// Tariff zones where the vehicle is currently located, i.e. from which a ticket can be activated.
     /// Individual zones are comma-separated rather than an array in order to save memory in the flatbuffer.
     /// This field only contains tariff zones of the transport network that operates this LWT device.
@@ -20,8 +21,8 @@ table TicketValidationInfo {
     is_razzia: bool;
 }
 
-table ActivationTokenHash {
-    /// Raw data of the activation token hash, which contains the SHA256 digest of the activation token.
+table ActivationToken {
+    /// Raw data of the activation token.
     /// It is suffixed with the signature of the data within by the ticket issuer authority.
     /// This is used as a security measure so that clients can not easily flood the activation server
     /// with unsigned hashes with the goal of evicting themselves out of the server's memory and resetting
@@ -33,13 +34,20 @@ table ActivationTokenHash {
 }
 
 table PreauthorizationTokenRequest {
-    /// SHA256 checksums of the activation tokens which the client
+    /// The activation tokens which the client
     /// promises to send, should they choose to redeem the preauthorization token.
     /// These are limited to a small amount of elements so as to prevent abuse.
     /// The client will not be able to activate a ticket whose token was not provided
     /// as part of this request, as the preauthorization token will not contain a
     /// digital signature for such tokens.
-    activation_token_hashes: [ActivationTokenHash] (required);
+    activation_tokens: [ActivationToken] (required);
+}
+
+table PreauthorizationToken {
+    /// The raw preauthorization token. The data within is implementation-dependent
+    /// and contains information such as the expiry timestamp, as well as a SHA256
+    /// HMAC at the end.
+    data: [ubyte];
 }
 
 enum PreauthorizationTokenStatus : ubyte {
@@ -47,14 +55,12 @@ enum PreauthorizationTokenStatus : ubyte {
     RequestedTooOften
 }
 
-table PreauthorizationToken {
+table PreauthorizationTokenResult {
     /// Status of the preauthorization token.
     status: PreauthorizationTokenStatus;
-    /// The raw preauthorization token. The data within is implementation-dependent
-    /// and contains information such as the expiry timestamp, as well as a SHA256
-    /// HMAC at the end.
+    /// The token.
     /// This field may not be present if the "status" field is not equal to "Ok".
-    preauthorization_token: [ubyte];
+    preauthorization_token: PreauthorizationToken;
 }
 
 table PreauthorizationTokenResponse {
@@ -69,17 +75,34 @@ table PreauthorizationTokenResponse {
     expires_at: long;
     /// Preauthorization tokens for the individual activation tokens requested. The order of these
     /// tokens is the same as in the PreauthorizationTokenRequest.
-    tokens: [PreauthorizationToken] (required);
+    tokens: [PreauthorizationTokenResult] (required);
 }
 
 table TicketActivationRequest {
     /// The activation token, which will produce the signed ticket data.
-    activation_token: [ubyte] (required);
+    activation_token: ActivationToken (required);
     /// Timestamp when the client requests the ticket to be activated. The server may or may not respect
     /// this, but it can be used for example for deferred activation when a passenger has a subscription ticket.
-    activation_time: long;
+    /// The timestamp is in the same format as in TripStopInfo - Unix timestamp, but in the time zone of the
+    /// current stop (!). For immediate activation, leave it null.
+    /// If the activation time is lower than permitted, the server will automatically adjust it.
+    activation_time: LwtLocalDateTime;
+    /// Set this to activate the ticket immediately if the activation time is in the future. This has one quite specific
+    /// use case - activating a ticket from the current stop of a trip.
+    /// In this case, suppose the trip is on time, then we want to activate at a time in the past (so that the activation
+    /// time is in line with scheduled departure, and choosing ticket parameters takes some time after that).
+    /// On the other hand, if it is delayed, we want to activate later, so that
+    /// our ticket's temporal validity is not crippled by the delay. However, delay calculation may be inaccurate and not
+    /// real-time, so the client may inadvertently choose to activate too late, which could lead to a fine. Therefore,
+    /// if this parameter is set, the final activation server will check the activation time and make sure that it is
+    /// not in the future. If it is, the ticket will be activated immediately. This is only permitted if a
+    /// preauthorization token is provided.
+    activate_now_if_earlier: bool;
     /// Comma-separated list of tariff zones for activation. May be omitted in special cases such as Prague-only tickets.
     activation_zones: string;
+    /// ID of the app that the ticket should be associated with. This is used to allow for account-less
+    /// or "anonymous" ticketing.
+    activation_app_id: string (required);
     /// Optional preauthorization token that permits immediate activation.
     /// If not given, tampered with or expired, the ticket may be activated with a security delay.
     preauthorization_token: PreauthorizationToken;
@@ -88,8 +111,13 @@ table TicketActivationRequest {
 table TicketActivationResponse {
     /// Signed ticket QR data that is valid for inspection.
     signed_etd: string (required);
+    /// TOTP seed shared with the client as an anti-theft measure. This seed
+    /// is separate from the ETD, so it does not have to be broadcasted.
+    totp_seed: string (required);
     /// Final start of validity time.
-    valid_since_time: long;
+    valid_since_time: LwtOffsetDateTime (required);
     /// Final end of validity time.
-    valid_until_time: long;
+    valid_until_time: LwtOffsetDateTime (required);
+    /// Time at which the activation was recorded by the activation server.
+    activated_at_time: LwtOffsetDateTime (required);
 }
