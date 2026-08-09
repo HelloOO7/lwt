@@ -88,6 +88,16 @@ namespace lwtp {
         return m_Flags & (1ULL << index);
     }
 
+    Server::~Server()
+    {
+        std::lock_guard lock(m_Lock);
+
+        for (auto& task : m_SocketTasks) {
+            vTaskDelete(task->m_Task);
+        }
+        m_SocketTasks.clear();
+    }
+
     void Server::AddSocket(lwdn::ServerSocket* socket, size_t taskCount, size_t taskStackSize)
     {
         std::lock_guard lock(m_Lock);
@@ -95,8 +105,7 @@ namespace lwtp {
             auto task = std::make_unique<SocketTask>();
             task->m_Socket = socket;
             task->m_Server = this;
-            xTaskCreate(SocketTaskFunc, "LWTP Socket task", taskStackSize, task.get(), tskIDLE_PRIORITY + 1, &task->m_TaskHandle);
-            configASSERT(task->m_TaskHandle);
+            xTaskCreateStaticPSRAM(SocketTaskFunc, "LWTP Socket task", taskStackSize, task.get(), tskIDLE_PRIORITY + 1, &task->m_Task);
             m_SocketTasks.push_back(std::move(task));
         }
     }

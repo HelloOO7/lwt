@@ -1,11 +1,12 @@
 #pragma once
 
 #include "lwdn_Socket.h"
+#include "lwdn_Link.h"
 #include <memory>
 
 namespace lwdn {
 
-    class ServerSocket {
+    class ServerSocket : public LinkObject {
     public:
         virtual ~ServerSocket() = default;
 

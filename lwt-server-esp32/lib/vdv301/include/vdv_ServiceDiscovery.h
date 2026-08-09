@@ -14,6 +14,9 @@
 namespace vdv301
 {
 
+    /**
+     * @brief mDNS-based service discovery as per the VDV 301 standard.
+     */
     class ServiceDiscovery
     {
     public:
@@ -121,7 +124,8 @@ namespace vdv301
         Protocol m_Protocol;
         std::string m_ProtocolStr;
         std::string m_Address;
-        
+        bool m_TrustNANPeers{ false };
+
         std::mutex m_BrowseStateMutex;
         size_t m_NextBrowseHandle{ 1 };
         std::vector<QueryBrowseState> m_ActiveBrowses;
@@ -133,17 +137,30 @@ namespace vdv301
         std::mutex m_AdditionalQueryMutex;
         std::vector<AdditionalQueryState> m_ActiveAdditionalQueries;
 
+        esp_event_handler_instance_t m_EthIPEventInstance;
+        esp_event_handler_instance_t m_StaIPEventInstance;
+        esp_event_handler_instance_t m_IPv6EventInstance;
+
     public:
         /**
-         * @brief Create a new service discovery provider. This will automatically initialize
-         * and de-initialize mDNS as needed. There must always be at most one instance of
+         * @brief Create a new service discovery provider. There must always be at most one instance of
          * ServiceDiscovery per service type + protocol, otherwise the behavior is undefined.
+         * You must call mdns_init() before creating instances of this class, otherwise an error will occur.
          *
          * @param serviceType service type without leading underscore and without trailing "._tcp" or "._udp", e.g. "my-service"
          * @param protocol protocol which the service is using
          */
         ServiceDiscovery(const std::string& serviceType, Protocol protocol);
         ~ServiceDiscovery();
+
+        /**
+         * @brief Enable trusting NAN (Wi-Fi Aware) peers during service discovery.
+         * This is disabled by default, as it would allow NAN devices connected over a datapath
+         * to inject themselves into service discovery, which may not be desirable.
+         * 
+         * @param trust 
+         */
+        void SetTrustNANPeers(bool trust);
 
         BrowseHandle StartBrowse(const Query& query, BrowseCallback callback);
         void StopBrowse(BrowseHandle handle);
@@ -172,6 +189,8 @@ namespace vdv301
         void OnIPAddressAssigned(ip_event_got_ip6_t* data);
         static bool DeviceHasAnyIPAddress();
         static void EventGotIPCallback(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
+
+        bool IsInterfaceTrusted(esp_netif_t* netif) const;
 
         void UpdateBrowseResultsAsync();
     };

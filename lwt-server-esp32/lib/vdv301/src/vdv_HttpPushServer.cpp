@@ -79,7 +79,6 @@ namespace vdv301 {
 
         psram_string body;
 
-        int received;
         if (req->content_len) {
             body.resize(req->content_len);
             char* bodyPtr = body.data();

@@ -234,7 +234,6 @@ namespace vdv301
         return m_Results.empty() ? nullptr : &m_Results.front();
     }
 
-    static int g_InstanceCount = 0;
     static std::mutex g_GlobalStateMutex;
     static std::unordered_map<std::string, ServiceDiscovery*> g_AddressToInstanceMap;
 
@@ -249,21 +248,18 @@ namespace vdv301
         m_Address{ BuildMdnsAddress(m_ServiceType, m_ProtocolStr) }
     {
         std::lock_guard lock(g_GlobalStateMutex);
-        if (g_InstanceCount++ == 0) {
-            ESP_ERROR_CHECK(mdns_init());
-        }
         g_AddressToInstanceMap[m_Address] = this;
 
-        ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &ServiceDiscovery::EventGotIPCallback, this));
-        ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &ServiceDiscovery::EventGotIPCallback, this));
-        ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_GOT_IP6, &ServiceDiscovery::EventGotIPCallback, this));
+        ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &ServiceDiscovery::EventGotIPCallback, this, &m_EthIPEventInstance));
+        ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &ServiceDiscovery::EventGotIPCallback, this, &m_StaIPEventInstance));
+        ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_GOT_IP6, &ServiceDiscovery::EventGotIPCallback, this, &m_IPv6EventInstance));
     }
 
     ServiceDiscovery::~ServiceDiscovery()
     {
-        ESP_ERROR_CHECK(esp_event_handler_unregister(IP_EVENT, IP_EVENT_ETH_GOT_IP, &ServiceDiscovery::EventGotIPCallback));
-        ESP_ERROR_CHECK(esp_event_handler_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &ServiceDiscovery::EventGotIPCallback));
-        ESP_ERROR_CHECK(esp_event_handler_unregister(IP_EVENT, IP_EVENT_GOT_IP6, &ServiceDiscovery::EventGotIPCallback));
+        ESP_ERROR_CHECK(esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_ETH_GOT_IP, &m_EthIPEventInstance));
+        ESP_ERROR_CHECK(esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, &m_StaIPEventInstance));
+        ESP_ERROR_CHECK(esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_GOT_IP6, &m_IPv6EventInstance));
 
         {
             std::scoped_lock lock(m_AdditionalQueryMutex, g_GlobalAsyncQueryMutex);
@@ -273,14 +269,11 @@ namespace vdv301
         }
 
         m_EventQueue.Close();
+    }
 
-        {
-            std::lock_guard lock(g_GlobalStateMutex);
-            g_AddressToInstanceMap.erase(m_Address);
-            if (--g_InstanceCount == 0) {
-                mdns_free();
-            }
-        }
+    void ServiceDiscovery::SetTrustNANPeers(bool trust)
+    {
+        m_TrustNANPeers = trust;
     }
 
     void ServiceDiscovery::GlobalBrowseNotifyCallback(mdns_result_t* results) {
@@ -370,6 +363,11 @@ namespace vdv301
     }
 
     void ServiceDiscovery::HandleBrowseResult(mdns_result_t* result, bool fetchAdditional) {
+        if (!IsInterfaceTrusted(result->esp_netif)) {
+            ESP_LOGI(TAG, "Ignoring mDNS browse result on untrusted interface %s", esp_netif_get_desc(result->esp_netif));
+            return;
+        }
+
         ESP_LOGI(TAG, "Received mDNS browse result for service instance %s at host %s:%u TTL: %u", result->instance_name, result->hostname, result->port, result->ttl);
         auto* addr = result->addr;
         while (addr) {
@@ -711,12 +709,20 @@ namespace vdv301
     }
 
     void ServiceDiscovery::OnIPAddressAssigned(ip_event_got_ip_t* eventData) {
-        ESP_LOGI(TAG, "IP address assigned: " IPSTR, IP2STR(&eventData->ip_info.ip));
+        if (!IsInterfaceTrusted(eventData->esp_netif)) {
+            ESP_LOGI(TAG, "Ignoring IP address assignment on untrusted interface %s", esp_netif_get_desc(eventData->esp_netif));
+            return;
+        }
+        ESP_LOGI(TAG, "IP address assigned: " IPSTR " (@%s)", IP2STR(&eventData->ip_info.ip), esp_netif_get_desc(eventData->esp_netif));
         RestartAllBrowses();
     }
 
     void ServiceDiscovery::OnIPAddressAssigned(ip_event_got_ip6_t* eventData) {
-        ESP_LOGI(TAG, "IPv6 address assigned: " IPV6STR, IPV62STR(eventData->ip6_info.ip));
+        if (!IsInterfaceTrusted(eventData->esp_netif)) {
+            ESP_LOGI(TAG, "Ignoring IPv6 address assignment on untrusted interface %s", esp_netif_get_desc(eventData->esp_netif));
+            return;
+        }
+        ESP_LOGI(TAG, "IPv6 address assigned: " IPV6STR " (@%s)", IPV62STR(eventData->ip6_info.ip), esp_netif_get_desc(eventData->esp_netif));
         RestartAllBrowses();
     }
 
@@ -774,6 +780,16 @@ namespace vdv301
     std::string ServiceDiscovery::BuildMdnsAddress(const std::string& serviceType, const std::string& protocolStr)
     {
         return serviceType + "." + protocolStr + ".local";
+    }
+
+    bool ServiceDiscovery::IsInterfaceTrusted(esp_netif_t* netif) const
+    {
+        if (!m_TrustNANPeers) {
+            if (strcmp(esp_netif_get_desc(netif), "nan") == 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     ServiceDiscovery HttpServiceDiscovery()

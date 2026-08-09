@@ -43,7 +43,6 @@ namespace lwt {
 
     auto BuildTripStopInfo(flatbuffers::FlatBufferBuilder& fbb, const TripInformationStructure& tripInfo, const StopInformationStructure& stopInfo)
     {
-        auto stopRef = fbb.CreateString(stopInfo.StopRef.Value);
         bool isFirstStop = stopInfo.StopIndex.Value == tripInfo.StopSequence.StopPoint.front().StopIndex.Value;
         bool isLastStop = stopInfo.StopIndex.Value == tripInfo.StopSequence.StopPoint.back().StopIndex.Value;
 

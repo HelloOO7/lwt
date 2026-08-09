@@ -227,4 +227,9 @@ namespace lwdn {
             return TranslateErrnoToMbed(errno, MBEDTLS_ERR_SSL_WANT_READ, MBEDTLS_ERR_NET_RECV_FAILED);
         }
     }
+
+    LinkAdapter* TLSSocket::GetLinkAdapter() const
+    {
+        return m_Base->GetLinkAdapter();
+    }
 }

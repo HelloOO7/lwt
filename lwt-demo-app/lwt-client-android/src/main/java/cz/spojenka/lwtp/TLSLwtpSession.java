@@ -96,7 +96,7 @@ public class TLSLwtpSession extends LwtpSession {
                 }
             }
         } catch (IOException ex) {
-            finishRemainingWithException(ex);
+            finishRemainingWithException(ex, cancellationToken);
         }
     }
 }

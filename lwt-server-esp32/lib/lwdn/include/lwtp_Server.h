@@ -8,6 +8,7 @@
 #include <memory>
 #include "PSRAMContainers.h"
 #include "lwtp_Protocol.h"
+#include "PSRAMTask.h"
 
 namespace lwtp {
 
@@ -51,7 +52,7 @@ namespace lwtp {
         };
     private:
         struct SocketTask {
-            TaskHandle_t m_TaskHandle{ nullptr };
+            PSRAMTask m_Task;
             Server* m_Server;
             lwdn::ServerSocket* m_Socket;
         };
@@ -62,6 +63,9 @@ namespace lwtp {
         std::vector<std::unique_ptr<SocketInterceptor>> m_Interceptors;
 
     public:
+        Server() = default;
+        virtual ~Server();
+
         void AddSocket(lwdn::ServerSocket* socket, size_t taskCount = 1, size_t taskStackSize = 4096);
         void AddInterceptor(std::unique_ptr<SocketInterceptor> interceptor);
 

@@ -8,3 +8,4 @@ wifi_secrets.h
 *.log
 lib/lwt-schemas/generated/
 *.old
+build/

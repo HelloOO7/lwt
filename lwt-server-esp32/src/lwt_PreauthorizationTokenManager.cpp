@@ -1,6 +1,7 @@
 #include "lwt_PreauthorizationTokenManager.h"
 #include <cassert>
 #include "BitConverter.h"
+#include "psa/crypto.h"
 
 namespace lwt {
 
@@ -9,9 +10,18 @@ namespace lwt {
     PreauthorizationTokenManager::PreauthorizationTokenManager(const std::vector<uint8_t>& hmacKey)
         : m_HMACKey(hmacKey)
     {
-        mbedtls_md_init(&m_HMACCtx);
-        int err = mbedtls_md_setup(&m_HMACCtx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), true);
-        assert(err == 0);
+        psa_key_attributes_t keyAttributes = PSA_KEY_ATTRIBUTES_INIT;
+        psa_set_key_usage_flags(&keyAttributes, PSA_KEY_USAGE_SIGN_MESSAGE | PSA_KEY_USAGE_VERIFY_MESSAGE);
+        psa_set_key_algorithm(&keyAttributes, PSA_ALG_HMAC(PSA_ALG_SHA_256));
+        psa_set_key_type(&keyAttributes, PSA_KEY_TYPE_HMAC);
+        assert(psa_import_key(&keyAttributes, hmacKey.data(), hmacKey.size(), &m_HMACKeyId) == PSA_SUCCESS);
+    }
+
+    PreauthorizationTokenManager::~PreauthorizationTokenManager()
+    {
+        if (m_HMACKeyId != PSA_KEY_ID_NULL) {
+            psa_destroy_key(m_HMACKeyId);
+        }
     }
 
     using BitConverter = ::BitConverter<std::endian::native>;
@@ -26,7 +36,7 @@ namespace lwt {
         out.WriteBytes(activationTokenHash);
         out.WriteInt64(expiresAt);
 
-        auto hmac = HMACMessage({data.data(), data.size() - HMAC{}.size()});
+        auto hmac = HMACMessage({ data.data(), data.size() - HMAC{}.size() });
         out.WriteBytes(hmac);
 
         return data;
@@ -47,7 +57,7 @@ namespace lwt {
         }
 
         BitConverter::InputStream in(innerData.data());
-        
+
         uint16_t version = in.ReadUInt16();
         if (version != TOKEN_BLOB_VERSION) {
             return VerificationResult::VERSION_MISMATCH;
@@ -72,16 +82,9 @@ namespace lwt {
 
     PreauthorizationTokenManager::HMAC PreauthorizationTokenManager::HMACMessage(const ByteSpan& message)
     {
-        int err = mbedtls_md_hmac_starts(&m_HMACCtx, m_HMACKey.data(), m_HMACKey.size());
-        assert(err == 0);
-
-        err = mbedtls_md_hmac_update(&m_HMACCtx, message.data(), message.size());
-        assert(err == 0);
-
         HMAC hmacOutput;
-        err = mbedtls_md_hmac_finish(&m_HMACCtx, hmacOutput.data());
-        assert(err == 0);
-
+        size_t macLength = 0;
+        assert(psa_mac_compute(m_HMACKeyId, PSA_ALG_HMAC(PSA_ALG_SHA_256), message.data(), message.size(), hmacOutput.data(), hmacOutput.size(), &macLength) == PSA_SUCCESS);
         return hmacOutput;
     }
 }

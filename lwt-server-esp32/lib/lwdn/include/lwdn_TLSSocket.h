@@ -42,6 +42,8 @@ namespace lwdn {
         int Write(const void* data, size_t len, size_t* sentLen = nullptr) override;
         int Read(void* buffer, size_t len, size_t* receivedLen = nullptr, size_t timeout = SIZE_MAX) override;
 
+        LinkAdapter* GetLinkAdapter() const override;
+
     private:
         int StartTLS();
         int SignalError(int err);

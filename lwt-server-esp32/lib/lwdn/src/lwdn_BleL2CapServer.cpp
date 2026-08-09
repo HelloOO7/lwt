@@ -52,6 +52,11 @@ namespace lwdn {
         m_MainRxBuf = os_mbuf_get_pkthdr(&m_MbufPool, 0);
     }
 
+    BleL2CapServer::Channel::~Channel()
+    {
+        os_mempool_unregister(&m_MemPool);
+    }
+
     uint16_t BleL2CapServer::GetPsm() const
     {
         return m_Psm;
@@ -280,6 +285,7 @@ namespace lwdn {
             else {
                 channel->m_Chan = event->reconfigured.chan;
             }
+            break;
         }
         case BLE_L2CAP_EVENT_COC_TX_UNSTALLED:
         {

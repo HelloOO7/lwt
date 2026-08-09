@@ -37,7 +37,7 @@ struct LocalTime {
 
     inline std::string to_string() const {
         if (second > 0) {
-            char buffer[9]; // HH:MM:SS + null terminator
+            char buffer[12]; // HH:MM:SS + null terminator
             snprintf(buffer, sizeof(buffer), "%02hhu:%02hhu:%02hhu", hour, minute, second);
             return std::string(buffer);
         } else {
@@ -172,7 +172,7 @@ struct OffsetDateTime {
             int totalMinutes = offset_seconds / 60;
             int hours = totalMinutes / 60;
             int minutes = std::abs(totalMinutes % 60);
-            char buffer[7]; // +HH:MM or -HH:MM + null terminator
+            char buffer[11]; // +HH:MM or -HH:MM + null terminator
             snprintf(buffer, sizeof(buffer), "%+03d:%02d", hours, minutes);
             result += buffer;
         }

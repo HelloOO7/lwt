@@ -2,6 +2,7 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "string.h"
+#include "esp_nan.h"
 
 /* FreeRTOS event group to signal when we are connected*/
 static EventGroupHandle_t s_wifi_event_group;
@@ -41,6 +42,15 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
     }
 }
 
+void wifi_init_default()
+{
+    wifi_mode_t mode;
+    if (esp_wifi_get_mode(&mode) == ESP_ERR_WIFI_NOT_INIT) {
+        wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+        ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    }
+}
+
 void wifi_init_sta(const char* ssid, const char* password, int retry_max)
 {
     s_wifi_event_group = xEventGroupCreate();
@@ -48,8 +58,7 @@ void wifi_init_sta(const char* ssid, const char* password, int retry_max)
 
     esp_netif_create_default_wifi_sta();
 
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    wifi_init_default();
 
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
@@ -68,12 +77,12 @@ void wifi_init_sta(const char* ssid, const char* password, int retry_max)
     memset(&wifi_config, 0, sizeof(wifi_config));
 
     wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
-    #ifdef CONFIG_ESP_WIFI_WPA3_COMPATIBLE_SUPPORT
+#ifdef CONFIG_ESP_WIFI_WPA3_COMPATIBLE_SUPPORT
     wifi_config.sta.disable_wpa3_compatible_mode = 0;
-    #endif
+#endif
 
-    strncpy((char*)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
-    strncpy((char*)wifi_config.sta.password, password, sizeof(wifi_config.sta.password));
+    strlcpy((char*)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
+    strlcpy((char*)wifi_config.sta.password, password, sizeof(wifi_config.sta.password));
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
@@ -100,4 +109,14 @@ void wifi_init_sta(const char* ssid, const char* password, int retry_max)
     else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
     }
+}
+
+void wifi_init_nan()
+{
+    wifi_init_default();
+    esp_netif_create_default_wifi_nan();
+
+    wifi_nan_sync_config_t nan_cfg = WIFI_NAN_SYNC_CONFIG_DEFAULT();
+    nan_cfg.disable_random_mac = true;
+    esp_wifi_nan_sync_start(&nan_cfg);
 }

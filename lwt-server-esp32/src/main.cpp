@@ -31,8 +31,14 @@
 #include "esp_event.h"
 #include "tls_setup.h"
 #include "tls_certs.h"
+#include "psa/crypto.h"
 #include "ticket_pubkey.h"
 #include "debug_device.h"
+#include "esp_nan.h"
+#include "lwdn_WifiNanPublisher.h"
+#include "lwdn_WifiNanAdvertiser.h"
+#include "lwdn_WifiNanServer.h"
+#include "NewAndDelete.h"
 #include <atomic>
 
 static constexpr uint16_t BLE_PSM = 0xD7; // 0x80 + 'W'
@@ -40,6 +46,10 @@ static constexpr lwdn::BleAdvertiser::UUID32 BLE_SERVICE_UUID_VEHICLE = 0x4C5754
 static constexpr lwdn::BleAdvertiser::UUID32 BLE_SERVICE_UUID_STOP = 0x4C575453; // 'LWTS'
 static constexpr lwdn::BleAdvertiser::UUID32 BLE_SERVICE_UUID_VEHICLE_EXTENDED = BLE_SERVICE_UUID_VEHICLE + 'E';
 static constexpr lwdn::BleAdvertiser::UUID32 BLE_SERVICE_UUID_STOP_EXTENDED = BLE_SERVICE_UUID_STOP + 'E';
+
+static constexpr in_port_t WIFI_NAN_PORT = 26001;
+static const std::vector<psram_vector<uint8_t>> WIFI_NAN_MATCHING_FILTERS_VEHICLE = { {'V'}, {'*'} };
+static const std::vector<psram_vector<uint8_t>> WIFI_NAN_MATCHING_FILTERS_STOP = { {'*'}, {'S'} };
 
 static const lwt::TicketValidationConfig TICKETING_CONFIG = {
     .TariffSystemID = "PID",
@@ -54,7 +64,6 @@ private:
     vdv301::ServiceDiscovery m_HttpServiceDiscovery;
     vdv301::SubscriberCIS m_CISSubscriber;
     vdv301::SubscriberTVS m_TVSSubscriber;
-    lwdn::BleL2CapServer m_BLEServer;
     lwt::ServiceRegistry m_ServiceRegistry;
     lwt::ApplicationServer m_AppServer;
     lwt::PingService m_PingService;
@@ -67,6 +76,12 @@ private:
 
     lwdn::BleAdvertiser m_BLETripAdvertiserLegacy;
     lwdn::BleAdvertiser m_BLETripAdvertiserExt;
+    lwdn::BleL2CapServer m_BLEServer;
+
+    lwdn::WifiNanPublisher m_WifiNanPublisher;
+    lwdn::WifiNanAdvertiser m_WifiNanAdvertiser;
+    lwdn::WifiNanServer m_WifiNanServer;
+
     lwt::TripInfoAdvertiser m_TripInfoAdvertiser;
 
 public:
@@ -84,38 +99,50 @@ public:
             m_HttpServiceDiscovery,
             vdv301::SubscriberTVS::Operation::GetRazzia | vdv301::SubscriberTVS::Operation::GetCurrentTariffStop
         ),
-        m_BLEServer(BLE_PSM, lwtp::MAX_PACKET_SIZE),
         m_ServiceRegistry(lwt::Operation_MIN, lwt::Operation_MAX),
         m_AppServer(m_ServiceRegistry),
-        m_ServerAuthService(get_debug_device_crt_start(), m_TlsCredentials.device_key, m_TlsCredentials.ctr_drbg),
+        m_ServerAuthService(get_debug_device_crt_start(), m_TlsCredentials.device_key),
         m_TripInfoService(m_CISSubscriber),
-        m_PreauthTokenManager(LoadOrCreateHmacKey(m_TlsCredentials.ctr_drbg, "pat_hmac_key", 32)),
+        m_PreauthTokenManager(LoadOrCreateHmacKey("pat_hmac_key", 32)),
         m_TicketVerifier(),
-        m_MOSClient("https://ticketing.mos.ropid:8080", {get_debug_device_crt_start(), get_debug_device_crt_end()}, {TLS_LWT_SERVER_KEY_DEBUG_START, TLS_LWT_SERVER_KEY_DEBUG_END}),
+        m_MOSClient("https://ticketing.mos.ropid:8080", { get_debug_device_crt_start(), get_debug_device_crt_end() }, { TLS_LWT_SERVER_KEY_DEBUG_START, TLS_LWT_SERVER_KEY_DEBUG_END }),
         m_TicketService(TICKETING_CONFIG, m_PreauthTokenManager, m_TicketVerifier, m_MOSClient, m_TripInfoService, &m_TVSSubscriber), //TVS not yet implemented
         m_BLETripAdvertiserLegacy(0, BLE_SERVICE_UUID_VEHICLE, lwdn::BleAdvertiser::Flags::INCLUDE_DEVICE_NAME | lwdn::BleAdvertiser::Flags::USE_LEGACY_ADVERTISING),
         m_BLETripAdvertiserExt(1, BLE_SERVICE_UUID_VEHICLE_EXTENDED, lwdn::BleAdvertiser::Flags::INCLUDE_DEVICE_NAME),
-        m_TripInfoAdvertiser(m_CISSubscriber, { &m_BLETripAdvertiserLegacy, &m_BLETripAdvertiserExt })
+        m_BLEServer(BLE_PSM, lwtp::MAX_PACKET_SIZE),
+        m_WifiNanPublisher(
+            {
+                .ServiceName = "LWT",
+                .ServiceType = NAN_PUBLISH_UNSOLICITED,
+                .MatchingFilters = WIFI_NAN_MATCHING_FILTERS_VEHICLE,
+                .Features = lwdn::WifiNanPublisher::Feature::DATAPATH
+            }
+        ),
+        m_WifiNanAdvertiser(m_WifiNanPublisher),
+        m_WifiNanServer(m_WifiNanPublisher, WIFI_NAN_PORT),
+        m_TripInfoAdvertiser(m_CISSubscriber, { &m_BLETripAdvertiserLegacy, &m_BLETripAdvertiserExt, &m_WifiNanAdvertiser })
     {
         lwt::ensure_generated_types_linked();
 
         setup_tls_config(m_TlsCredentials, m_MbedTlsConfig);
 
-        m_TicketVerifier.RegisterPublicKey(0, {TICKET_SIGNING_KEY_PUB_START, TICKET_SIGNING_KEY_PUB_END});
+        m_TicketVerifier.RegisterPublicKey(0, { TICKET_SIGNING_KEY_PUB_START, TICKET_SIGNING_KEY_PUB_END });
 
         m_ServiceRegistry.RegisterServices(m_PingService, m_ServerAuthService, m_TripInfoService, m_TicketService);
 
         m_AppServer.AddInterceptor(std::make_unique<lwtp::StartTLSInterceptor>(m_MbedTlsConfig));
         m_AppServer.AddSocket(&m_BLEServer, 1, 6144);
+        m_AppServer.AddSocket(&m_WifiNanServer, 1, 6144);
     }
 
     void StartAdvertising() {
         m_BLETripAdvertiserLegacy.Start();
         m_BLETripAdvertiserExt.Start();
+        m_WifiNanAdvertiser.Start();
     }
 
 private:
-    static std::vector<uint8_t> LoadOrCreateHmacKey(mbedtls_ctr_drbg_context& ctrDrbg, const char* nvsKey, size_t expectedSize) {
+    static std::vector<uint8_t> LoadOrCreateHmacKey(const char* nvsKey, size_t expectedSize) {
         nvs_handle nvsHandle;
         ESP_ERROR_CHECK(nvs_open("lwt", NVS_READWRITE, &nvsHandle));
         std::vector<uint8_t> hmacKey(expectedSize);
@@ -123,7 +150,7 @@ private:
         esp_err_t err = nvs_get_blob(nvsHandle, nvsKey, hmacKey.data(), &pBlobSize);
         if (err == ESP_ERR_NVS_NOT_FOUND) {
             // generate new key
-            int rc = mbedtls_ctr_drbg_random(&ctrDrbg, hmacKey.data(), expectedSize);
+            int rc = psa_generate_random(hmacKey.data(), expectedSize);
             assert(rc == 0);
             ESP_ERROR_CHECK(nvs_set_blob(nvsHandle, nvsKey, hmacKey.data(), expectedSize));
             ESP_ERROR_CHECK(nvs_commit(nvsHandle));
@@ -158,123 +185,6 @@ void nimble_task(void* param)
     nimble_port_freertos_deinit();
 }
 
-static void bleprph_readvertise(void);
-
-static int bleprph_gap_event(struct ble_gap_event* event, void* arg)
-{
-    switch (event->type) {
-    case BLE_GAP_EVENT_CONNECT:
-        /* A new connection was established or a connection attempt failed. */
-        if (event->connect.status == 0) {
-            MODLOG_DFLT(INFO, "connection established; handle=%d\n", event->connect.conn_handle);
-        }
-        else {
-            MODLOG_DFLT(INFO, "connection failed; status=%d\n", event->connect.status);
-        }
-        bleprph_readvertise();
-        break;
-
-    case BLE_GAP_EVENT_DISCONNECT:
-        MODLOG_DFLT(INFO, "disconnect; reason=%d\n", event->disconnect.reason);
-        bleprph_readvertise();
-        break;
-
-    case BLE_GAP_EVENT_ADV_COMPLETE:
-        MODLOG_DFLT(INFO, "advertise complete\n");
-        bleprph_readvertise();
-        break;
-
-    default:
-        break;
-    }
-    return 0;
-}
-
-static void bleprph_advertise(void)
-{
-    struct ble_gap_ext_adv_params adv_params;
-    struct ble_hs_adv_fields fields;
-    const char* name;
-    int rc;
-
-    uint8_t gap_instance = 0;
-
-    memset(&adv_params, 0, sizeof(adv_params));
-
-    adv_params.connectable = true;
-    adv_params.scannable = true;
-    adv_params.legacy_pdu = true;
-    adv_params.anonymous = false;
-    adv_params.own_addr_type = BLE_OWN_ADDR_PUBLIC;
-
-    rc = ble_gap_ext_adv_configure(gap_instance, &adv_params, 0, bleprph_gap_event, 0);
-    if (rc != 0) {
-        MODLOG_DFLT(ERROR, "error configuring advertisement; rc=%d\n", rc);
-        return;
-    }
-
-    memset(&fields, 0, sizeof(fields));
-    // normally it is not mandatory to provide a device name and we could in theory just read the raw scan data
-    // and match the service UUID.
-    // however, in order to allow background scans on Android 8+, we need to use a ScanFilter, which
-    // does not work reliably over service data on a lot of devices, thereby mandating the use of the
-    // less bug-prone name field. This also limits our advertisement size to 20 bytes on BLE 4.x.
-    name = ble_svc_gap_device_name();
-    fields.name = (uint8_t*)name;
-    fields.name_len = strlen(name);
-    fields.name_is_complete = 1;
-    uint8_t svc_data[sizeof(uint32_t) + lwt::AdvDataBasic::PACKED_SIZE];
-    BitConverter<std::endian::little>::FromUInt32(BLE_SERVICE_UUID_VEHICLE, svc_data);
-    lwt::AdvDataBasic test_adv_data{
-        .line_type = lwt::LineType::LineType_GenericBus,
-        .line_license_number = 100394,
-        .trip_number = 1001,
-        .direction_cis_number = 27882,
-        .stop_cis_number = 1054,
-        .stop_arrival_time = 9 * 60 + 10,
-        .stop_departure_time = 9 * 60 + 11,
-        .delay = -1,
-        .flags = lwt::AdvDataBasic::FLAG_IS_AT_STOP
-    };
-    test_adv_data.pack(svc_data + sizeof(uint32_t));
-    fields.svc_data_uuid32 = svc_data;
-    fields.svc_data_uuid32_len = sizeof(svc_data);
-
-    os_mbuf* adv_data = os_msys_get_pkthdr(BLE_HS_ADV_MAX_SZ, 0);
-    assert(adv_data);
-    rc = ble_hs_adv_set_fields_mbuf(&fields, adv_data);
-    if (rc != 0) {
-        MODLOG_DFLT(ERROR, "error encoding advertisement data; rc=%d\n", rc);
-        return;
-    }
-
-    rc = ble_gap_ext_adv_set_data(gap_instance, adv_data);
-    if (rc != 0)
-    {
-        MODLOG_DFLT(ERROR, "error setting advertisement data; rc=%d\n", rc);
-        return;
-    }
-
-    /* Begin advertising. */
-    rc = ble_gap_ext_adv_start(gap_instance, 0, 0);
-    if (rc != 0)
-    {
-        MODLOG_DFLT(ERROR, "error enabling advertisement; rc=%d\n", rc);
-        return;
-    }
-}
-
-static void bleprph_readvertise(void) {
-    if (!ble_gap_ext_adv_active(0)) {
-        int rc = ble_gap_ext_adv_start(0, 0, 0);
-        if (rc != 0)
-        {
-            MODLOG_DFLT(ERROR, "error re-enabling advertisement; rc=%d\n", rc);
-            return;
-        }
-    }
-}
-
 bool ble_synced{ false };
 
 static void bleprph_on_sync(void)
@@ -283,7 +193,6 @@ static void bleprph_on_sync(void)
     if (g_AppMain) {
         g_AppMain->StartAdvertising();
     }
-    //bleprph_advertise();
 }
 
 void init_nimble() {
@@ -300,23 +209,179 @@ void init_nimble() {
     nimble_port_freertos_init(nimble_task);
 }
 
+#include <sys/socket.h>
+
+void tcp_server_app_main(void);
+
+lwdn::WifiNanPublisher nanPublisher(
+    {
+        .ServiceName = "_ESP-Demo._udp",
+        .ServiceType = NAN_PUBLISH_UNSOLICITED,
+        .Features = lwdn::WifiNanPublisher::Feature::DATAPATH
+    }
+);
+
+void test_server_task(void* param) {
+    constexpr const char* TAG = "testTCPServerMain";
+
+    lwdn::WifiNanServer nanServer(nanPublisher, 3333);
+
+    while (true) {
+        ESP_LOGI("testTCPServerMain", "Waiting for incoming connection on port %d...", 3333);
+        auto socket = nanServer.Accept();
+        if (socket) {
+            char buf[128];
+            size_t receivedLen;
+            int err = socket->Read(buf, sizeof(buf), &receivedLen, 5000);
+            if (err == 0) {
+                ESP_LOGI("testTCPServerMain", "Received %d bytes: %.*s", receivedLen, (int)receivedLen, buf);
+                size_t sentLen;
+                err = socket->Write(buf, receivedLen, &sentLen);
+                if (err == 0) {
+                    ESP_LOGI("testTCPServerMain", "Sent %d bytes back to client", sentLen);
+                } else {
+                    ESP_LOGE("testTCPServerMain", "Error occurred during sending: errno %d", err);
+                }
+            } else {
+                ESP_LOGE("testTCPServerMain", "Error occurred during receive: errno %d", err);
+            }
+        } else {
+            ESP_LOGI("testTCPServerMain", "Accept returned null socket, exiting accept loop");
+            break;
+        }
+    }
+
+    /*char rx_buffer[128];
+    char addr_str[INET6_ADDRSTRLEN];
+    struct sockaddr_in6 dest_addr;
+
+    while (1) {
+        bzero(&dest_addr, sizeof(dest_addr));
+        dest_addr.sin6_family = AF_INET6;
+        dest_addr.sin6_port = htons(3333);
+
+        int sock = socket(AF_INET6, SOCK_STREAM, IPPROTO_IPV6);
+        if (sock < 0) {
+            ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
+            break;
+        }
+        ESP_LOGI(TAG, "Socket created");
+
+        struct timeval timeout = { .tv_sec = 10, .tv_usec = 0 };
+        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
+        int err = bind(sock, (struct sockaddr*)&dest_addr, sizeof(dest_addr));
+        if (err < 0) {
+            ESP_LOGE(TAG, "Socket unable to bind: errno %d", errno);
+        }
+        ESP_LOGI(TAG, "Socket bound, port %d", 3333);
+
+        err = listen(sock, 1);
+        if (err < 0) {
+            ESP_LOGE(TAG, "Error occurred during listen: errno %d", errno);
+            break;
+        }
+
+        struct sockaddr_in6 source_addr;
+        socklen_t socklen = sizeof(source_addr);
+
+        while (1) {
+            ESP_LOGI(TAG, "Waiting for data");
+            int client_sock = accept(sock, (struct sockaddr*)&source_addr, &socklen);
+            if (client_sock < 0) {
+                if (errno == EAGAIN) {
+                    continue; // timeout, go back to waiting for data
+                }
+                ESP_LOGE(TAG, "Unable to accept connection: errno %d", errno);
+                break;
+            }
+            inet6_ntoa_r(source_addr.sin6_addr, addr_str, sizeof(addr_str) - 1);
+            ESP_LOGI(TAG, "Socket accepted ip6=%s", addr_str);
+
+            int recv_len = recv(client_sock, rx_buffer, sizeof(rx_buffer), 0);
+            if (recv_len < 0) {
+                ESP_LOGE(TAG, "Error occurred during receive: errno %d", errno);
+                break;
+            }
+            ESP_LOGI(TAG, "Received %d bytes: %.*s", recv_len, recv_len, rx_buffer);
+
+            // send back the same data to the client
+            int to_write = recv_len;
+            int written = send(client_sock, rx_buffer, to_write, 0);
+            if (written < 0) {
+                ESP_LOGE(TAG, "Error occurred during sending: errno %d", errno);
+                break;
+            }
+            ESP_LOGI(TAG, "Sent %d bytes back to client", written);
+
+            shutdown(client_sock, SHUT_RDWR);
+            close(client_sock);
+        }
+
+        if (sock != -1) {
+            ESP_LOGE(TAG, "Shutting down socket and restarting...");
+            shutdown(sock, SHUT_RDWR);
+            close(sock);
+        }
+    }*/
+}
+
+static void got_ip6_handler(void* arg, esp_event_base_t event_base,
+    int32_t event_id, void* event_data)
+{
+    static bool s_server_started = false;
+
+    ip_event_got_ip6_t* event = (ip_event_got_ip6_t*)event_data;
+
+    /* Only act on the NAN datapath interface; ignore GOT_IP6 from other netifs. */
+    if (event->esp_netif != esp_netif_get_handle_from_ifkey("WIFI_NAN_DEF")) {
+        return;
+    }
+
+    if (s_server_started) {
+        return;
+    }
+    s_server_started = true;
+
+    xTaskCreate(test_server_task, "tcp_server", 4096, NULL, 5, NULL);
+}
+
+void testTCPServerMain() {
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_GOT_IP6, &got_ip6_handler, NULL));
+
+    nanPublisher.Publish();
+}
+
 extern "C" void app_main() {
+    InitNewAndDelete();
     init_nvs();
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     init_nimble();
     std::cout << "Hello, VDV301!" << std::endl;
     esp_netif_init();
+
+    wifi_init_default();
+    wifi_init_nan();
     //wifi_init_sta(WIFI_SSID, WIFI_PASSWORD, 1);
+
     ethernet_init();
     ethernet_init_netif();
+
+    mdns_init();
+    psa_crypto_init();
+
+    std::cout << "Services initialized, free memory before app launch=" << esp_get_free_internal_heap_size() << " bytes" << std::endl;
 
     g_AppMain = new AppMain();
     if (ble_synced) {
         g_AppMain->StartAdvertising();
     }
 
+    std::cout << "Application started, remaining memory=" << esp_get_free_internal_heap_size() << " bytes" << std::endl;
+
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(1000));
+        //std::cout << "Application running, remaining memory=" << esp_get_free_internal_heap_size() << " bytes" << std::endl;
     }
 
     delete g_AppMain;

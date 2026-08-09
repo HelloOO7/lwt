@@ -4,8 +4,18 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
 import android.net.wifi.aware.AttachCallback;
+import android.net.wifi.aware.DiscoverySessionCallback;
+import android.net.wifi.aware.PeerHandle;
+import android.net.wifi.aware.SubscribeConfig;
+import android.net.wifi.aware.SubscribeDiscoverySession;
 import android.net.wifi.aware.WifiAwareManager;
+import android.net.wifi.aware.WifiAwareNetworkInfo;
+import android.net.wifi.aware.WifiAwareNetworkSpecifier;
 import android.net.wifi.aware.WifiAwareSession;
 import android.os.Build;
 import android.os.Bundle;
@@ -13,14 +23,19 @@ import android.os.Handler;
 import android.util.Log;
 import android.widget.Toast;
 
+import java.io.DataInputStream;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import javax.net.ssl.SSLContext;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresPermission;
 import androidx.core.app.ActivityCompat;
 import cz.spojenka.android.ui.activity.BaseActivity;
+import cz.spojenka.android.util.AsyncUtils;
 import cz.spojenka.lwdn.LwdnScanConfig;
 import cz.spojenka.lwdn.LwdnScanException;
 import cz.spojenka.lwt.*;
@@ -49,7 +64,7 @@ public class MainActivity extends BaseActivity {
         setContentView(binding.getRoot());
         setButtonsEnabled(false);
         sslContext = createSSLContext();
-        lwtScanner = new LwtDeviceScanner(this);
+        lwtScanner = new LwtDeviceScanner(this, GlobalLwtScanner.getInstance(getApplication()).getLinkSession());
         if (hasBluetoothScanPermission()) {
             lwtScanner.startScan(
                     new LwdnScanConfig.Builder()
@@ -74,7 +89,6 @@ public class MainActivity extends BaseActivity {
         }
         binding.btnTest.setOnClickListener(v -> checkTrustAndRunTest());
         binding.btnTestTls.setOnClickListener(v -> runTestOverTLS());
-        testWifiAware();
 
         binding.btnShowDeviceList.setOnClickListener(v -> startActivity(new Intent(this, DeviceListActivity.class)));
         binding.btnRunTicketActivation.setOnClickListener(v -> {
@@ -109,6 +123,108 @@ public class MainActivity extends BaseActivity {
         });
     }
 
+    private void testNanDatapath() {
+        getSystemService(WifiAwareManager.class).attach(new AttachCallback() {
+
+            @Override
+            public void onAttached(WifiAwareSession session) {
+                /*var netsp = session.createNetworkSpecifierOpen(WifiAwareManager.WIFI_AWARE_DATA_PATH_ROLE_INITIATOR, new byte[]{(byte) 0xd2, (byte) 0xcf, 0x13, (byte) 0x4d, (byte) 0xd6, (byte) 0x3a});
+                var netreq = new NetworkRequest.Builder()
+                        .addTransportType(NetworkCapabilities.TRANSPORT_WIFI_AWARE)
+                        .setNetworkSpecifier(netsp)
+                        .build();
+                getSystemService(ConnectivityManager.class).requestNetwork(netreq, new ConnectivityManager.NetworkCallback() {
+
+                    @Override
+                    public void onAvailable(@NonNull Network network) {
+                        Log.d(TAG, "NAN datapath available: " + network);
+                    }
+
+                    @Override
+                    public void onUnavailable() {
+                        Log.d(TAG, "NAN datapath unavailable");
+                    }
+                });*/
+                try {
+                    session.subscribe(new SubscribeConfig.Builder()
+                            .setServiceName("_ESP-Demo._udp")
+                            .setSubscribeType(SubscribeConfig.SUBSCRIBE_TYPE_PASSIVE)
+                            .build(), new DiscoverySessionCallback() {
+
+                        private SubscribeDiscoverySession sds;
+
+                        @Override
+                        public void onSubscribeStarted(@NonNull SubscribeDiscoverySession session) {
+                            this.sds = session;
+                        }
+
+                        @Override
+                        public void onServiceDiscovered(PeerHandle peerHandle, byte[] serviceSpecificInfo, List<byte[]> matchFilter) {
+                            Log.d(TAG, "NAN service discovered: " + peerHandle);
+                            //sds.sendMessage(peerHandle, 0, "hello".getBytes());
+                            CompletableFuture.runAsync(() -> {
+                                try {
+                                    Thread.sleep(1200);
+                                } catch (InterruptedException e) {
+                                    throw new RuntimeException(e);
+                                }
+                            }).thenAcceptAsync(unused -> {
+                                startDatapath(peerHandle);
+                            }, getMainExecutor());
+                        }
+
+                        @Override
+                        public void onMessageReceived(PeerHandle peerHandle, byte[] message) {
+                        }
+
+                        private void startDatapath(PeerHandle peerHandle) {
+                            var netsp = new WifiAwareNetworkSpecifier.Builder(sds, peerHandle).build();
+                            var netreq = new NetworkRequest.Builder()
+                                    .addTransportType(NetworkCapabilities.TRANSPORT_WIFI_AWARE)
+                                    .setNetworkSpecifier(netsp)
+                                    .build();
+                            getSystemService(ConnectivityManager.class).requestNetwork(netreq, new ConnectivityManager.NetworkCallback() {
+
+                                private boolean testRun = false;
+
+                                @Override
+                                public void onAvailable(@NonNull Network network) {
+                                    Log.d(TAG, "NAN datapath available: " + network);
+                                }
+
+                                @Override
+                                public void onCapabilitiesChanged(@NonNull Network network, @NonNull NetworkCapabilities networkCapabilities) {
+                                    if (!testRun) {
+                                        Log.d(TAG, "Testing NAN socket");
+                                        WifiAwareNetworkInfo ni = (WifiAwareNetworkInfo) networkCapabilities.getTransportInfo();
+                                        AsyncUtils.runAsync(() -> {
+                                            try (var socket = network.getSocketFactory().createSocket(ni.getPeerIpv6Addr(), 3333)) {
+                                                socket.getOutputStream().write("hello".getBytes());
+                                                var in = socket.getInputStream();
+                                                byte[] resp = new byte[5];
+                                                new DataInputStream(in).readFully(resp);
+                                                Log.d(TAG, "NAN datapath test response: " + new String(resp, 0, resp.length));
+                                            }
+                                            getSystemService(ConnectivityManager.class).unregisterNetworkCallback(this);
+                                        });
+                                        testRun = true;
+                                    }
+                                }
+
+                                @Override
+                                public void onUnavailable() {
+                                    Log.d(TAG, "NAN datapath unavailable");
+                                }
+                            });
+                        }
+                    }, null);
+                } catch (SecurityException ex) {
+                    Log.e(TAG, "NAN subscribe failed", ex);
+                }
+            }
+        }, null);
+    }
+
     private boolean hasBluetoothScanPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             return ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED;
@@ -117,58 +233,37 @@ public class MainActivity extends BaseActivity {
         }
     }
 
-    private void testWifiAware() {
-        if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_WIFI_AWARE)) {
-            return;
-        }
-        WifiAwareManager awareManager = getSystemService(WifiAwareManager.class);
-        awareManager.attach(new AttachCallback() {
-            @Override
-            public void onAttached(WifiAwareSession session) {
-                Log.i(TAG, "Wi-Fi Aware attached: " + session);
-            }
-
-            @Override
-            public void onAttachFailed() {
-                Log.e(TAG, "Wi-Fi Aware attach failed");
-            }
-
-            @Override
-            public void onAwareSessionTerminated() {
-                Log.w(TAG, "Wi-Fi Aware session terminated");
-            }
-        }, new Handler(getMainLooper()));
-    }
-
     private void checkTrustAndRunTest() {
         initTest();
-        LwtAPIClient client = new LwtAPIClient(foundDevice.getAddress());
-        client.setSocketWatchdogTimeout(Duration.ofSeconds(5));
-        client.disableTLS();
-        client.authenticateServer(GlobalTrustManager.getInstance(getApplication()), CommType.ENQUEUE).whenCompleteAsync((trusted, error) -> {
-            if (error != null) {
-                Log.e(TAG, "Server auth operation error", error);
-                setButtonsEnabled(true);
-            } else {
-                Log.i(TAG, "Server authentication result: " + trusted);
-            }
-        }, getMainExecutor());
-        enqueueTestOperations(client);
-        executeOps(client);
+        try (LwtAPIClient client = new LwtAPIClient(this, foundDevice.getAddress())) {
+            client.setSocketWatchdogTimeout(Duration.ofSeconds(5));
+            client.disableTLS();
+            client.authenticateServer(GlobalTrustManager.getInstance(getApplication()), CommType.ENQUEUE).whenCompleteAsync((trusted, error) -> {
+                if (error != null) {
+                    Log.e(TAG, "Server auth operation error", error);
+                    setButtonsEnabled(true);
+                } else {
+                    Log.i(TAG, "Server authentication result: " + trusted);
+                }
+            }, getMainExecutor());
+            enqueueTestOperations(client);
+            executeOps(client);
+        }
     }
 
     private void runTestOverTLS() {
         initTest();
-        LwtAPIClient client = new LwtAPIClient(foundDevice.getAddress());
-        client.setSocketWatchdogTimeout(Duration.ofSeconds(5));
-        client.useTLS(
-                new LwtpTLSConfig.Builder(foundDevice.getAddress())
-                        .setTLSPolicy(LwtpTLSPolicy.EXPLICIT_OPPORTUNISTIC)
-                        .setSSLContext(sslContext)
-                        .build()
-        );
-        enqueueTestOperations(client);
-        executeOps(client);
+        try (LwtAPIClient client = new LwtAPIClient(this, foundDevice.getAddress())) {
+            client.setSocketWatchdogTimeout(Duration.ofSeconds(5));
+            client.useTLS(
+                    new LwtpTLSConfig.Builder(foundDevice.getAddress())
+                            .setTLSPolicy(LwtpTLSPolicy.EXPLICIT_OPPORTUNISTIC)
+                            .setSSLContext(sslContext)
+                            .build()
+            );
+            enqueueTestOperations(client);
+            executeOps(client);
+        }
     }
 
     private void initTest() {

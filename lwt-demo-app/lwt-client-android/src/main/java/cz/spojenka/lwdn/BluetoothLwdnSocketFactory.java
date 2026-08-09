@@ -15,7 +15,12 @@ public class BluetoothLwdnSocketFactory implements LwdnSocketFactory {
     }
 
     @Override
-    public LwdnSocket openSocket() throws IOException {
+    public BluetoothLwdnSocket openSocket() throws IOException {
         return new BluetoothLwdnSocket(device, psm);
+    }
+
+    @Override
+    public void close() {
+
     }
 }

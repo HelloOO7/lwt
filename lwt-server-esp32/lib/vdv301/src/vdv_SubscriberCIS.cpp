@@ -20,7 +20,7 @@ namespace vdv301
             .FilterTxtRecord("ver", "2.3CZ1.0")
             .Build(),
             std::to_underlying(subscribedOps),
-            8192 | EventQueue::STACK_PSRAM_BIT
+            8192
         )
     {
 

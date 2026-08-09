@@ -1,7 +1,10 @@
 package cz.spojenka.lwt;
 
+import android.content.Context;
+
 import com.google.flatbuffers.FlatBufferBuilder;
 
+import java.io.Closeable;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
@@ -10,9 +13,9 @@ import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -28,7 +31,7 @@ import cz.spojenka.lwtp.LwtpTLSConfig;
 import cz.spojenka.lwtp.LwtpTLSPolicy;
 import cz.spojenka.lwtp.TLSLwtpSession;
 
-public class LwtClient {
+public class LwtClient implements Closeable {
 
     private static final Object[] EMPTY_ARGS = new Object[]{ByteBuffer.allocate(0)};
 
@@ -42,10 +45,24 @@ public class LwtClient {
 
     private final List<ExecutionObserver> observers = new ArrayList<>();
 
-    public LwtClient(LwdnAddress address) {
+    private final Set<CompletableFuture<?>> runningAsyncSessions = new HashSet<>();
+
+    public LwtClient(Context context, LwdnAddress address) {
         this.address = address;
-        this.baseSocketFactory = LwdnSocketFactory.create(address);
+        this.baseSocketFactory = LwdnSocketFactory.create(context, address);
         this.socketFactory = baseSocketFactory;
+    }
+
+    @Override
+    public void close() {
+        if (runningAsyncSessions.isEmpty()) {
+            baseSocketFactory.close();
+        } else {
+            // asynchronously finish closing when sessions are done
+            CompletableFuture.allOf(runningAsyncSessions.toArray(new CompletableFuture[0])).whenComplete((result, ex) -> {
+                baseSocketFactory.close();
+            });
+        }
     }
 
     public LwdnAddress getPeerAddress() {
@@ -178,18 +195,30 @@ public class LwtClient {
      * still being executed.
      *
      * @param executor the executor to run the execution on. If null, the default executor will be used.
-     *
      * @return Future that will be completed when all requests finish,
      * and which can be used to cancel all execution.
      */
     public CompletableFuture<Void> executeAsync(Executor executor) {
         LwtpSession execSession = lwtpSession;
         lwtpSession = lwtpSession.cloneAsEmpty();
-        return execSession.executeAsync(socketFactory, executor);
+        CompletableFuture<Void> future = execSession.executeAsync(socketFactory, executor);
+        trackAsyncExecution(future);
+        return future;
     }
 
     public CompletableFuture<Void> executeAsync() {
         return executeAsync(null);
+    }
+
+    private void trackAsyncExecution(CompletableFuture<?> execution) {
+        synchronized (runningAsyncSessions) {
+            runningAsyncSessions.add(execution);
+            execution.whenComplete((result, ex) -> {
+                synchronized (runningAsyncSessions) {
+                    runningAsyncSessions.remove(execution);
+                }
+            });
+        }
     }
 
     private <T> CompletableFuture<T> createResponseFuture(CompletableFuture<LwtpPacket> baseFuture, Class<T> responseType) {

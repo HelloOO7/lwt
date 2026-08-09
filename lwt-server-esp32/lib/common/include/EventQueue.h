@@ -9,6 +9,7 @@
 #include <condition_variable>
 #include <string>
 #include "PSRAMContainers.h"
+#include "PSRAMTask.h"
 
 class EventQueue
 {
@@ -33,9 +34,7 @@ private:
     std::string m_Name;
     size_t m_Capacity;
 
-    TaskHandle_t m_Task;
-    StaticTask_t m_TaskBuffer;
-    psram_vector<StackType_t> m_TaskStackPSRAM;
+    PSRAMTask m_Task;
     
     std::deque<EventRegistration> m_Queue;
     std::mutex m_Mutex;

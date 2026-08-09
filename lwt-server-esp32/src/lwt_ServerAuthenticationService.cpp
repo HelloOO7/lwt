@@ -6,6 +6,7 @@
 #include "esp_netif.h"
 #include "esp_log.h"
 #include "lwt_CryptoTypes.h"
+#include "mbedtls/md.h"
 
 namespace lwt {
 
@@ -13,10 +14,9 @@ namespace lwt {
 
     static constexpr const char* CHALLENGE_SALT = "LwtServerAuthentication";
 
-    ServerAuthenticationService::ServerAuthenticationService(uint8_t* certString, mbedtls_pk_context& signingKey, mbedtls_ctr_drbg_context& ctrDrbg) :
+    ServerAuthenticationService::ServerAuthenticationService(uint8_t* certString, mbedtls_pk_context& signingKey) :
         m_CertString(certString),
-        m_SigningKey(signingKey),
-        m_CtrDrbg(ctrDrbg)
+        m_SigningKey(signingKey)
     {
     }
 
@@ -44,7 +44,7 @@ namespace lwt {
 
         SHA256Hash saltedChallengeHash;
 
-        int err = mbedtls_sha256(saltedChallenge.data(), saltedChallenge.size(), saltedChallengeHash.data(), false);
+        int err = mbedtls_md(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), saltedChallenge.data(), saltedChallenge.size(), saltedChallengeHash.data());
         if (err != 0) {
             ESP_LOGE(TAG, "Failed to compute SHA-256 hash of challenge: -0x%04X", -err);
             return {};
@@ -53,7 +53,7 @@ namespace lwt {
         psram_vector<uint8_t> signature(MBEDTLS_PK_SIGNATURE_MAX_SIZE);
         size_t signatureLen;
         ESP_LOGI(TAG, "Signing challenge");
-        err = mbedtls_pk_sign(&m_SigningKey, MBEDTLS_MD_SHA256, saltedChallengeHash.data(), saltedChallengeHash.size(), signature.data(), signature.size(), &signatureLen, mbedtls_ctr_drbg_random, &m_CtrDrbg);
+        err = mbedtls_pk_sign(&m_SigningKey, MBEDTLS_MD_SHA256, saltedChallengeHash.data(), saltedChallengeHash.size(), signature.data(), signature.size(), &signatureLen);
         if (err != 0) {
             ESP_LOGE(TAG, "Failed to sign challenge: -0x%04X", -err);
             return {};

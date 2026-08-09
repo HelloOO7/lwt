@@ -14,7 +14,7 @@ import androidx.core.os.ParcelCompat;
 public record LwdnScanResult(
         LwdnAddress deviceAddress,
         int rssi,
-        Map<UUID, byte[]> serviceData
+        Map<LwdnServiceID, byte[]> serviceData
 ) implements Parcelable {
 
     static final Creator<LwdnScanResult> CREATOR = new Creator<>() {
@@ -23,11 +23,11 @@ public record LwdnScanResult(
             LwdnAddress address = ParcelCompat.readParcelable(in, LwdnAddress.class.getClassLoader(), LwdnAddress.class);
             int rssi = in.readInt();
             int serviceDataSize = in.readInt();
-            Map<UUID, byte[]> serviceData = new HashMap<>();
+            Map<LwdnServiceID, byte[]> serviceData = new HashMap<>();
             for (int i = 0; i < serviceDataSize; i++) {
-                ParcelUuid parcelUuid = ParcelCompat.readParcelable(in, ParcelUuid.class.getClassLoader(), ParcelUuid.class);
+                LwdnServiceID serviceID = ParcelCompat.readParcelable(in, LwdnServiceID.class.getClassLoader(), LwdnServiceID.class);
                 byte[] data = in.createByteArray();
-                serviceData.put(parcelUuid != null ? parcelUuid.getUuid() : null, data);
+                serviceData.put(serviceID, data);
             }
             return new LwdnScanResult(address, rssi, serviceData);
         }
@@ -48,8 +48,8 @@ public record LwdnScanResult(
         dest.writeParcelable(deviceAddress, flags);
         dest.writeInt(rssi);
         dest.writeInt(serviceData.size());
-        for (Map.Entry<UUID, byte[]> entry : serviceData.entrySet()) {
-            dest.writeParcelable(new ParcelUuid(entry.getKey()), flags);
+        for (Map.Entry<LwdnServiceID, byte[]> entry : serviceData.entrySet()) {
+            dest.writeParcelable(entry.getKey(), flags);
             dest.writeByteArray(entry.getValue());
         }
     }

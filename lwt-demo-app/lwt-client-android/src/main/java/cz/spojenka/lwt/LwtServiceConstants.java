@@ -1,5 +1,9 @@
 package cz.spojenka.lwt;
 
+import java.util.List;
+
+import cz.spojenka.lwdn.LwdnServiceID;
+
 public class LwtServiceConstants {
 
     public static final int BLE_SERVICE_UUID_VEHICLE = 0x4C575456; // "LWTV"
@@ -16,17 +20,30 @@ public class LwtServiceConstants {
 
     public static final int BLE_API_PSM = 0xD7;
 
-    public static int serviceUUIDForDeviceType(LwtDeviceType deviceType) {
-        return switch (deviceType) {
+    public static final String WIFI_AWARE_SERVICE_NAME = "LWT";
+    public static final List<LwdnServiceID.MatchingFilterSlot> WIFI_AWARE_MATCHING_FILTERS_VEHICLE = List.of(new LwdnServiceID.MatchingFilterSlot(0, new byte[]{'V'}));
+    public static final List<LwdnServiceID.MatchingFilterSlot> WIFI_AWARE_MATCHING_FILTERS_STOP = List.of(new LwdnServiceID.MatchingFilterSlot(1, new byte[]{'S'}));
+
+    public static final int WIFI_API_PORT = 26001;
+
+    public static LwdnServiceID serviceUUIDForDeviceType(LwtDeviceType deviceType) {
+        return new LwdnServiceID.UUID(switch (deviceType) {
             case VEHICLE -> BLE_SERVICE_UUID_VEHICLE;
             case STOP -> BLE_SERVICE_UUID_STOP;
-        };
+        });
     }
 
-    public static int serviceExtendedUUIDForDeviceType(LwtDeviceType deviceType) {
-        return switch (deviceType) {
+    public static LwdnServiceID serviceExtendedUUIDForDeviceType(LwtDeviceType deviceType) {
+        return new LwdnServiceID.UUID(switch (deviceType) {
             case VEHICLE -> BLE_SERVICE_UUID_VEHICLE_EXTENDED;
             case STOP -> BLE_SERVICE_UUID_STOP_EXTENDED;
-        };
+        });
+    }
+
+    public static LwdnServiceID serviceNameForDeviceType(LwtDeviceType deviceType) {
+        return new LwdnServiceID.ServiceName(WIFI_AWARE_SERVICE_NAME, switch (deviceType) {
+            case VEHICLE -> WIFI_AWARE_MATCHING_FILTERS_VEHICLE;
+            case STOP -> WIFI_AWARE_MATCHING_FILTERS_STOP;
+        });
     }
 }

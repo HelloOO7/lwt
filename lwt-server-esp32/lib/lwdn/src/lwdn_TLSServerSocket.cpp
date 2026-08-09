@@ -16,4 +16,9 @@ namespace lwdn {
         }
         return std::make_unique<TLSSocket>(std::move(baseSocket), m_SSLConfig);
     }
+
+    LinkAdapter* TLSServerSocket::GetLinkAdapter() const
+    {
+        return m_Base.GetLinkAdapter();
+    }
 }

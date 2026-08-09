@@ -1,0 +1,34 @@
+namespace lwt;
+
+enum AdvertisingChannel : ubyte {
+    BleLegacy,
+    BleExtended,
+    WifiNan
+}
+
+table AdvertisingInfo {
+    /// Type of the advertising channel, which affects
+    /// both the physical transport and possibly the data format.
+    channel_type: AdvertisingChannel;
+    /// MAC address of the LWDN endpoint where a socket can be opened.
+    /// Multiple channels may share an address.
+    lwdn_address: [ubyte] (required);
+    /// Data that can normally be obtained during service discovery on
+    /// the advertising channel. It may be omitted either if it is currently
+    /// not given by LWT, or if include_data is set to false in the
+    /// AdvertisingInfoRequest.
+    data: [ubyte];
+}
+
+table AdvertisingInfoRequest {
+    /// Channels for which information should be fetched. If empty,
+    /// info will be returned for all available channels.
+    channels: [AdvertisingChannel];
+    /// Whether to include the AdvertisingInfo.data field.
+    include_data: bool;
+}
+
+table AdvertisingInfoResponse {
+    /// Advertising info for the channels given in the request.
+    data: [AdvertisingInfo] (required);
+}

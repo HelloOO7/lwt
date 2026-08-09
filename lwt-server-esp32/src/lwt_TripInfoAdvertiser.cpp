@@ -6,6 +6,9 @@
 #include <cstdio>
 #include "FNVHash.h"
 #include "lwt_TripInformationService.h"
+#include "lwdn_BleAdvertiser.h"
+#include "lwdn_Link.h"
+#include "host/ble_hs_id.h"
 
 namespace lwt {
 
@@ -16,6 +19,7 @@ namespace lwt {
         m_CISSubscriber{ cisSubscriber },
         m_Advertisers{ advertisers }
     {
+        ESP_LOGI("TripInfoAdvertiser", "Created TripInfoAdvertiser with %zu advertisers", m_Advertisers.size());
         m_CISSubscriber.ObserveAllData(*this);
     }
 
@@ -25,6 +29,8 @@ namespace lwt {
 
     void TripInfoAdvertiser::OnChanged(const SubscriberCIS::AllData* result)
     {
+        std::lock_guard lock(m_DataMutex);
+
         if (!result) {
             for (auto* advertiser : m_Advertisers) {
                 advertiser->Stop();
@@ -50,15 +56,20 @@ namespace lwt {
 
             for (auto* advertiser : m_Advertisers) {
                 ESP_LOGI("TripInfoAdvertiser", "Advertiser %p max size=%zu", advertiser, advertiser->GetMaxAdvDataSize());
-                if (advertiser->GetMaxAdvDataSize() < m_ExtDataBuffer.size()) {
-                    advertiser->SetLwdnAdvData(m_LegacyDataBuffer);
+                if (IsUseExtendedDataForAdvertiser(advertiser)) {
+                    advertiser->SetLwdnAdvData(m_ExtDataBuffer);
                 }
                 else {
-                    advertiser->SetLwdnAdvData(m_ExtDataBuffer);
+                    advertiser->SetLwdnAdvData(m_LegacyDataBuffer);
                 }
                 advertiser->Start();
             }
         }
+    }
+
+    bool TripInfoAdvertiser::IsUseExtendedDataForAdvertiser(const lwdn::Advertiser* advertiser) const
+    {
+        return advertiser->GetMaxAdvDataSize() >= m_ExtDataBuffer.size();
     }
 
     AdvDataBasic TripInfoAdvertiser::CreateBasicAdvData(const SubscriberCIS::AllData& result)
@@ -161,5 +172,31 @@ namespace lwt {
             return std::stoi(stop->GlobalStopRef.Value);
         }
         return 0;
+    }
+
+    void TripInfoAdvertiser::EnumerateAdvertisingChannels(std::function<void(const ChannelInfo&)> callback)
+    {
+        std::lock_guard lock(m_DataMutex);
+
+        for (auto* advertiser : m_Advertisers) {
+            ChannelInfo info{};
+            info.m_AdvData = IsUseExtendedDataForAdvertiser(advertiser) ? ByteSpan{ m_ExtDataBuffer } : ByteSpan{ m_LegacyDataBuffer };
+            auto link = advertiser->GetLinkAdapter();
+            if (link->GetLinkType() == lwdn::LinkType::BLE) {
+                lwdn::BleAdvertiser* bleAdv = static_cast<lwdn::BleAdvertiser*>(advertiser);
+                info.m_Type = (bleAdv->GetFlags() & lwdn::BleAdvertiser::Flags::USE_LEGACY_ADVERTISING) == lwdn::BleAdvertiser::Flags::USE_LEGACY_ADVERTISING
+                    ? ChannelType::BLE_LEGACY
+                    : ChannelType::BLE_EXTENDED;
+            }
+            else if (link->GetLinkType() == lwdn::LinkType::WIFI_NAN) {
+                info.m_Type = ChannelType::WIFI_NAN;
+            }
+            else {
+                continue;
+            }
+            auto mac = link->GetLinkAddress();
+            info.m_MACAddress = ByteSpan(mac);
+            callback(info);
+        }
     }
 }

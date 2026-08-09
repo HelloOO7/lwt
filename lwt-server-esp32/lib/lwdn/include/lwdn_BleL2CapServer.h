@@ -4,6 +4,7 @@
 #include "host/ble_l2cap.h"
 #include "os/os_mempool.h"
 #include <memory>
+#include "lwdn_BleLink.h"
 #include "lwdn_Socket.h"
 #include "lwdn_ServerSocket.h"
 #include <vector>
@@ -45,6 +46,7 @@ namespace lwdn {
             std::condition_variable m_TxUnstalled;
 
             Channel(SocketHandle socketHandle, ble_l2cap_chan* nativeChan, uint16_t mtu, uint16_t chunkSize);
+            ~Channel();
         };
     private:
         uint16_t m_Psm;
@@ -64,7 +66,9 @@ namespace lwdn {
         uint16_t GetPsm() const;
         uint16_t GetMtu() const;
 
-        std::unique_ptr<Socket> Accept() override;
+        virtual std::unique_ptr<Socket> Accept() override;
+
+        virtual LinkAdapter* GetLinkAdapter() const override { return &BLE_ADAPTER; }
 
     private:
         Channel* FindChannel(ble_l2cap_chan* nativeChan, bool createIfNotFound = false);
@@ -93,5 +97,7 @@ namespace lwdn {
 
         virtual int Write(const void* data, size_t len, size_t* sentLen = nullptr) override;
         virtual int Read(void* buffer, size_t len, size_t* receivedLen = nullptr, size_t timeout = SIZE_MAX) override;
+
+        virtual LinkAdapter* GetLinkAdapter() const override { return m_Server->GetLinkAdapter(); }
     };
 }

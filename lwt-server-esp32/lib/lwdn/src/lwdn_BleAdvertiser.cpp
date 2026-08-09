@@ -54,6 +54,10 @@ namespace lwdn {
         return ble_gap_ext_adv_active(m_InstanceID);
     }
 
+    BleAdvertiser::Flags BleAdvertiser::GetFlags() const {
+        return m_Flags;
+    }
+
     int BleAdvertiser::HandleGapEvent(ble_gap_event* event) {
         switch (event->type) {
         case BLE_GAP_EVENT_CONNECT:

@@ -29,10 +29,7 @@ void ethernet_init_netif(void) {
         // Use ESP_NETIF_INHERENT_DEFAULT_ETH when multiple Ethernet interfaces are used and so you need to modify
         // esp-netif configuration parameters for each interface (name, priority, etc.).
         esp_netif_inherent_config_t esp_netif_config = ESP_NETIF_INHERENT_DEFAULT_ETH();
-        esp_netif_config_t cfg_spi = {
-            .base = &esp_netif_config,
-            .stack = ESP_NETIF_NETSTACK_DEFAULT_ETH
-        };
+        esp_netif_config_t cfg_spi = ESP_NETIF_DEFAULT_ETH();
         char if_key_str[10];
         char if_desc_str[10];
         char num_str[3];

@@ -9,5 +9,6 @@ enum Operation : ushort {
     GetTripRouteInfo,
     CreatePreauthorizationToken,
     AuthenticateServer,
-    ActivateTicket
+    ActivateTicket,
+    GetAdvertisingInfo
 }

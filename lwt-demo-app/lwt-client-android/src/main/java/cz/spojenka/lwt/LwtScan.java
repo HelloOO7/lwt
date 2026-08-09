@@ -95,16 +95,11 @@ public class LwtScan extends AbstractScan<LwtDevice, LwdnScanException, LwtScan>
     }
 
     private byte[] getVehicleResultData(LwdnScanResult result) {
-        byte[] data = result.serviceData().get(make32BitUUID(LwtServiceConstants.BLE_SERVICE_UUID_VEHICLE));
+        byte[] data = result.serviceData().get(LwtServiceConstants.serviceNameForDeviceType(LwtDeviceType.VEHICLE));
         if (data == null) {
-            data = result.serviceData().get(make32BitUUID(LwtServiceConstants.BLE_SERVICE_UUID_VEHICLE_EXTENDED));
+            data = result.serviceData().get(LwtServiceConstants.serviceExtendedUUIDForDeviceType(LwtDeviceType.VEHICLE));
         }
         return data;
-    }
-
-    static UUID make32BitUUID(int value) {
-        // https://stackoverflow.com/questions/13964342/android-how-do-bluetooth-uuids-work
-        return new UUID((Integer.toUnsignedLong(value) << 32) | 0x1000, 0x800000805f9b34fbL);
     }
 
     @Override

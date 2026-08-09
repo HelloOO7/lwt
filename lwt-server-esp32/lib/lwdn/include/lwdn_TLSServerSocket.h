@@ -21,5 +21,7 @@ namespace lwdn {
         TLSServerSocket(ServerSocket& base, mbedtls_ssl_config& sslConfig);
 
         std::unique_ptr<Socket> Accept() override;
+
+        virtual LinkAdapter* GetLinkAdapter() const override;
     };
 }

@@ -3,6 +3,7 @@
 #include "FNVHash.h"
 #include "vdv_Utility.h"
 #include <regex>
+#include "NewAndDelete.h"
 
 namespace vdv301
 {
@@ -17,7 +18,7 @@ namespace vdv301
             .FilterTxtRecord("ver", "2.2")
             .Build(),
             std::to_underlying(subscribedOps),
-            8192 | EventQueue::STACK_PSRAM_BIT
+            8192
         )
     {
     }
@@ -82,7 +83,10 @@ namespace vdv301
                 auto hash = HashResponseWithoutTimestamp(result.GetResult());
                 if (hash != m_LastRazziaRespHash) {
                     TicketValidationService_GetRazziaResponseStructure razziaResp;
-                    load_data(result.GetResult().c_str(), razziaResp);
+                    {
+                        UseHeapCaps<MALLOC_CAP_SPIRAM> usePsram;
+                        load_data(result.GetResult().c_str(), razziaResp);
+                    }
                     if (razziaResp.RazziaData) {
                         m_LastRazziaResp = std::move(*razziaResp.RazziaData);
                         ESP_LOGI(TAG, "Updated Razzia data: state=%s timestamp=%s",
@@ -103,7 +107,10 @@ namespace vdv301
                 auto hash = HashResponseWithoutTimestamp(result.GetResult());
                 if (hash != m_LastCurTariffStopHash) {
                     TicketValidationService_GetCurrentTariffStopResponseStructure stopResp;
-                    load_data(FixupCtsXml(result.GetResult()).c_str(), stopResp);
+                    {
+                        UseHeapCaps<MALLOC_CAP_SPIRAM> usePsram;
+                        load_data(FixupCtsXml(result.GetResult()).c_str(), stopResp);
+                    }
                     if (stopResp.CurrentTariffStopData) {
                         m_CurTariffStop = std::move(*stopResp.CurrentTariffStopData);
                         ESP_LOGI(TAG, "Updated CurrentTariffStop data: stop=%s timestamp=%s",

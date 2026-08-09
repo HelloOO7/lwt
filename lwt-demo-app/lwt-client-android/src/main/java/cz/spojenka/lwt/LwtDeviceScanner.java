@@ -3,6 +3,7 @@ package cz.spojenka.lwt;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
 import android.content.Context;
+import android.net.wifi.aware.WifiAwareManager;
 import android.util.Log;
 
 import java.io.IOException;
@@ -16,6 +17,7 @@ import cz.spojenka.lwdn.LwdnScan;
 import cz.spojenka.lwdn.LwdnScanConfig;
 import cz.spojenka.lwdn.LwdnScanException;
 import cz.spojenka.lwdn.LwdnScanResult;
+import cz.spojenka.lwdn.LwdnServiceID;
 
 public class LwtDeviceScanner {
 
@@ -23,13 +25,17 @@ public class LwtDeviceScanner {
 
     private final HybridLwdnScanner lwdnScanner = new HybridLwdnScanner();
 
-    public LwtDeviceScanner(Context context) {
+    public LwtDeviceScanner(Context context, LwtLinkSession session) {
         BluetoothManager btm = context.getSystemService(BluetoothManager.class);
         if (btm != null) {
             BluetoothAdapter adapter = btm.getAdapter();
             if (adapter != null) {
                 lwdnScanner.addBluetoothScanner(context, btm.getAdapter(), LwtServiceConstants.BLE_API_PSM);
             }
+        }
+        WifiAwareManager wam = context.getSystemService(WifiAwareManager.class);
+        if (wam != null) {
+            lwdnScanner.addWifiAwareScanner(wam, session.getAwareSessionManager(wam), LwtServiceConstants.WIFI_API_PORT);
         }
     }
 
@@ -46,23 +52,22 @@ public class LwtDeviceScanner {
     }
 
     public LwtScan startScan(@Nullable List<LwtDeviceType> deviceTypes, LwdnScanConfig config) {
-        List<UUID> serviceUUIDs = new ArrayList<>();
+        List<LwdnServiceID> serviceIDs = new ArrayList<>();
 
         if (deviceTypes == null || deviceTypes.isEmpty()) {
             deviceTypes = List.of(LwtDeviceType.values());
         }
 
         for (LwtDeviceType deviceType : deviceTypes) {
-            int uuid;
+            serviceIDs.add(LwtServiceConstants.serviceNameForDeviceType(deviceType));
             if (lwdnScanner.isUsingExtendedAdvertising()) {
-                uuid = LwtServiceConstants.serviceExtendedUUIDForDeviceType(deviceType);
+                serviceIDs.add(LwtServiceConstants.serviceExtendedUUIDForDeviceType(deviceType));
             } else {
-                uuid = LwtServiceConstants.serviceUUIDForDeviceType(deviceType);
+                serviceIDs.add(LwtServiceConstants.serviceUUIDForDeviceType(deviceType));
             }
-            serviceUUIDs.add(LwtScan.make32BitUUID(uuid));
         }
 
-        LwdnScan lwdnScan = lwdnScanner.startScan(serviceUUIDs, config);
+        LwdnScan lwdnScan = lwdnScanner.startScan(serviceIDs, config);
 
         return new LwtScan(lwdnScan);
     }

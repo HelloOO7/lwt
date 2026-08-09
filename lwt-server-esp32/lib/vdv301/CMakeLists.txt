@@ -13,3 +13,5 @@ idf_component_register(
         ${VDV301_XSD_INCLUDE_DIRS}
     REQUIRES common mdns esp_http_client esp_http_server
 )
+
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-missing-field-initializers -Wno-implicit-fallthrough -Wno-error=missing-field-initializers -Wno-error=implicit-fallthrough)

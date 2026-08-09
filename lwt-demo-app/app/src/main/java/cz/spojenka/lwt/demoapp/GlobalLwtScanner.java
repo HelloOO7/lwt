@@ -15,6 +15,7 @@ import cz.spojenka.lwdn.ScanErrorCode;
 import cz.spojenka.lwt.LwtDevice;
 import cz.spojenka.lwt.LwtDeviceScanner;
 import cz.spojenka.lwt.LwtDeviceType;
+import cz.spojenka.lwt.LwtLinkSession;
 import cz.spojenka.lwt.LwtScan;
 
 public class GlobalLwtScanner {
@@ -25,13 +26,15 @@ public class GlobalLwtScanner {
 
     private static GlobalLwtScanner INSTANCE;
 
+    private final LwtLinkSession linkSession;
     private final LwtDeviceScanner scanner;
 
     private final Map<List<LwtDeviceType>, ActiveScan> activeScans = new HashMap<>();
     private final Map<List<LwtDeviceType>, ActiveScan> scanHistory = new HashMap<>();
 
     private GlobalLwtScanner(Application app) {
-        this.scanner = new LwtDeviceScanner(app);
+        linkSession = new LwtLinkSession();
+        this.scanner = new LwtDeviceScanner(app, linkSession);
     }
 
     public static GlobalLwtScanner getInstance(Application app) {
@@ -39,6 +42,14 @@ public class GlobalLwtScanner {
             INSTANCE = new GlobalLwtScanner(app);
         }
         return INSTANCE;
+    }
+
+    public synchronized LwtLinkSession getLinkSession() {
+        return linkSession;
+    }
+
+    public synchronized void releaseLinkSession() {
+        linkSession.close();
     }
 
     public synchronized void cancelAllScans() {

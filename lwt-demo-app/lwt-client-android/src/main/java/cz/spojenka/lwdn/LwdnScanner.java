@@ -6,5 +6,5 @@ import java.util.UUID;
 public interface LwdnScanner {
 
     public boolean isAvailable();
-    public LwdnScan startScan(List<UUID> services, LwdnScanConfig config);
+    public LwdnScan startScan(List<LwdnServiceID> services, LwdnScanConfig config);
 }

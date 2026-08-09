@@ -1,0 +1,13 @@
+{
+  "idf.customExtraVars": {
+    "OPENOCD_USB_ADAPTER_LOCATION": "2-8",
+    "IDF_TARGET": "esp32c5"
+  },
+  "idf.openOcdConfigs": [
+    "board/esp32c5-builtin.cfg"
+  ],
+  "idf.currentSetup": "C:\\dev\\esp\\master\\esp-idf",
+  "idf.portWin": "COM9",
+  "idf.flashType": "UART",
+  "idf.flashBaudRate": "921600"
+}

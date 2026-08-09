@@ -216,7 +216,7 @@ namespace vdv301
         // if we need to lock m_CommMutex here, ONLY do it if is_async is true on HTTP config,
         // otherwise we are waiting on esp_http_client_perform() and we would deadlock.
 
-        ESP_LOGI(TAG, "HTTP event %d", evt->event_id);
+        //ESP_LOGI(TAG, "HTTP event %d", evt->event_id);
 
         return ESP_OK;
     }

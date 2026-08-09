@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <variant>
 #include "host/ble_gap.h"
+#include "lwdn_BleLink.h"
 #include "EnumBitflags.h"
 
 namespace lwdn {
@@ -39,8 +40,12 @@ namespace lwdn {
         virtual void Stop() override;
         virtual bool IsAdvertising() const override;
 
+        Flags GetFlags() const;
+
         virtual size_t GetMaxAdvDataSize() const override;
         virtual bool SetLwdnAdvData(const std::span<const uint8_t>& data) override;
+
+        virtual LinkAdapter* GetLinkAdapter() const override { return &BLE_ADAPTER; }
 
     private:
         size_t GetRawFieldsMaxSize() const;

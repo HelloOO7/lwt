@@ -2,10 +2,11 @@
 
 #include <span>
 #include <cstdint>
+#include "lwdn_Link.h"
 
 namespace lwdn {
 
-    class Advertiser
+    class Advertiser : public LinkObject
     {
     public:
         virtual ~Advertiser() = default;

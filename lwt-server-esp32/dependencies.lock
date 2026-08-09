@@ -148,10 +148,44 @@ dependencies:
       registry_url: https://components.espressif.com/
       type: service
     version: 1.11.3
+  espressif/w5500:
+    component_hash: b5f5b466dd0b8f1f2de7ac5b7e4a364e993daf40c999044a54fb545e25be8aba
+    dependencies:
+    - name: espressif/wiznet_common
+      registry_url: https://components.espressif.com
+      require: private
+      version: ^1.0.0
+    - name: idf
+      require: private
+      version: '>=6.0'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 2.0.0
+  espressif/wifi_aware:
+    component_hash: 8507ecc788d489e76f50ba7301e672cbfda3187865dec184fc9a9c832dcfc8d2
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.2'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 0.0.1
+  espressif/wiznet_common:
+    component_hash: 57414f4b8ce11295c03030da7ff3ef90184e07b3ba1e8985b5edb2461e9be780
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.3'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 1.0.0
   idf:
     source:
       type: idf
-    version: 5.5.4
+    version: 6.2.0
   johboh/nlohmann-json:
     component_hash: 2a97e10124d755da820b0381e36a9a6504574328f262964ccea3f8b2f228fc66
     dependencies:
@@ -165,7 +199,8 @@ dependencies:
 direct_dependencies:
 - espressif/ethernet_init
 - espressif/mdns
+- espressif/wifi_aware
 - johboh/nlohmann-json
-manifest_hash: 24b2ccf5e1ff9bca7f2230fa5e4684fbaa57b2663f9df13d8ab023d0847fab1f
+manifest_hash: b92166170d780b93480169227b49a93419c75863289658bd211cf2388fcdab4a
 target: esp32c5
-version: 2.0.0
+version: 3.0.0

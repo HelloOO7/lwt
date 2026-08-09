@@ -148,27 +148,27 @@ public class LwtpSession {
                     pendingRequest.future.complete(response);
                 }
             } catch (Exception e) {
-                if (cancellationToken != null && cancellationToken.isCancelled()) {
-                    pendingRequest.future.cancel(true);
-                } else {
-                    pendingRequest.future.completeExceptionally(e);
-                    if (cancellationToken != null && !cancellationToken.isCompletedExceptionally()) {
-                        // only the first error will be reported to the overarching future, if present
-                        cancellationToken.completeExceptionally(e);
-                    }
-                }
+                finishRemainingWithException(e, cancellationToken);
+                break;
             }
         }
         pendingRequests.clear();
     }
 
-    protected void finishRemainingWithException(Exception ex) {
+    protected void finishRemainingWithException(Exception ex, CompletableFuture<?> cancellationToken) {
         for (PendingRequest pendingRequest : pendingRequests) {
-            if (!pendingRequest.future.isDone() && !pendingRequest.future.isCancelled()) {
-                pendingRequest.future.completeExceptionally(ex);
+            if (!pendingRequest.future.isDone()) {
+                if (cancellationToken != null && cancellationToken.isCancelled()) {
+                    pendingRequest.future.cancel(true);
+                } else {
+                    pendingRequest.future.completeExceptionally(ex);
+                }
             }
         }
         pendingRequests.clear();
+        if (cancellationToken != null && !cancellationToken.isDone()) {
+            cancellationToken.completeExceptionally(ex);
+        }
     }
 
     /**
@@ -203,10 +203,7 @@ public class LwtpSession {
             execute(socket, cancellationToken);
         } catch (IOException ex) {
             // exception when opening socket
-            finishRemainingWithException(ex);
-            if (cancellationToken != null) {
-                cancellationToken.completeExceptionally(ex);
-            }
+            finishRemainingWithException(ex, cancellationToken);
         }
     }
 

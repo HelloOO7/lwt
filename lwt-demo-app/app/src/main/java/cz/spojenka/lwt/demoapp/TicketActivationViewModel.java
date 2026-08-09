@@ -123,6 +123,8 @@ public class TicketActivationViewModel extends AndroidViewModel {
 
         addCloseable(devicesViewModel::close);
         addCloseable(tickNotifier::unregister);
+        addCloseable(() -> GlobalLwtScanner.getInstance(getApplication()).releaseLinkSession());
+        addCloseable(this::releaseClients);
     }
 
     public void setTicket(TicketData ticket) {
@@ -173,6 +175,7 @@ public class TicketActivationViewModel extends AndroidViewModel {
         activationStop.setValue(null);
         devicePreauthToken.setValue(null);
         preauthExpirationSecondsLeft.setValue(null);
+        releaseClients();
 
         var chosenZones = getChosenZones().getValue();
         if (chosenZones != null && !chosenZones.isManual() && !chosenZones.zones().isEmpty()) {
@@ -194,6 +197,17 @@ public class TicketActivationViewModel extends AndroidViewModel {
         }
     }
 
+    private void releaseClients() {
+        if (lwtClient != null) {
+            lwtClient.close();
+            lwtClient = null;
+        }
+        if (secureLwtClient != null) {
+            secureLwtClient.close();
+            secureLwtClient = null;
+        }
+    }
+
     public void selectAutoActivationDevice(LwtDevice device) {
         clearAutoActivationDevice(false);
         if (device == null) {
@@ -204,10 +218,10 @@ public class TicketActivationViewModel extends AndroidViewModel {
 
         deviceDataIsLoading.setValue(true);
 
-        lwtClient = new LwtAPIClient(device.getAddress());
+        lwtClient = new LwtAPIClient(getApplication(), device.getAddress());
         lwtClient.disableTLS(); // at this stage, use unencrypted connection
-        //lwtClient.addSessionExecutionObserver(new LwtpLoggingObserver());
-        secureLwtClient = new LwtAPIClient(device.getAddress());
+        lwtClient.addSessionExecutionObserver(new LwtpLoggingObserver());
+        secureLwtClient = new LwtAPIClient(getApplication(), device.getAddress());
         try {
             SSLContext sslContext;
             if (MOCK_UNTRUSTED_SERVER) {
@@ -223,6 +237,7 @@ public class TicketActivationViewModel extends AndroidViewModel {
                             .setSSLContext(sslContext)
                             .build()
             );
+            secureLwtClient.addSessionExecutionObserver(new LwtpLoggingObserver());
         } catch (GeneralSecurityException e) {
             Log.e(TAG, "Failed to create SSL context for secure LWT client, fallback to insecure", e);
             secureLwtClient = lwtClient;

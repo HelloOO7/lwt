@@ -20,4 +20,9 @@ public class TLSLwdnSocketFactory implements LwdnSocketFactory {
     public LwdnSocket openSocket() throws IOException {
         return TLSLwdnSocket.client(baseFactory.openSocket(), sslContext, peerAddress);
     }
+
+    @Override
+    public void close() {
+        baseFactory.close();
+    }
 }

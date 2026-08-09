@@ -1,6 +1,7 @@
 package cz.spojenka.lwt;
 
 import android.bluetooth.BluetoothDevice;
+import android.content.Context;
 import android.util.Log;
 
 import com.google.flatbuffers.FlatBufferBuilder;
@@ -36,8 +37,8 @@ public class LwtAPIClient extends LwtClient {
     private final LwtAPI api;
     private final SecureRandom random = new SecureRandom();
 
-    public LwtAPIClient(LwdnAddress address) {
-        super(address);
+    public LwtAPIClient(Context context, LwdnAddress address) {
+        super(context, address);
         api = bind(LwtAPI.class);
     }
 

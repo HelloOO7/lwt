@@ -2,10 +2,11 @@
 
 #include <cstdint>
 #include <cstddef>
+#include "lwdn_Link.h"
 
 namespace lwdn {
 
-    class Socket {
+    class Socket : public LinkObject {
     public:
         virtual ~Socket() = default;
 
