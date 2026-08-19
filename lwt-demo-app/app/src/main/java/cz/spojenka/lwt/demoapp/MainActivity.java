@@ -19,7 +19,6 @@ import android.net.wifi.aware.WifiAwareNetworkSpecifier;
 import android.net.wifi.aware.WifiAwareSession;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -32,7 +31,6 @@ import javax.net.ssl.SSLContext;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.annotation.RequiresPermission;
 import androidx.core.app.ActivityCompat;
 import cz.spojenka.android.ui.activity.BaseActivity;
 import cz.spojenka.android.util.AsyncUtils;
@@ -56,7 +54,6 @@ public class MainActivity extends BaseActivity {
 
     private LwtDevice foundDevice;
 
-    @SuppressLint("MissingPermission")
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);

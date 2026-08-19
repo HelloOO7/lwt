@@ -36,7 +36,18 @@ namespace lwt {
 
         void InvalidateAll();
 
-        bool IsTokenHashAllowed(const SHA256HashView& tokenHash, int64_t currentTime);
+        /**
+         * @brief Check if a token hash is not rate limited, i. e. it has not yet been used or enough time has passed since its
+         * last use to exceed the configured maximum age.
+         *
+         * @param tokenHash The token hash
+         * @param currentTime The current system time to use as a point of reference for measuring age
+         * @param pBlockingTokenTimestamp If set, the variable will receive the timestamp from which the age of the token hash that blocks
+         * more tokens from being issued is measured.
+         * @return true
+         * @return false
+         */
+        bool IsTokenHashAllowed(const SHA256HashView& tokenHash, int64_t currentTime, int64_t* pBlockingTokenTimestamp = nullptr);
         void RegisterTokenHashUsed(const SHA256HashView& tokenHash, int64_t currentTime);
 
     private:

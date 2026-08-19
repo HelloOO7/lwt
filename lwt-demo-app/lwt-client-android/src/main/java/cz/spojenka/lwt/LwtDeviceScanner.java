@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.UUID;
 
 import androidx.annotation.Nullable;
+import cz.spojenka.lwdn.BluetoothLwdnScanner;
 import cz.spojenka.lwdn.HybridLwdnScanner;
 import cz.spojenka.lwdn.LwdnScan;
 import cz.spojenka.lwdn.LwdnScanConfig;
@@ -29,7 +30,7 @@ public class LwtDeviceScanner {
         BluetoothManager btm = context.getSystemService(BluetoothManager.class);
         if (btm != null) {
             BluetoothAdapter adapter = btm.getAdapter();
-            if (adapter != null) {
+            if (adapter != null && BluetoothLwdnScanner.isSupported(context)) {
                 lwdnScanner.addBluetoothScanner(context, btm.getAdapter(), LwtServiceConstants.BLE_API_PSM);
             }
         }

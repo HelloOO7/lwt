@@ -4952,13 +4952,6 @@ CONFIG_MDNS_PREDEF_NETIF_AP=y
 CONFIG_MDNS_PREDEF_NETIF_ETH=y
 # end of MDNS Predefined interfaces
 # end of mDNS
-
-#
-# Wi-Fi Aware Configuration
-#
-# default:
-CONFIG_WIFI_AWARE_STATIC_ND6=y
-# end of Wi-Fi Aware Configuration
 # end of Component config
 
 # default:

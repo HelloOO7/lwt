@@ -81,7 +81,7 @@ namespace lwt {
                     std::lock_guard lock(m_TokenGeneratorMutex);
 
                     auto currentTime = esp_timer_get_time();
-                    auto expiryTime = currentTime + m_Config.PreauthorizationGracePeriodUs;
+                    auto newTokenExpiryTime = currentTime + m_Config.PreauthorizationGracePeriodUs;
 
                     std::vector<SHA256Hash> tokenHashes; // can be a view, as it looks inside the request flatbuffer
 
@@ -114,25 +114,37 @@ namespace lwt {
                     std::vector<flatbuffers::Offset<PreauthorizationTokenResult>> tokenOffsets;
 
                     for (auto&& tokenHash : tokenHashes) {
-                        if (!m_PreauthRateLimiter.IsTokenHashAllowed(tokenHash, currentTime)) {
-                            ESP_LOGW(TAG, "Activation token hash has already been used recently, refusing to create preauthorization token");
+                        int64_t existingTokenTimestamp = 0;
+                        int64_t tokenExpiryTime = newTokenExpiryTime;
 
-                            tokenOffsets.push_back(CreatePreauthorizationTokenResult(
-                                fbb,
-                                PreauthorizationTokenStatus_RequestedTooOften
-                            ));
+                        if (!m_PreauthRateLimiter.IsTokenHashAllowed(tokenHash, currentTime, &existingTokenTimestamp)) {
+                            tokenExpiryTime = existingTokenTimestamp + m_Config.PreauthorizationGracePeriodUs;
+                            if (currentTime > tokenExpiryTime) {
+                                ESP_LOGW(TAG, "Activation token hash has already been used recently and is no longer valid, returning nothing");
+
+                                tokenOffsets.push_back(CreatePreauthorizationTokenResult(
+                                    fbb,
+                                    PreauthorizationTokenStatus_RequestedTooOften
+                                ));
+
+                                continue;
+                            }
+                            else {
+                                ESP_LOGW(TAG, "Activation token hash has already been used and can still be valid, returning token with adjusted validity");
+                            }
                         }
                         else {
                             m_PreauthRateLimiter.RegisterTokenHashUsed(tokenHash, currentTime);
-
-                            auto preauthTokenBlob = m_TokenManager.CreatePreauthorizationToken(tokenHash, expiryTime);
-
-                            tokenOffsets.push_back(CreatePreauthorizationTokenResult(
-                                fbb,
-                                PreauthorizationTokenStatus_Ok,
-                                CreatePreauthorizationToken(fbb, fbb.CreateVector(preauthTokenBlob))
-                            ));
                         }
+
+                        auto preauthTokenBlob = m_TokenManager.CreatePreauthorizationToken(tokenHash, tokenExpiryTime);
+
+                        tokenOffsets.push_back(CreatePreauthorizationTokenResult(
+                            fbb,
+                            PreauthorizationTokenStatus_Ok,
+                            CreatePreauthorizationToken(fbb, fbb.CreateVector(preauthTokenBlob)),
+                            tokenExpiryTime / 1000
+                        ));
                     }
 
                     auto finishedTime = esp_timer_get_time();
@@ -140,7 +152,7 @@ namespace lwt {
                     // time approximately halfway between request and response, to allow for more accurate RTT estimation
                     auto halfTime = currentTime + (finishedTime - currentTime) / 2;
 
-                    fbb.Finish(CreatePreauthorizationTokenResponseDirect(fbb, halfTime / 1000, expiryTime / 1000, &tokenOffsets));
+                    fbb.Finish(CreatePreauthorizationTokenResponseDirect(fbb, halfTime / 1000, &tokenOffsets));
 
                     return 200;
                 }
@@ -368,7 +380,7 @@ namespace lwt {
         ResetValidationInfo();
 
         auto tsi = m_TripInfoService.GetTripStateInfo(m_ValidationInfoFBB);
-        
+
         if (tsi.IsNull()) {
             ESP_LOGW(TAG, "TripStateInfo is null, cannot update ticket validation info");
         }
@@ -448,12 +460,15 @@ namespace lwt {
         }
     }
 
-    bool TicketPreauthRateLimiter::IsTokenHashAllowed(const SHA256HashView& tokenHash, int64_t currentTime)
+    bool TicketPreauthRateLimiter::IsTokenHashAllowed(const SHA256HashView& tokenHash, int64_t currentTime, int64_t* pBlockingTokenTimestamp)
     {
         InvalidateOldEntries(currentTime);
 
         for (auto&& entry : m_Entries) {
             if (std::equal(entry.TokenHash.begin(), entry.TokenHash.end(), tokenHash.begin())) {
+                if (pBlockingTokenTimestamp) {
+                    *pBlockingTokenTimestamp = entry.TimestampUs;
+                }
                 return false;
             }
         }

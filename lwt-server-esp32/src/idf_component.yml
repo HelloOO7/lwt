@@ -1,4 +1,3 @@
 dependencies:
   espressif/ethernet_init: "==1.4.1"
   johboh/nlohmann-json: "^3.12.0"
-  espressif/wifi_aware: "^0.0.1"

@@ -4,25 +4,21 @@ plugins {
 
 android {
     namespace = 'cz.spojenka.lwt.demoapp'
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk = 37
 
     defaultConfig {
-        applicationId "cz.spojenka.lwt.demoapp"
-        minSdk 29
-        targetSdk 36
-        versionCode 1
-        versionName "1.0"
+        applicationId = "cz.spojenka.lwt.demoapp"
+        minSdk = 29
+        targetSdk = 36
+        versionCode = 1
+        versionName = "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled = false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }

@@ -61,6 +61,10 @@ table PreauthorizationTokenResult {
     /// The token.
     /// This field may not be present if the "status" field is not equal to "Ok".
     preauthorization_token: PreauthorizationToken;
+    /// Timestamp (in milliseconds of server time) when the preauthorization token becomes invalid.
+    /// This may vary between tokens in the same response if one of them has been used earlier
+    /// and is being returned again with shorter validity.
+    expires_at: long;
 }
 
 table PreauthorizationTokenResponse {
@@ -71,8 +75,6 @@ table PreauthorizationTokenResponse {
     /// The client may measure the request RTT and use this to calculate an
     /// estimate of their local expiry time.
     issued_at: long;
-    /// Timestamp (in milliseconds of server time) when the preauthorization tokens become invalid.
-    expires_at: long;
     /// Preauthorization tokens for the individual activation tokens requested. The order of these
     /// tokens is the same as in the PreauthorizationTokenRequest.
     tokens: [PreauthorizationTokenResult] (required);

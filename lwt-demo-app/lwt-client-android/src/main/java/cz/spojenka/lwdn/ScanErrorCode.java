@@ -14,6 +14,10 @@ public enum ScanErrorCode {
      */
     NOT_SUPPORTED,
     /**
+     * Scanning is possible, but the required hardware (e.g. Bluetooth) is disabled by the user.
+     */
+    NOT_ENABLED,
+    /**
      * Hardware resources are in short supply.
      */
     OUT_OF_RESOURCES,

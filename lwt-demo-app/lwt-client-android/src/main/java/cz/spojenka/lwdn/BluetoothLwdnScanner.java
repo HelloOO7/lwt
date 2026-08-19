@@ -8,6 +8,7 @@ import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -24,7 +25,6 @@ public class BluetoothLwdnScanner implements LwdnScanner {
 
     private final Context context;
     private final BluetoothAdapter adapter;
-    private final BluetoothLeScanner scanner;
     private final int addressPsm;
     private final boolean isUsingExtendedAdvertising;
 
@@ -33,10 +33,13 @@ public class BluetoothLwdnScanner implements LwdnScanner {
     public BluetoothLwdnScanner(Context context, BluetoothAdapter adapter, int addressPsm) {
         this.context = context;
         this.adapter = adapter;
-        this.scanner = adapter.getBluetoothLeScanner();
         this.addressPsm = addressPsm;
         isUsingExtendedAdvertising = adapter.isLeExtendedAdvertisingSupported();
         handler = new Handler(Looper.getMainLooper());
+    }
+
+    public static boolean isSupported(Context context) {
+        return context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE);
     }
 
     public boolean isUsingExtendedAdvertising() {
@@ -71,7 +74,17 @@ public class BluetoothLwdnScanner implements LwdnScanner {
     public LwdnScan startScan(List<LwdnServiceID> services, LwdnScanConfig config) {
         LwdnScan scan = new LwdnScan();
 
-        new ScanController(scan).startScan(services, config);
+        BluetoothLeScanner scanner = adapter.getBluetoothLeScanner();
+
+        if (scanner != null) {
+            new ScanController(scanner, scan).startScan(services, config);
+        } else {
+            if (adapter.isEnabled()) {
+                scan.markFailed(new LwdnScanException(ScanErrorCode.NOT_SUPPORTED, "Bluetooth LE scanner is not supported (even though Bluetooth is enabled)"));
+            } else {
+                scan.markFailed(new LwdnScanException(ScanErrorCode.NOT_ENABLED, "Bluetooth is off"));
+            }
+        }
 
         return scan;
     }
@@ -89,10 +102,12 @@ public class BluetoothLwdnScanner implements LwdnScanner {
 
     private class ScanController {
 
+        private final BluetoothLeScanner scanner;
         private TimeoutScanCallback callback;
         private final LwdnScan scan;
 
-        public ScanController(LwdnScan scan) {
+        public ScanController(BluetoothLeScanner scanner, LwdnScan scan) {
+            this.scanner = scanner;
             this.scan = scan;
             scan.setCancellationHandler(this::stopScan);
         }

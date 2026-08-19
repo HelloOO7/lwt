@@ -186,35 +186,35 @@ public class LwtAPIClient extends LwtClient {
         return builder.dataBuffer();
     }
 
-    public CompletableFuture<TokenWithExpiration<Map<byte[], PreauthorizationTokenResult>>> requestPreauthorizationTokens(List<byte[]> activationTokenHashes, CommType comm) {
+    public CompletableFuture<Map<byte[], TokenWithExpiration<PreauthorizationTokenResult>>> requestPreauthorizationTokens(List<byte[]> activationTokenHashes, CommType comm) {
         CompletableFuture<PreauthorizationTokenResponse> responseFuture = enqueueOrCall(LwtAPI::createPreauthorizationToken, createPreauthorizationTokensRequest(activationTokenHashes), comm);
         RTTExecutionObserver rtt = new RTTExecutionObserver(responseFuture);
         addExecutionObserver(rtt);
         responseFuture.whenCompleteAsync((r, e) -> removeExecutionObserver(rtt));
         return responseFuture.thenApply(response -> {
-            Map<byte[], PreauthorizationTokenResult> tokenMap = new HashMap<>();
+            RemoteTime remoteTime = new RemoteTime(rtt.getRoundTripStartTime(), Instant.ofEpochMilli(response.issuedAt()), rtt.getRoundTripDuration());
+
+            Instant issuedAt = remoteTime.remoteToLocal(Instant.ofEpochMilli(response.issuedAt()));
+
+            Map<byte[], TokenWithExpiration<PreauthorizationTokenResult>> tokenMap = new HashMap<>();
             for (int i = 0; i < response.tokensLength(); i++) {
                 PreauthorizationTokenResult token = response.tokens(i);
                 if (token != null) {
-                    tokenMap.put(activationTokenHashes.get(i), token);
+                    tokenMap.put(activationTokenHashes.get(i), new TokenWithExpiration<>(
+                            issuedAt,
+                            remoteTime.remoteToLocal(Instant.ofEpochMilli(token.expiresAt())),
+                            token
+                    ));
                 }
             }
 
-            RemoteTime remoteTime = new RemoteTime(rtt.getRoundTripStartTime(), Instant.ofEpochMilli(response.issuedAt()), rtt.getRoundTripDuration());
-
-            return new TokenWithExpiration<>(
-                    remoteTime.remoteToLocal(Instant.ofEpochMilli(response.issuedAt())),
-                    remoteTime.remoteToLocal(Instant.ofEpochMilli(response.expiresAt())),
-                    tokenMap
-            );
+            return tokenMap;
         });
     }
 
     public CompletableFuture<TokenWithExpiration<PreauthorizationTokenResult>> requestPreauthorizationToken(byte[] activationToken, CommType comm) {
         return requestPreauthorizationTokens(List.of(activationToken), comm)
-                .thenApply(tokenMap -> new TokenWithExpiration<>(
-                        tokenMap.issuedAt(), tokenMap.expiresAt(), tokenMap.token().get(activationToken)
-                ));
+                .thenApply(tokenMap -> tokenMap.get(activationToken));
     }
 
     public CompletableFuture<TicketActivationResponse> activateTicket(TicketActivationParams params, CommType comm) {
