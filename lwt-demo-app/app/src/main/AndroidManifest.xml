@@ -42,6 +42,7 @@
         <activity android:name=".LitackaZonePickerActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
         <activity android:name=".TripStopPickerActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
         <activity android:name=".TicketActivationActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
+        <activity android:name=".TicketInspectionActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge.QRContrast" />
     </application>
 
 </manifest>

@@ -1,21 +1,17 @@
 package cz.spojenka.lwt.demoapp;
 
-import android.animation.Animator;
 import android.animation.LayoutTransition;
 import android.animation.ValueAnimator;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
-import android.graphics.drawable.ShapeDrawable;
 import android.os.Bundle;
-import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewPropertyAnimator;
-import android.view.animation.AccelerateDecelerateInterpolator;
 import android.view.animation.PathInterpolator;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -23,7 +19,6 @@ import android.widget.Toast;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -307,8 +302,11 @@ public class TicketActivationActivity extends BaseActivity {
 
         viewModel.getActivationResult().observe(this, result -> {
             if (result != null) {
-                Log.i(TAG, "Activated ticket; etd=" + result.signedEtd() + "; totp=" + result.totpSeed());
+                Log.i(TAG, "Activated ticket; etd=" + result.getEtdAsString());
                 finish();
+                // debug
+                startActivity(new Intent(this, TicketInspectionActivity.class)
+                        .putExtra(TicketInspectionActivity.EXTRA_TICKET, result));
             }
         });
     }

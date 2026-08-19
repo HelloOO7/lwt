@@ -9,13 +9,21 @@ struct LocalTime {
     uint8_t hour{ 0 };
     uint8_t minute{ 0 };
     uint8_t second{ 0 };
+    uint32_t nanosecond{ 0 };
 
     inline static LocalTime parse(const char* str, const char** endPtr = nullptr) {
         LocalTime lt;
         int numRead;
         sscanf(str, "%2hhu:%2hhu%n", &lt.hour, &lt.minute, &numRead);
-        if (str[5] == ':') {
-            sscanf(str + 6, "%2hhu", &lt.second);
+        if (str[numRead] == ':') {
+            int numRead2;
+            sscanf(str + numRead + 1, "%2hhu%n", &lt.second, &numRead2);
+            numRead += 1 + numRead2;
+            if (str[numRead] == '.') {
+                int numRead3;
+                sscanf(str + numRead + 1, "%9lu%n", &lt.nanosecond, &numRead3);
+                numRead += 1 + numRead3;
+            }
         }
         if (endPtr) {
             *endPtr = str + numRead;
@@ -37,10 +45,18 @@ struct LocalTime {
 
     inline std::string to_string() const {
         if (second > 0) {
-            char buffer[12]; // HH:MM:SS + null terminator
-            snprintf(buffer, sizeof(buffer), "%02hhu:%02hhu:%02hhu", hour, minute, second);
-            return std::string(buffer);
-        } else {
+            if (nanosecond > 0) {
+                char buffer[24]; // HH:MM:SS.nnnnnnnnn + null terminator
+                snprintf(buffer, sizeof(buffer), "%02hhu:%02hhu:%02hhu.%09lu", hour, minute, second, nanosecond);
+                return std::string(buffer);
+            }
+            else {
+                char buffer[12]; // HH:MM:SS + null terminator
+                snprintf(buffer, sizeof(buffer), "%02hhu:%02hhu:%02hhu", hour, minute, second);
+                return std::string(buffer);
+            }
+        }
+        else {
             char buffer[6]; // HH:MM + null terminator
             snprintf(buffer, sizeof(buffer), "%02hhu:%02hhu", hour, minute);
             return std::string(buffer);
@@ -141,7 +157,8 @@ struct OffsetDateTime {
         if (*str == 'Z') {
             odt.offset_seconds = 0;
             str++;
-        } else if (*str == '+' || *str == '-') {
+        }
+        else if (*str == '+' || *str == '-') {
             int sign = (*str == '+') ? 1 : -1;
             str++;
             int hours, minutes;
@@ -149,7 +166,8 @@ struct OffsetDateTime {
             // can be either 02:00 or 0200
             if (sscanf(str, "%2d:%2d%n", &hours, &minutes, &numRead) == 2) {
                 odt.offset_seconds = sign * (hours * 3600 + minutes * 60);
-            } else if (sscanf(str, "%2d%2d%n", &hours, &minutes, &numRead) == 2) {
+            }
+            else if (sscanf(str, "%2d%2d%n", &hours, &minutes, &numRead) == 2) {
                 odt.offset_seconds = sign * (hours * 3600 + minutes * 60);
             }
             str += numRead; // Move past the offset
@@ -168,7 +186,8 @@ struct OffsetDateTime {
         std::string result = date_time.to_string();
         if (offset_seconds == 0) {
             result += "Z";
-        } else {
+        }
+        else {
             int totalMinutes = offset_seconds / 60;
             int hours = totalMinutes / 60;
             int minutes = std::abs(totalMinutes % 60);

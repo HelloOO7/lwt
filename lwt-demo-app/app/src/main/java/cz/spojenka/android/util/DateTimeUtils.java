@@ -220,7 +220,11 @@ public class DateTimeUtils {
      * @return The number of "clock" minutes between the two date-times
      */
     private static int getWallClockMinutesBetween(LocalDateTime from, LocalDateTime to) {
-        return (int) ChronoUnit.MINUTES.between(from.truncatedTo(ChronoUnit.MINUTES), to.truncatedTo(ChronoUnit.MINUTES));
+        return getWallClockDurationBetween(from, to, ChronoUnit.MINUTES);
+    }
+
+    private static int getWallClockDurationBetween(LocalDateTime from, LocalDateTime to, ChronoUnit units) {
+        return (int) units.between(from.truncatedTo(units), to.truncatedTo(units));
     }
 
     /**
@@ -277,9 +281,10 @@ public class DateTimeUtils {
                 else {
                     timeString = formatTimeDifference(context, Duration.between(params.asSeenFrom, localDt).abs(), params.relativeTimeSmallestUnit);
                 }
-                if (minutes == 0) {
+                int truncatedDifference = getWallClockDurationBetween(params.asSeenFrom, localDt, params.relativeTimeSmallestUnit);
+                if (truncatedDifference == 0) {
                     sb.append(context.getString(R.string.now));
-                } else if (minutes > 0) {
+                } else if (truncatedDifference > 0) {
                     sb.append(context.getString(R.string.in_x_time_format, timeString));
                 } else {
                     sb.append(context.getString(R.string.x_ago_time_format, timeString));
@@ -579,6 +584,16 @@ public class DateTimeUtils {
      */
     public static boolean isTodaySameZone(@NonNull ZonedDateTime dt) {
         return dt.toLocalDate().equals(ZonedDateTime.now(dt.getZone()).toLocalDate());
+    }
+
+    /**
+     * Check if a offset timestamp's date corresponds to today's date in its own time offset.
+     *
+     * @param dt The timestamp
+     * @return true/false
+     */
+    public static boolean isTodaySameOffset(@NonNull OffsetDateTime dt) {
+        return dt.toLocalDate().equals(OffsetDateTime.now(dt.getOffset()).toLocalDate());
     }
 
     /**

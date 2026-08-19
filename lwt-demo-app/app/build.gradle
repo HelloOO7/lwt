@@ -39,6 +39,8 @@ dependencies {
     implementation libs.swipeRefreshLayout
     implementation libs.flexboxLayout
     implementation libs.flatbuffers.java
+    implementation libs.zxing
+    implementation libs.okhttp
     implementation project(":lwt-client-android")
     testImplementation libs.junit
     androidTestImplementation libs.espresso.core

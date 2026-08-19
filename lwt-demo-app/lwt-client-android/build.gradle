@@ -33,6 +33,7 @@ dependencies {
     implementation libs.appcompat
     implementation libs.flatbuffers.java
     implementation libs.tlsChannel
+    implementation libs.javaOtp
     testImplementation libs.junit
     androidTestImplementation libs.espresso.core
     androidTestImplementation libs.ext.junit

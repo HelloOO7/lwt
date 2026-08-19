@@ -4,6 +4,7 @@
 #include "esp_crt_bundle.h"
 
 #include "nlohmann/json.hpp"
+#include "mbedtls/base64.h"
 
 #include <iostream>
 
@@ -36,7 +37,17 @@ namespace lwt {
     }
 
     OffsetDateTime DateTimeFromJson(const psram_json& json) {
-        return OffsetDateTime::parse(json.get<std::string>());
+        return OffsetDateTime::parse(json.get_ref<const psram_string&>().c_str());
+    }
+
+    psram_vector<uint8_t> JsonToByteVector(const psram_json& json) {
+        auto str = json.get_ref<const psram_string&>();
+        // base64 decode
+        size_t decodedLen = 0;
+        mbedtls_base64_decode(nullptr, 0, &decodedLen, (const unsigned char*)str.data(), str.size());
+        psram_vector<uint8_t> decoded(decodedLen);
+        mbedtls_base64_decode(decoded.data(), decoded.size(), &decodedLen, (const unsigned char*)str.data(), str.size());
+        return decoded;
     }
 
     int MOSClient::ActivateTicket(uint64_t ticketId, const MOSTicketActivationParams& params, MOSTicket* pActivatedTicket) {
@@ -64,9 +75,9 @@ namespace lwt {
 
         int status = PerformHttpRequest(HTTP_METHOD_POST, "/tickets/" + std::to_string(ticketId) + "/activate", body, &body); //reuse request memory for response
 
-        std::cout << "<--- MOS::ActivateTicket ---" << std::endl;
+        std::cout << "<---" << status << " MOS::ActivateTicket ---" << std::endl;
 
-        if (status != 200) {
+        if (status >= 400) {
             std::cout << body << std::endl;
             return status;
         }
@@ -76,8 +87,8 @@ namespace lwt {
         std::cout << std::setw(4) << response << std::endl;
 
         response.at("id").get_to(pActivatedTicket->TicketId);
-        response.at("payload").at("etd").get_to(pActivatedTicket->Payload.ETD);
-        response.at("payload").at("derivedTotpSeed").get_to(pActivatedTicket->Payload.TOTPSeed);
+        pActivatedTicket->Payload.ETD = JsonToByteVector(response.at("payload").at("etd"));
+        pActivatedTicket->Payload.TOTPSeed = JsonToByteVector(response.at("payload").at("derivedTotpSeed"));
         pActivatedTicket->ValidSince = DateTimeFromJson(response.at("validSince"));
         pActivatedTicket->ValidUntil = DateTimeFromJson(response.at("validUntil"));
         response.at("validZones").get_to(pActivatedTicket->ValidZones);
@@ -89,7 +100,7 @@ namespace lwt {
 
     struct ClientEventData {
         psram_string* m_ResponseBody;
-        bool m_ResponseBodyInitialized { false };
+        bool m_ResponseBodyInitialized{ false };
     };
 
     esp_err_t client_event_data_handler(esp_http_client_event_handle_t evt) {
@@ -99,7 +110,8 @@ namespace lwt {
                 if (!pEventData->m_ResponseBodyInitialized) {
                     pEventData->m_ResponseBodyInitialized = true;
                     pEventData->m_ResponseBody->assign(static_cast<const char*>(evt->data), evt->data_len);
-                } else {
+                }
+                else {
                     pEventData->m_ResponseBody->append(static_cast<const char*>(evt->data), evt->data_len);
                 }
             }
@@ -116,7 +128,7 @@ namespace lwt {
 
         std::string url = m_BaseUrl + path;
 
-        ClientEventData eventData { pResponseBody, false };
+        ClientEventData eventData{ pResponseBody, false };
 
         esp_http_client_set_method(client, method);
         esp_http_client_set_url(client, url.c_str());
@@ -132,8 +144,10 @@ namespace lwt {
             return -2; // HTTP request failed
         }
 
+        int status = esp_http_client_get_status_code(client);
+
         esp_http_client_cleanup(client);
 
-        return esp_http_client_get_status_code(client);
+        return status;
     }
 }

@@ -21,8 +21,8 @@ namespace lwt {
     };
 
     struct MOSTicketPayload {
-        psram_string ETD;
-        psram_string TOTPSeed;
+        psram_vector<uint8_t> ETD;
+        psram_vector<uint8_t> TOTPSeed;
     };
 
     struct MOSTicket {

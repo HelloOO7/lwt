@@ -13,4 +13,9 @@
     <color name="delay_mid">#FF9800</color>
     <color name="delay_high">#F44336</color>
     <color name="dark_gray">#444444</color>
+
+    <color name="ticket_inspection_progress_active">#129447</color>
+    <color name="ticket_inspection_progress_warn">#d69209</color>
+    <color name="ticket_inspection_progress_inactive">#e02727</color>
+    <color name="ticket_inspection_progress_bg">#ffdadbdf</color>
 </resources>

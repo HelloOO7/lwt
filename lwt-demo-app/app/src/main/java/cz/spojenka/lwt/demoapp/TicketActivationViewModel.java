@@ -104,7 +104,7 @@ public class TicketActivationViewModel extends AndroidViewModel {
 
     private CompletableFuture<?> currentActivationCall;
     private MutableLiveData<Throwable> activationError = new MutableLiveData<>();
-    private MutableLiveData<TicketActivationResponse> activationResult = new MutableLiveData<>();
+    private MutableLiveData<TicketData> activationResult = new MutableLiveData<>();
     private MutableLiveData<Boolean> isActivationInProgress = new MutableLiveData<>(false);
 
     public TicketActivationViewModel(@NonNull Application application) {
@@ -967,7 +967,14 @@ public class TicketActivationViewModel extends AndroidViewModel {
                 Log.e(TAG, "Failed to activate ticket via LWT", throwable);
                 activationError.setValue(throwable);
             } else {
-                activationResult.setValue(result);
+                TicketData activatedTicket = new TicketData(ticket);
+                activatedTicket.setActivatedAt(LwtTime.convertOffsetDateTime(result.activatedAtTime()));
+                activatedTicket.setValidSince(LwtTime.convertOffsetDateTime(result.validSinceTime()));
+                activatedTicket.setValidUntil(LwtTime.convertOffsetDateTime(result.validUntilTime()));
+                activatedTicket.setEtd(ByteBufferUtils.toByteArray(result.signedEtdAsByteBuffer()));
+                activatedTicket.setTotpSeed(ByteBufferUtils.toByteArray(result.totpSeedAsByteBuffer()));
+                activatedTicket.setChosenZones(info.zones());
+                activationResult.setValue(activatedTicket);
             }
         }, getApplication().getMainExecutor());
 
@@ -978,7 +985,7 @@ public class TicketActivationViewModel extends AndroidViewModel {
         return isActivationInProgress;
     }
 
-    public LiveData<TicketActivationResponse> getActivationResult() {
+    public LiveData<TicketData> getActivationResult() {
         return activationResult;
     }
 

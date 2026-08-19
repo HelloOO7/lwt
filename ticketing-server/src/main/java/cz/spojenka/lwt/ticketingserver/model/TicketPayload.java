@@ -2,31 +2,30 @@ package cz.spojenka.lwt.ticketingserver.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
+import org.apache.commons.lang3.ArrayUtils;
 import org.jspecify.annotations.NonNull;
 
 @Embeddable
 public class TicketPayload {
 
-    @NonNull
     @Column(length = 1024)
-    private String etd;
-    @NonNull
-    private String derivedTotpSeed;
+    private byte @NonNull [] etd;
+    private byte @NonNull [] derivedTotpSeed;
 
-    public TicketPayload(@NonNull String etd, @NonNull String derivedTotpSeed) {
+    public TicketPayload(byte @NonNull [] etd, byte @NonNull [] derivedTotpSeed) {
         this.etd = etd;
         this.derivedTotpSeed = derivedTotpSeed;
     }
 
     TicketPayload() {
-        this("", "");
+        this(ArrayUtils.EMPTY_BYTE_ARRAY, ArrayUtils.EMPTY_BYTE_ARRAY);
     }
 
-    public @NonNull String getEtd() {
+    public byte @NonNull [] getEtd() {
         return etd;
     }
 
-    public @NonNull String getDerivedTotpSeed() {
+    public byte @NonNull [] getDerivedTotpSeed() {
         return derivedTotpSeed;
     }
 }

@@ -71,4 +71,13 @@
     <string name="fast_activation_infobox_title">Zrychlená aktivace</string>
     <string name="fast_activation_infobox_message">Aktivace jízdenky pro zvolený spoj v uvedeném časovém okně nepodléhá ochranné lhůtě - jízdenka začne platit okamžitě.</string>
     <string name="ticket_activation_confirm_in_progress">Probíhá aktivace</string>
+    <string name="ticket_activation_error_title">Chyba aktivace</string>
+    <string name="ticket_inspection_valid_until">Platí do</string>
+    <string name="ticket_inspection_valid_duration">Doba platnosti</string>
+    <string name="ticket_inspection_valid_since">Platí od</string>
+    <string name="ticket_inspection_valid_zones">Pásma</string>
+    <string name="ticket_inspection_title">Vaše jízdenka</string>
+    <string name="ticket_inspection_validity_ended">Platnost skončila</string>
+    <string name="ticket_inspection_activates_at_format">Začátek platnosti %1$s</string>
+    <string name="ticket_inspection_remaining_format">Zbývá %1$s</string>
 </resources>

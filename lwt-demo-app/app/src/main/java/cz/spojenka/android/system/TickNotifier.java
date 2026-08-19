@@ -4,6 +4,8 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.SystemClock;
 
+import java.util.function.LongSupplier;
+
 /**
  * Class for firing a callback with a specified period. The interval is tied to the ticks
  * of a real-time clock - the actual time at which the event is fired is rounded down
@@ -22,18 +24,39 @@ public class TickNotifier implements Runnable {
     private final int intervalMs;
     private final int updateIntervalMs;
     private long lastTick = 0;
+    private LongSupplier timeSource;
 
     /**
      * Constructor.
      *
-     * @param callback Callback to run on each tick.
+     * @param callback   Callback to run on each tick.
      * @param intervalMs Tick interval (time modulus) in milliseconds.
+     * @param timeSource Source of current time in milliseconds. If null, System.currentTimeMillis() is used.
      */
-    public TickNotifier(Context context, Runnable callback, int intervalMs) {
+    public TickNotifier(Context context, Runnable callback, int intervalMs, LongSupplier timeSource) {
         handler = new Handler(context.getMainLooper());
         this.callback = callback;
         this.intervalMs = intervalMs;
         this.updateIntervalMs = Math.min(intervalMs, Math.max(50, intervalMs / 10));
+        this.timeSource = timeSource != null ? timeSource : System::currentTimeMillis;
+    }
+
+    /**
+     * Constructor.
+     *
+     * @param context          Context
+     * @param callback         Callback to run on each tick.
+     * @param intervalMs       Tick interval (time modulus) in milliseconds.
+     * @param useInternalClock True to use the device's internal clock ({@link SystemClock#elapsedRealtime()})
+     *                         instead of the default {@link System#currentTimeMillis()}. The internal clock is
+     *                         immune to changes in the system time, but as a result is not synced on second boundaries.
+     */
+    public TickNotifier(Context context, Runnable callback, int intervalMs, boolean useInternalClock) {
+        this(context, callback, intervalMs, useInternalClock ? SystemClock::elapsedRealtime : null);
+    }
+
+    public TickNotifier(Context context, Runnable callback, int intervalMs) {
+        this(context, callback, intervalMs, false);
     }
 
     /**
@@ -64,9 +87,9 @@ public class TickNotifier implements Runnable {
         if (!running) {
             return;
         }
-        long ts = SystemClock.elapsedRealtime();
+        long ts = timeSource.getAsLong();
         if (lastTick == 0 || (lastTick / intervalMs != ts / intervalMs)) {
-            lastTick = SystemClock.elapsedRealtime();
+            lastTick = ts;
             callback.run();
         }
         handler.postDelayed(this, updateIntervalMs);

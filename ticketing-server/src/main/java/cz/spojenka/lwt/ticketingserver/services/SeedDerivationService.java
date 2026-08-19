@@ -12,6 +12,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 
 @Service
 public class SeedDerivationService {
@@ -51,7 +52,15 @@ public class SeedDerivationService {
         return ETDUtils.getDecodedTicketSignature(etd);
     }
 
-    public String deriveTotpSeedForEtd(LitackaETD etd) {
-        return DigestUtils.sha256Hex(ArrayUtils.addAll(getTicketSignature(etd), getOrCreateSecretForTime(getSecretTimeForEtd(etd)).getData()));
+    public byte[] deriveTotpSeedForEtd(LitackaETD etd) {
+        return DigestUtils.sha256(ArrayUtils.addAll(getTicketSignature(etd), getOrCreateSecretForTime(getSecretTimeForEtd(etd)).getData()));
+    }
+
+    public List<SeedDerivationSecret> getAllSecretsSince(Instant instant) {
+        return repository.getAllSince(instant.getEpochSecond());
+    }
+
+    public static Instant tsToInstant(long ts) {
+        return Instant.ofEpochSecond(ts);
     }
 }

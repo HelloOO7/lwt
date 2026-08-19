@@ -112,10 +112,10 @@ table TicketActivationRequest {
 
 table TicketActivationResponse {
     /// Signed ticket QR data that is valid for inspection.
-    signed_etd: string (required);
+    signed_etd: [ubyte] (required);
     /// TOTP seed shared with the client as an anti-theft measure. This seed
     /// is separate from the ETD, so it does not have to be broadcasted.
-    totp_seed: string (required);
+    totp_seed: [ubyte] (required);
     /// Final start of validity time.
     valid_since_time: LwtOffsetDateTime (required);
     /// Final end of validity time.

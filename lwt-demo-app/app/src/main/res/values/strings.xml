@@ -73,4 +73,12 @@
     <string name="fast_activation_infobox_message">Within the displayed time period, a ticket can be activated for the selected line without a security delay - it will become valid right away.</string>
     <string name="ticket_activation_confirm_in_progress">Activating</string>
     <string name="ticket_activation_error_title">Activation error</string>
+    <string name="ticket_inspection_valid_since">Valid since</string>
+    <string name="ticket_inspection_valid_until">Valid until</string>
+    <string name="ticket_inspection_valid_duration">Duration</string>
+    <string name="ticket_inspection_valid_zones">Zones</string>
+    <string name="ticket_inspection_title">Your ticket</string>
+    <string name="ticket_inspection_validity_ended">Past validity</string>
+    <string name="ticket_inspection_activates_at_format">Validity starts %1$s</string>
+    <string name="ticket_inspection_remaining_format">Remaining %1$s</string>
 </resources>
