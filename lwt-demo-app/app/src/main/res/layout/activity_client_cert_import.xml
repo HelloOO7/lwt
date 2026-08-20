@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <cz.spojenka.lwt.demoapp.TitleBar
+        android:id="@+id/titleBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="@dimen/activity_horizontal_margin"
+        android:layout_marginTop="@dimen/activity_vertical_margin"
+        android:icon="@drawable/ic_license_48px"
+        android:text="@string/cert_import_title"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:marginWindowInsets="horizontal|top" />
+
+    <Button
+        android:id="@+id/btnFinishImport"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="@dimen/activity_vertical_margin"
+        android:text="@string/cert_import_finish"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="@+id/titleBar"
+        app:layout_constraintStart_toStartOf="@+id/titleBar"
+        app:layout_constraintTop_toBottomOf="@+id/tvCertDetails"
+        app:layout_constraintVertical_bias="1.0"
+        app:marginWindowInsets="bottom" />
+
+    <TextView
+        android:id="@+id/tvStep1Title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/section_margin_normal"
+        android:text="@string/cert_import_step1_title"
+        android:textSize="@dimen/text_title_s"
+        app:layout_constraintEnd_toEndOf="@+id/titleBar"
+        app:layout_constraintStart_toStartOf="@+id/titleBar"
+        app:layout_constraintTop_toBottomOf="@+id/titleBar" />
+
+    <Button
+        android:id="@+id/btnOpenCertFile"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/item_margin_normal"
+        android:text="@string/cert_import_open_file"
+        app:icon="@drawable/ic_file_open_24px"
+        app:layout_constraintStart_toStartOf="@+id/tvStep1Title"
+        app:layout_constraintTop_toBottomOf="@+id/tvStep1Title" />
+
+    <TextView
+        android:id="@+id/tvStep2Title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/item_margin_normal"
+        android:text="@string/cert_import_step2_title"
+        android:textSize="@dimen/text_title_s"
+        app:layout_constraintEnd_toEndOf="@+id/titleBar"
+        app:layout_constraintStart_toStartOf="@+id/titleBar"
+        app:layout_constraintTop_toBottomOf="@+id/btnOpenCertFile" />
+
+    <TextView
+        android:id="@+id/tvCertDetails"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/item_margin_normal"
+        android:text="@string/cert_import_step2_default_text"
+        app:layout_constraintEnd_toEndOf="@+id/tvStep2Title"
+        app:layout_constraintStart_toStartOf="@+id/tvStep2Title"
+        app:layout_constraintTop_toBottomOf="@+id/tvStep2Title" />
+
+    <TextView
+        android:id="@+id/tvStep3Title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/item_margin_normal"
+        android:text="@string/cert_import_step3_title"
+        android:textSize="@dimen/text_title_s"
+        app:layout_constraintEnd_toEndOf="@+id/titleBar"
+        app:layout_constraintStart_toStartOf="@+id/titleBar"
+        app:layout_constraintTop_toBottomOf="@+id/tvCertDetails" />
+
+    <RadioGroup
+        android:id="@+id/rgAliases"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/item_margin_normal"
+        app:layout_constraintEnd_toEndOf="@+id/tvStep3Title"
+        app:layout_constraintStart_toStartOf="@+id/tvStep3Title"
+        app:layout_constraintTop_toBottomOf="@id/tvStep3Title" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

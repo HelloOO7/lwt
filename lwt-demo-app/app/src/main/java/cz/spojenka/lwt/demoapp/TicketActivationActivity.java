@@ -305,8 +305,8 @@ public class TicketActivationActivity extends BaseActivity {
                 Log.i(TAG, "Activated ticket; etd=" + result.getEtdAsString());
                 finish();
                 // debug
-                startActivity(new Intent(this, TicketInspectionActivity.class)
-                        .putExtra(TicketInspectionActivity.EXTRA_TICKET, result));
+                startActivity(new Intent(this, TicketDisplayActivity.class)
+                        .putExtra(TicketDisplayActivity.EXTRA_TICKET, result));
             }
         });
     }

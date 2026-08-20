@@ -24,17 +24,17 @@ import cz.spojenka.android.system.TickNotifier;
 import cz.spojenka.android.ui.activity.BaseActivity;
 import cz.spojenka.android.util.DateTimeUtils;
 import cz.spojenka.android.util.ViewUtils;
-import cz.spojenka.lwt.demoapp.databinding.ActivityTicketInspectionBinding;
+import cz.spojenka.lwt.demoapp.databinding.ActivityTicketDisplayBinding;
 import cz.spojenka.lwt.demoapp.databinding.TicketInfoLineRowBinding;
 
-public class TicketInspectionActivity extends BaseActivity {
+public class TicketDisplayActivity extends BaseActivity {
 
-    public static final String EXTRA_TICKET = TicketInspectionActivity.class.getName() + ".EXTRA_TICKET";
+    public static final String EXTRA_TICKET = TicketDisplayActivity.class.getName() + ".EXTRA_TICKET";
 
     private static final DateTimeFormatter CLOCK_FORMAT = DateTimeFormatter.ofPattern("d.M.yyyy HH:mm:ss");
 
-    private ActivityTicketInspectionBinding binding;
-    private TicketInspectionViewModel viewModel;
+    private ActivityTicketDisplayBinding binding;
+    private TicketDisplayViewModel viewModel;
 
     private TickNotifier clockTicker;
     private TickNotifier qrTicker;
@@ -44,7 +44,7 @@ public class TicketInspectionActivity extends BaseActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        binding = ActivityTicketInspectionBinding.inflate(getLayoutInflater());
+        binding = ActivityTicketDisplayBinding.inflate(getLayoutInflater());
         setContentView(ViewUtils.wrapInScrollView(binding.getRoot()));
 
         clockTicker = new TickNotifier(this, this::updateClockAndProgress, 1000);
@@ -54,11 +54,11 @@ public class TicketInspectionActivity extends BaseActivity {
                         .setAllCornerSizes(getResources().getDimension(R.dimen.ticket_qr_frame_corner_dim))
                         .build()
         );
-        qrLoading.setTint(getColor(R.color.ticket_inspection_progress_active));
+        qrLoading.setTint(getColor(R.color.ticket_display_progress_active));
         qrLoading.setStrokeWidth(ViewUtils.dpToPx(this, 4));
         binding.ivQR.setForeground(qrLoading);
 
-        viewModel = new ViewModelProvider(this).get(TicketInspectionViewModel.class);
+        viewModel = new ViewModelProvider(this).get(TicketDisplayViewModel.class);
         TicketData ticket = Objects.requireNonNull(IntentCompat.getParcelableExtra(getIntent(), EXTRA_TICKET, TicketData.class));
         viewModel.loadTicket(ticket);
 
@@ -77,11 +77,11 @@ public class TicketInspectionActivity extends BaseActivity {
                 zones = ticketData.getZoneOptions();
             }
             if (zones != null && !zones.isEmpty()) {
-                addInfoView(R.string.ticket_inspection_valid_zones, String.join(", ", zones));
+                addInfoView(R.string.ticket_display_valid_zones, String.join(", ", zones));
             }
-            addInfoView(R.string.ticket_inspection_valid_duration, DateTimeUtils.formatTimeDifferenceMinutes(this, ticketData.getValidityPeriod()));
-            addInfoView(R.string.ticket_inspection_valid_since, DateTimeUtils.formatDateTimeLocalized(ticketData.getValidSince().toLocalDateTime()));
-            addInfoView(R.string.ticket_inspection_valid_until, DateTimeUtils.formatDateTimeLocalized(ticketData.getValidUntil().toLocalDateTime()));
+            addInfoView(R.string.ticket_display_valid_duration, DateTimeUtils.formatTimeDifferenceMinutes(this, ticketData.getValidityPeriod()));
+            addInfoView(R.string.ticket_display_valid_since, DateTimeUtils.formatDateTimeLocalized(ticketData.getValidSince().toLocalDateTime()));
+            addInfoView(R.string.ticket_display_valid_until, DateTimeUtils.formatDateTimeLocalized(ticketData.getValidUntil().toLocalDateTime()));
 
             ticketForClock = ticketData;
             updateClockAndProgress();
@@ -109,7 +109,7 @@ public class TicketInspectionActivity extends BaseActivity {
                 binding.pbValidity.setVisibility(View.VISIBLE);
                 Duration toEndOfValidity = Duration.between(now, to);
                 binding.tvRemainingTime.setText(getString(
-                        R.string.ticket_inspection_remaining_format,
+                        R.string.ticket_display_remaining_format,
                         DateTimeUtils.formatTimeDifference(context, toEndOfValidity, ChronoUnit.SECONDS)
                 ));
                 boolean warn = toEndOfValidity.compareTo(ticketForClock.getValidityPeriod().dividedBy(10)) <= 0;
@@ -118,7 +118,7 @@ public class TicketInspectionActivity extends BaseActivity {
                 setupProgress(from, now, to);
             } else if (now.isBefore(from)) {
                 String validityText = getString(
-                        R.string.ticket_inspection_activates_at_format,
+                        R.string.ticket_display_activates_at_format,
                         DateTimeUtils.formatDateTimePhrase(
                                 context,
                                 from.toLocalDateTime(),
@@ -136,9 +136,9 @@ public class TicketInspectionActivity extends BaseActivity {
                 setupProgress(act, now, from);
             } else {
                 binding.pbValidity.setVisibility(View.GONE);
-                binding.tvRemainingTime.setText(R.string.ticket_inspection_validity_ended);
-                progressTint = context.getColor(R.color.ticket_inspection_progress_bg);
-                progressTextTint = context.getColor(R.color.ticket_inspection_progress_inactive);
+                binding.tvRemainingTime.setText(R.string.ticket_display_validity_ended);
+                progressTint = context.getColor(R.color.ticket_display_progress_bg);
+                progressTextTint = context.getColor(R.color.ticket_display_progress_inactive);
             }
             binding.tvRemainingTime.setTextColor(progressTextTint);
             binding.pbValidity.setProgressTintList(ColorStateList.valueOf(progressTint));
@@ -156,9 +156,9 @@ public class TicketInspectionActivity extends BaseActivity {
 
     protected @ColorInt int getProgressBarTint(boolean isValid, boolean isWarn) {
         if (isValid) {
-            return getColor(isWarn ? R.color.ticket_inspection_progress_warn : R.color.ticket_inspection_progress_active);
+            return getColor(isWarn ? R.color.ticket_display_progress_warn : R.color.ticket_display_progress_active);
         } else {
-            return getColor(R.color.ticket_inspection_progress_inactive);
+            return getColor(R.color.ticket_display_progress_inactive);
         }
     }
 

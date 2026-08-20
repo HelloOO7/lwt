@@ -17,7 +17,7 @@ public record LwdnScanResult(
         Map<LwdnServiceID, byte[]> serviceData
 ) implements Parcelable {
 
-    static final Creator<LwdnScanResult> CREATOR = new Creator<>() {
+    public static final Creator<LwdnScanResult> CREATOR = new Creator<>() {
         @Override
         public LwdnScanResult createFromParcel(Parcel in) {
             LwdnAddress address = ParcelCompat.readParcelable(in, LwdnAddress.class.getClassLoader(), LwdnAddress.class);

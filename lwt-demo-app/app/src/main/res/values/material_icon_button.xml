@@ -14,7 +14,7 @@
     </style>
     <style name="Ext.MaterialComponents.IconButton.Outlined" parent="Widget.MaterialComponents.Button.OutlinedButton">
         <item name="iconPadding">0dp</item>
-        <item name="iconTint">?attr/colorOnSurface</item>
+        <item name="iconTint">?attr/colorPrimary</item>
         <item name="iconGravity">textStart</item>
         <item name="android:minWidth">0dp</item>
         <item name="strokeColor">@color/mtrl_btn_stroke_color_selector</item>

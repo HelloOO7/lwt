@@ -11,7 +11,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.access.annotation.Secured;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import retrofit2.http.Query;
@@ -31,7 +31,7 @@ public class TicketsController {
     }
 
     @PostMapping("/tickets/new")
-    @PreAuthorize("hasRole('TICKET_ISSUER')")
+    @Secured("TICKET_ISSUER")
     @Operation(
             summary = "Issue a new ticket",
             description = "Create a new ticket for the specified product and holder account. Requires TICKET_ISSUER role.",

@@ -65,4 +65,12 @@
     </declare-styleable>
 
     <attr name="colorPrimaryMuted" />
+
+    <declare-styleable name="TitleBar">
+        <attr name="dividerVisible" format="boolean" />
+        <attr name="dividerThickness" format="dimension" />
+        <attr name="android:text" format="string" />
+        <attr name="android:textSize" format="dimension" />
+        <attr name="android:icon" format="reference" />
+    </declare-styleable>
 </resources>

@@ -3,14 +3,14 @@
     <item android:id="@android:id/background">
         <shape>
             <corners android:radius="@dimen/ticket_progress_bar_corner_radius"/>
-            <solid android:color="@color/ticket_inspection_progress_bg"/>
+            <solid android:color="@color/ticket_display_progress_bg"/>
         </shape>
     </item>
     <item android:id="@android:id/secondaryProgress">
         <scale android:scaleWidth="100%">
             <shape>
                 <corners android:radius="@dimen/ticket_progress_bar_corner_radius"/>
-                <solid android:color="@color/ticket_inspection_progress_bg"/>
+                <solid android:color="@color/ticket_display_progress_bg"/>
             </shape>
         </scale>
     </item>

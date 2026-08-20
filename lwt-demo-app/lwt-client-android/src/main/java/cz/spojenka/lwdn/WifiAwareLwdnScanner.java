@@ -261,6 +261,7 @@ public class WifiAwareLwdnScanner implements LwdnScanner {
             }
         }
 
+        @SuppressWarnings("deprecation")
         private SubscribeConfig createSubscribeConfig(LwdnServiceID.ServiceName serviceName, LwdnScanConfig config) {
             SubscribeConfig.Builder builder = new SubscribeConfig.Builder()
                     .setServiceName(serviceName.name())
@@ -269,7 +270,11 @@ public class WifiAwareLwdnScanner implements LwdnScanner {
                     .setTerminateNotificationEnabled(true);
 
             if (config.hasMaxDistance()) {
-                builder.setMaxDistanceMm(config.getMaxDistanceMm());
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.CINNAMON_BUN) {
+                    builder.setIngressDistanceMm(config.getMaxDistanceMm());
+                } else {
+                    builder.setMaxDistanceMm(config.getMaxDistanceMm());
+                }
             }
 
             return builder.build();

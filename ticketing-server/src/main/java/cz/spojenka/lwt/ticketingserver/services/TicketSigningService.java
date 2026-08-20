@@ -4,6 +4,7 @@ import cz.dpp.praguepublictransport.etd.ETDUtils;
 import cz.dpp.praguepublictransport.etd.LitackaETD;
 import jakarta.annotation.PostConstruct;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.openssl.PEMKeyPair;
 import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
@@ -15,6 +16,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
+import java.util.List;
 import java.util.Objects;
 
 @Service
@@ -22,8 +24,11 @@ public class TicketSigningService {
 
     @Value("${tickets.signing-key-path.priv}")
     private String privSigningKeyPath;
+    @Value("${tickets.signing-key-path.pub}")
+    private String pubSigningKeyPath;
 
     private PrivateKey signingKey;
+    private PublicKey verificationKey;
 
     public TicketSigningService() {
     }
@@ -31,7 +36,13 @@ public class TicketSigningService {
     @PostConstruct
     private void loadSigningKey() throws GeneralSecurityException, IOException {
         Objects.requireNonNull(privSigningKeyPath, "Private signing key path must be set");
+        Objects.requireNonNull(pubSigningKeyPath, "Public signing key path must be set");
         signingKey = loadSigningKeyFromPath(privSigningKeyPath);
+        verificationKey = loadVerificationKeyFromPath(pubSigningKeyPath);
+    }
+
+    public PublicKey getVerificationKey() {
+        return verificationKey;
     }
 
     private static PrivateKey loadSigningKeyFromPath(String path) throws IOException, GeneralSecurityException {
@@ -46,6 +57,24 @@ public class TicketSigningService {
 
             if (object instanceof PrivateKeyInfo privateKeyInfo) {
                 return converter.getPrivateKey(privateKeyInfo);
+            }
+
+            throw new IllegalArgumentException("Unsupported PEM object: " + object.getClass());
+        }
+    }
+
+    private static PublicKey loadVerificationKeyFromPath(String path) throws IOException, GeneralSecurityException {
+        try (PEMParser parser = new PEMParser(new FileReader(path))) {
+            Object object = parser.readObject();
+
+            JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
+
+            if (object instanceof PEMKeyPair keyPair) {
+                return converter.getKeyPair(keyPair).getPublic();
+            }
+
+            if (object instanceof SubjectPublicKeyInfo pubKeyInfo) {
+                return converter.getPublicKey(pubKeyInfo);
             }
 
             throw new IllegalArgumentException("Unsupported PEM object: " + object.getClass());
@@ -92,5 +121,9 @@ public class TicketSigningService {
 
     public byte[] signActivationToken(byte[] activationToken) {
         return signString(activationToken);
+    }
+
+    public List<PublicKey> getAllVerificationKeys() {
+        return List.of(getVerificationKey());
     }
 }

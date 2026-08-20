@@ -13,4 +13,5 @@ spring:
 
 tickets:
   signing-key-path:
+    pub: "../pki/Ticket_signing_key_pub.pem"
     priv: "../pki/Ticket_signing_key_priv.key"

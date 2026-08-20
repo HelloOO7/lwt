@@ -6,6 +6,7 @@
 #include "flatbuffer_util.h"
 #include "Observable.h"
 #include <mutex>
+#include "StringExtensions.h"
 
 namespace lwt {
 
@@ -63,7 +64,13 @@ namespace lwt {
             if (!zones.empty()) {
                 zones += ";";
             }
-            zones += zone.Value;
+            if (zone.Value.contains(":")) {
+                // TVS sends IDS information correctly (as a global identifier), but we are already used
+                // to the "displayable" convention of using a gap, so convert it
+                zones += str_replace(zone.Value, ":", " ");
+            } else {
+                zones += zone.Value;
+            }
         }
         return zones;
     }

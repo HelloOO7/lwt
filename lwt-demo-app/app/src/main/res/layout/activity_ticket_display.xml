@@ -7,30 +7,16 @@
     android:theme="@style/Theme.LWTDemo.EdgeToEdge.QRContrast"
     app:paddingWindowInsets="all">
 
-    <TextView
-        android:id="@+id/tvTitle"
+    <cz.spojenka.lwt.demoapp.TitleBar
+        android:id="@+id/tbTitle"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_gravity="start|center_vertical"
-        android:layout_weight="1"
-        android:text="@string/ticket_inspection_title"
-        android:textSize="@dimen/text_title_l"
+        android:text="@string/ticket_display_title"
         android:layout_marginHorizontal="@dimen/activity_horizontal_margin"
         android:layout_marginTop="@dimen/section_margin_normal"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
-
-    <com.google.android.material.divider.MaterialDivider
-        android:id="@+id/titleDivider"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="@dimen/activity_horizontal_margin"
-        android:layout_marginTop="@dimen/item_margin_normal"
-        app:layout_constraintTop_toBottomOf="@id/tvTitle"
-        app:layout_constraintStart_toStartOf="@id/tvTitle"
-        app:layout_constraintEnd_toEndOf="@id/tvTitle"
-        app:marginWindowInsets="horizontal" />
 
     <TextView
         android:id="@+id/tvClock"
@@ -58,7 +44,7 @@
         android:layout_marginTop="@dimen/section_margin_large"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/titleDivider"
+        app:layout_constraintTop_toBottomOf="@+id/tbTitle"
         tools:srcCompat="@drawable/ic_untrusted_48px" />
 
     <TextView
@@ -90,7 +76,7 @@
         tools:max="100"
         tools:min="0"
         tools:progress="20"
-        tools:progressTint="@color/ticket_inspection_progress_active" />
+        tools:progressTint="@color/ticket_display_progress_active" />
 
     <LinearLayout
         android:id="@+id/llTicketInfoRows"

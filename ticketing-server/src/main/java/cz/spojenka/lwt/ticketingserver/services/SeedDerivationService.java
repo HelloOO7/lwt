@@ -56,6 +56,10 @@ public class SeedDerivationService {
         return DigestUtils.sha256(ArrayUtils.addAll(getTicketSignature(etd), getOrCreateSecretForTime(getSecretTimeForEtd(etd)).getData()));
     }
 
+    public void ensureSecretForCurrentTime() {
+        getOrCreateSecretForTime(Instant.now().getEpochSecond());
+    }
+
     public List<SeedDerivationSecret> getAllSecretsSince(Instant instant) {
         return repository.getAllSince(instant.getEpochSecond());
     }

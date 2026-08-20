@@ -36,6 +36,12 @@
         <item quantity="many">zóny</item>
         <item quantity="other">zóny</item>
     </plurals>
+    <plurals name="zones_pid">
+        <item quantity="one">pásmo</item>
+        <item quantity="few">pásma</item>
+        <item quantity="many">pásma</item>
+        <item quantity="other">pásma</item>
+    </plurals>
     <plurals name="zones_pid_locative">
         <item quantity="one">pásmu</item>
         <item quantity="few">pásmech</item>

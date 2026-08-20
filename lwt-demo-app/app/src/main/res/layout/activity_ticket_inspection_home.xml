@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <cz.spojenka.lwt.demoapp.TitleBar
+        android:id="@+id/tbTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="@dimen/activity_horizontal_margin"
+        android:layout_marginTop="@dimen/activity_vertical_margin"
+        android:text="@string/ticket_inspection_title"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:marginWindowInsets="horizontal|top" />
+
+    <Button
+        android:id="@+id/btnSyncKeys"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="@dimen/activity_vertical_margin"
+        app:marginWindowInsets="bottom"
+        android:text="@string/ticket_inspection_sync_keys"
+        app:icon="@drawable/ic_cloud_download_24px"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/llSpringboard"
+        app:layout_constraintVertical_bias="1.0" />
+
+    <LinearLayout
+        android:id="@+id/llSpringboard"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintWidth_max="wrap"
+        app:layout_constraintVertical_chainStyle="packed"
+        app:layout_constraintBottom_toTopOf="@id/tvVehicleInfo"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tbTitle">
+
+        <Button
+            android:id="@+id/btnScanTicketQR"
+            style="@style/Theme.LWTDemo.TicketInspectionHome.SpringboardButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/ticket_inspection_scan_qr"
+            app:icon="@drawable/ic_qr_scan_24px" />
+
+        <Button
+            android:id="@+id/btnLinkVehicle"
+            style="@style/Theme.LWTDemo.TicketInspectionHome.SpringboardButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/ticket_inspection_link_vehicle"
+            app:icon="@drawable/ic_bus_24px" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvVehicleInfo"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/ticket_inspection_vehicle_none"
+        android:textAlignment="center"
+        android:layout_marginTop="@dimen/section_margin_normal"
+        app:layout_constraintEnd_toEndOf="@+id/llSpringboard"
+        app:layout_constraintStart_toStartOf="@+id/llSpringboard"
+        app:layout_constraintTop_toBottomOf="@+id/llSpringboard"
+        app:layout_constraintBottom_toTopOf="@id/btnRefreshVehicleData" />
+
+    <Button
+        android:id="@+id/btnRefreshVehicleData"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/item_margin_normal"
+        android:text="@string/ticket_inspection_vehicle_update"
+        android:visibility="gone"
+        app:icon="@drawable/ic_sync_24px"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="@+id/tvVehicleInfo"
+        app:layout_constraintStart_toStartOf="@+id/tvVehicleInfo"
+        app:layout_constraintTop_toBottomOf="@+id/tvVehicleInfo"
+        tools:visibility="visible" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

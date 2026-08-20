@@ -1,5 +1,6 @@
 package cz.spojenka.lwt;
 
+import android.os.BadParcelableException;
 import android.os.Parcel;
 import android.os.Parcelable;
 
@@ -37,6 +38,26 @@ public sealed abstract class LwtDevice implements Parcelable permits LwtDevice.V
             this.advData = advData;
         }
 
+        public static final Parcelable.Creator<Vehicle> CREATOR = new Parcelable.Creator<>() {
+            @Override
+            public Vehicle createFromParcel(Parcel source) {
+                LwdnScanResult scanResult = ParcelCompat.readParcelable(source, LwdnScanResult.class.getClassLoader(), LwdnScanResult.class);
+                byte[] advDataBytes = source.createByteArray();
+                TripAdvertisementData advData;
+                try {
+                    advData = TripAdvertisementData.unwrap(advDataBytes);
+                } catch (IOException e) {
+                    throw new BadParcelableException(e);
+                }
+                return new Vehicle(scanResult, advData);
+            }
+
+            @Override
+            public Vehicle[] newArray(int size) {
+                return new Vehicle[size];
+            }
+        };
+
         @Override
         public LwtDeviceType getType() {
             return LwtDeviceType.VEHICLE;
@@ -69,25 +90,5 @@ public sealed abstract class LwtDevice implements Parcelable permits LwtDevice.V
                 throw new RuntimeException(e);
             }
         }
-
-        static final Parcelable.Creator<Vehicle> CREATOR = new Parcelable.Creator<>() {
-            @Override
-            public Vehicle createFromParcel(Parcel source) {
-                LwdnScanResult scanResult = ParcelCompat.readParcelable(source, LwdnScanResult.class.getClassLoader(), LwdnScanResult.class);
-                byte[] advDataBytes = source.createByteArray();
-                TripAdvertisementData advData;
-                try {
-                    advData = TripAdvertisementData.unwrap(advDataBytes);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-                return new Vehicle(scanResult, advData);
-            }
-
-            @Override
-            public Vehicle[] newArray(int size) {
-                return new Vehicle[size];
-            }
-        };
     }
 }

@@ -20,6 +20,7 @@ import java.util.function.Predicate;
 import androidx.activity.result.contract.ActivityResultContract;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import cz.dpp.praguepublictransport.LitackaUtils;
 import cz.spojenka.android.ui.activity.SubActivity;
 import cz.spojenka.android.ui.dialog.CommonDialogs;
 import cz.spojenka.android.ui.resources.ListFormat;

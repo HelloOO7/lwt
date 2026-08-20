@@ -12,13 +12,15 @@ import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
+import cz.dpp.praguepublictransport.etd.ETDUtils;
+import cz.dpp.praguepublictransport.etd.LitackaETD;
 import cz.spojenka.android.ui.drawable.QrCodeDrawable;
 import cz.spojenka.lwt.util.PIDTicketTOTP;
 import cz.spojenka.lwt.util.TicketTOTP;
 
-public class TicketInspectionViewModel extends AndroidViewModel {
+public class TicketDisplayViewModel extends AndroidViewModel {
 
-    private static final String TAG = TicketInspectionViewModel.class.getSimpleName();
+    private static final String TAG = TicketDisplayViewModel.class.getSimpleName();
 
     private final MutableLiveData<TicketData> ticketLiveData = new MutableLiveData<>();
     private final MutableLiveData<Drawable> qrDrawable = new MutableLiveData<>();
@@ -30,7 +32,7 @@ public class TicketInspectionViewModel extends AndroidViewModel {
     private TicketData ticket;
     private TicketTOTP totp;
 
-    public TicketInspectionViewModel(@NonNull Application application) {
+    public TicketDisplayViewModel(@NonNull Application application) {
         super(application);
     }
 
@@ -43,10 +45,10 @@ public class TicketInspectionViewModel extends AndroidViewModel {
     }
 
     private String generateQRData() {
-        String etd = ticket.getEtdAsString();
+        LitackaETD etd = LitackaETD.parse(ticket.getEtdAsString());
         String totpPass = totp.generatePasswordString(Instant.now());
-        etd += "X-TOTP:" + totpPass + "*";
-        return etd;
+        etd.setProperty("X-TOTP", totpPass);
+        return etd.encode();
     }
 
     private Drawable createQRDrawable() {

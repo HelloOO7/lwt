@@ -8,6 +8,10 @@
         <item quantity="one">zone</item>
         <item quantity="other">zones</item>
     </plurals>
+    <plurals name="zones_pid">
+        <item quantity="one">zone</item>
+        <item quantity="other">zones</item>
+    </plurals>
     <plurals name="zones_pid_locative">
         <item quantity="one">zone</item>
         <item quantity="other">zones</item>

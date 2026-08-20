@@ -2,6 +2,7 @@ package cz.spojenka.lwdn;
 
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
+import android.os.SystemClock;
 import android.util.Log;
 
 import java.io.IOException;
@@ -29,6 +30,7 @@ public class BluetoothLwdnSocket implements LwdnSocket {
             IOException connectError = null;
             int numRetries = 0;
             for (int i = 0; i < 3; i++) {
+                long connectAttemptStart = SystemClock.elapsedRealtime();
                 try {
                     socket.connect();
                     Thread.sleep(50);
@@ -37,6 +39,10 @@ public class BluetoothLwdnSocket implements LwdnSocket {
                     break;
                 } catch (IOException e) {
                     connectError = e;
+                    if (SystemClock.elapsedRealtime() - connectAttemptStart > 1000) {
+                        // at this point, it is not likely that a radio instability caused this, it is more likely to be a real timeout
+                        break;
+                    }
                 } catch (InterruptedException ignored) {
                     break;
                 }

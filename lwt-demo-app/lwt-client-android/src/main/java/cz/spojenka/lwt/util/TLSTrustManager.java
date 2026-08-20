@@ -13,14 +13,16 @@ import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.Signature;
-import java.security.cert.CertPathValidator;
+import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 
@@ -31,14 +33,18 @@ public class TLSTrustManager {
     private static final String TAG = "TLSTrustManager";
 
     private final CertificateFactory certFactoryX509;
-    private final KeyStore keyStore;
+
+    private KeyStore clientKeyStore;
+    private char[] clientKeyStorePassword;
+    private final KeyStore peerKeyStore;
 
     private TrustManagerFactory tmf;
+    private KeyManagerFactory kmf;
 
     public TLSTrustManager() throws IOException, GeneralSecurityException {
         certFactoryX509 = CertificateFactory.getInstance("X.509");
-        keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
-        keyStore.load(null, null);
+        peerKeyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+        peerKeyStore.load(null, null);
     }
 
     private X509Certificate loadCertificate(InputStream in) throws CertificateException {
@@ -77,35 +83,107 @@ public class TLSTrustManager {
         }
     }
 
+    public KeyStore loadPKCS12(InputStream in, char[] password) throws IOException, GeneralSecurityException {
+        KeyStore keyStore = KeyStore.getInstance("PKCS12");
+        keyStore.load(in, password);
+        return keyStore;
+    }
+
+    public KeyStore loadPKCS12(Context context, @RawRes int resId, char[] password) throws IOException, GeneralSecurityException {
+        try (InputStream in = context.getResources().openRawResource(resId)) {
+            return loadPKCS12(in, password);
+        }
+    }
+
+    public KeyStore loadPKCS12(AssetManager assetManager, String assetPath, char[] password) throws IOException, GeneralSecurityException {
+        try (InputStream in = assetManager.open(assetPath)) {
+            return loadPKCS12(in, password);
+        }
+    }
+
+    public static boolean isWrongPassword(Throwable throwable) {
+        if (throwable instanceof UnrecoverableKeyException || throwable.getCause() instanceof UnrecoverableKeyException) {
+            return true;
+        }
+        if (throwable.getMessage() != null) {
+            // Android's bouncycastle returns rather unhelpful errors
+            if ((throwable instanceof NullPointerException || throwable instanceof IOException) && throwable.getMessage().contains("password")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void addCertificate(Context context, @RawRes int resId, String alias) throws IOException, GeneralSecurityException {
         X509Certificate cert = loadCertificate(context, resId);
-        keyStore.setCertificateEntry(alias, cert);
+        peerKeyStore.setCertificateEntry(alias, cert);
         invalidateTmf();
     }
 
     public void addCertificate(AssetManager assetManager, String assetPath, String alias) throws IOException, GeneralSecurityException {
         X509Certificate cert = loadCertificate(assetManager, assetPath);
-        keyStore.setCertificateEntry(alias, cert);
+        peerKeyStore.setCertificateEntry(alias, cert);
         invalidateTmf();
+    }
+
+    private void addClientKeyImpl(KeyStore keyStore, char[] password) {
+        clientKeyStore = keyStore;
+        clientKeyStorePassword = password;
+        invalidateKmf();
+    }
+
+    public void addClientKey(Context context, @RawRes int pfxResId, String password) throws IOException, GeneralSecurityException {
+        char[] pwdChars = password != null ? password.toCharArray() : null;
+        addClientKeyImpl(loadPKCS12(context, pfxResId, pwdChars), pwdChars);
+    }
+
+    public void addClientKey(AssetManager assetManager, String pfxAssetPath, String password) throws IOException, GeneralSecurityException {
+        char[] pwdChars = password != null ? password.toCharArray() : null;
+        addClientKeyImpl(loadPKCS12(assetManager, pfxAssetPath, pwdChars), pwdChars);
+    }
+
+    public void addClientKey(KeyStore keyStore, String password) {
+        char[] pwdChars = password != null ? password.toCharArray() : null;
+        addClientKeyImpl(keyStore, pwdChars);
     }
 
     private void invalidateTmf() {
         tmf = null;
     }
 
+    private void invalidateKmf() {
+        kmf = null;
+    }
+
     private TrustManagerFactory getTmf() throws NoSuchAlgorithmException, KeyStoreException {
         if (tmf == null) {
             tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-            tmf.init(keyStore);
+            tmf.init(peerKeyStore);
         }
         return tmf;
     }
 
+    private KeyManagerFactory getKmf() throws NoSuchAlgorithmException, UnrecoverableKeyException, KeyStoreException {
+        if (kmf == null) {
+            kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            kmf.init(clientKeyStore, clientKeyStorePassword);
+        }
+        return kmf;
+    }
+
     public SSLContext createSSLContext() throws GeneralSecurityException {
         SSLContext sslContext = SSLContext.getInstance("TLS");
-        sslContext.init(null, getTmf().getTrustManagers(), null);
+        sslContext.init(
+                clientKeyStore != null ? getKmf().getKeyManagers() : null,
+                getTmf().getTrustManagers(),
+                null
+        );
 
         return sslContext;
+    }
+
+    public X509TrustManager getX509TrustManager() throws GeneralSecurityException {
+        return (X509TrustManager) getTmf().getTrustManagers()[0];
     }
 
     public boolean isCertificateChainTrusted(byte[] certChainData) throws GeneralSecurityException, IOException {

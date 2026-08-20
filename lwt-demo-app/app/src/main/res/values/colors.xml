@@ -14,8 +14,12 @@
     <color name="delay_high">#F44336</color>
     <color name="dark_gray">#444444</color>
 
-    <color name="ticket_inspection_progress_active">#129447</color>
-    <color name="ticket_inspection_progress_warn">#d69209</color>
-    <color name="ticket_inspection_progress_inactive">#e02727</color>
-    <color name="ticket_inspection_progress_bg">#ffdadbdf</color>
+    <color name="ticket_display_progress_active">#129447</color>
+    <color name="ticket_display_progress_warn">#d69209</color>
+    <color name="ticket_display_progress_inactive">#e02727</color>
+    <color name="ticket_display_progress_bg">#ffdadbdf</color>
+
+    <color name="light_green">#AAFFAA</color>
+    <color name="spanish_red">#ffe60026</color>
+    <color name="overlay_white">#80FFFFFF</color>
 </resources>

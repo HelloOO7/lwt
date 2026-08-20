@@ -50,7 +50,7 @@ public class TripAdvertisementData {
         writeInt24(dos, tripNumber);
         dos.writeInt(directionCisNumber);
         dos.writeInt(stopCisNumber);
-        int timeUnion = (delay << 22) | (stopDepTime.toSecondOfDay() / 60 << 11) | (stopArrTime.toSecondOfDay() / 60);
+        int timeUnion = (delay << 22) | (convertTime(stopDepTime) << 11) | convertTime(stopArrTime);
         dos.writeInt(timeUnion);
         dos.writeByte(flags);
     }
@@ -149,6 +149,13 @@ public class TripAdvertisementData {
             return null;
         }
         return LocalTime.ofSecondOfDay(bits * 60);
+    }
+
+    private int convertTime(LocalTime time) {
+        if (time == null) {
+            return 2047;
+        }
+        return time.toSecondOfDay() / 60;
     }
 
     private int readInt24(DataInputStream dis) throws IOException {

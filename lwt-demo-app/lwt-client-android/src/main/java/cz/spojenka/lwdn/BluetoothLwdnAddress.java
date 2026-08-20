@@ -57,7 +57,7 @@ public final class BluetoothLwdnAddress implements LwdnAddress {
         return Objects.hash(device, psm);
     }
 
-    static final Creator<BluetoothLwdnAddress> CREATOR = new Creator<>() {
+    public static final Creator<BluetoothLwdnAddress> CREATOR = new Creator<>() {
         @Override
         public BluetoothLwdnAddress createFromParcel(Parcel in) {
             return new BluetoothLwdnAddress(

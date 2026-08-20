@@ -1,7 +1,6 @@
 package cz.spojenka.lwt.demoapp;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
@@ -34,6 +33,7 @@ import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
 import cz.spojenka.android.ui.activity.BaseActivity;
 import cz.spojenka.android.util.AsyncUtils;
+import cz.spojenka.android.util.ViewUtils;
 import cz.spojenka.lwdn.LwdnScanConfig;
 import cz.spojenka.lwdn.LwdnScanException;
 import cz.spojenka.lwt.*;
@@ -58,7 +58,7 @@ public class MainActivity extends BaseActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         binding = ActivityMainBinding.inflate(getLayoutInflater());
-        setContentView(binding.getRoot());
+        setContentView(ViewUtils.wrapInScrollView(binding.getRoot()));
         setButtonsEnabled(false);
         sslContext = createSSLContext();
         lwtScanner = new LwtDeviceScanner(this, GlobalLwtScanner.getInstance(getApplication()).getLinkSession());
@@ -118,6 +118,15 @@ public class MainActivity extends BaseActivity {
                             )
             );
         });
+
+        binding.btnRunTicketInspection.setOnClickListener(v -> startActivity(new Intent(this, TicketInspectionHomeActivity.class)));
+
+        binding.btnSetClientCert.setOnClickListener(v -> startActivity(
+                new Intent(this, ClientCertImportActivity.class)
+                        .putExtra(ClientCertImportActivity.EXTRA_TARGET_ALIAS, GlobalTrustManager.APP_CLIENT_KEY_ALIAS)
+        ));
+
+        Log.d(TAG, "Client key present: " + GlobalTrustManager.isClientKeyPresent());
     }
 
     private void testNanDatapath() {

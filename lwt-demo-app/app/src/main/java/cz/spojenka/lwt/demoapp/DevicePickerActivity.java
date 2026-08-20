@@ -2,11 +2,13 @@ package cz.spojenka.lwt.demoapp;
 
 import android.content.Context;
 import android.content.Intent;
+import android.os.Bundle;
 
 import androidx.activity.result.contract.ActivityResultContract;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.IntentCompat;
+import androidx.lifecycle.ViewModelProvider;
 import cz.spojenka.lwt.LwtDevice;
 import cz.spojenka.lwt.LwtDeviceType;
 
@@ -18,7 +20,7 @@ public class DevicePickerActivity extends DeviceListActivity {
         @NonNull
         @Override
         public Intent createIntent(@NonNull Context context, LwtDeviceType[] lwtDeviceTypes) {
-            return new Intent(context, DeviceListActivity.class).putExtra(EXTRA_DEVICE_TYPE_FILTER, lwtDeviceTypes);
+            return new Intent(context, DevicePickerActivity.class).putExtra(EXTRA_DEVICE_TYPE_FILTER, lwtDeviceTypes);
         }
 
         @Override
@@ -29,6 +31,13 @@ public class DevicePickerActivity extends DeviceListActivity {
             return null;
         }
     };
+
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        DeviceListViewModel vm = new ViewModelProvider(this).get(DeviceListViewModel.class);
+        vm.setUseContinuousScan(true);
+        super.onCreate(savedInstanceState);
+    }
 
     @Override
     protected void onDeviceSelected(LwtDevice device) {

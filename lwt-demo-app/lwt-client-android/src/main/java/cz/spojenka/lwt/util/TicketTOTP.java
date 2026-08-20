@@ -24,6 +24,10 @@ public class TicketTOTP {
         }
     }
 
+    public Duration getRefreshInterval() {
+        return totp.getTimeStep();
+    }
+
     public int generatePassword(Instant time) {
         try {
             return totp.generateOneTimePassword(secretKey, time);

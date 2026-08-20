@@ -15,6 +15,10 @@
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
         android:allowBackup="true"
@@ -42,7 +46,10 @@
         <activity android:name=".LitackaZonePickerActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
         <activity android:name=".TripStopPickerActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
         <activity android:name=".TicketActivationActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
-        <activity android:name=".TicketInspectionActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge.QRContrast" />
+        <activity android:name=".TicketDisplayActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge.QRContrast" />
+        <activity android:name=".ClientCertImportActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
+        <activity android:name=".ZxingScanActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
+        <activity android:name=".TicketInspectionHomeActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
     </application>
 
 </manifest>
