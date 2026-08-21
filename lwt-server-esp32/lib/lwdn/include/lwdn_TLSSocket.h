@@ -37,6 +37,7 @@ namespace lwdn {
          */
         std::unique_ptr<Socket> ExtractBaseSocket();
 
+        mbedtls_ssl_context& GetSSLContext();
         bool IsCloseNotifyReceived() const;
 
         int Write(const void* data, size_t len, size_t* sentLen = nullptr) override;

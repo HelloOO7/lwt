@@ -40,6 +40,11 @@ namespace lwdn {
         return std::move(m_Base);
     }
 
+    mbedtls_ssl_context& TLSSocket::GetSSLContext()
+    {
+        return m_SSLContext;
+    }
+
     bool TLSSocket::IsCloseNotifyReceived() const
     {
         return m_ReceivedCloseNotify;

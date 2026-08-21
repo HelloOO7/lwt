@@ -5,6 +5,7 @@
 #include "flatbuffer_util.h"
 #include "esp_log.h"
 #include <cstdio>
+#include "lwt_CertRoleInterceptor.h"
 
 namespace lwt {
 
@@ -14,7 +15,7 @@ namespace lwt {
 
     }
 
-    lwtp::PacketData ApplicationServer::ServeRequest(const lwtp::PacketData& request) {
+    lwtp::PacketData ApplicationServer::ServeRequest(lwtp::Server::SocketSession& session, const lwtp::PacketData& request) {
         // debug
         printf("request: ");
         for (auto& byte : request) {
@@ -24,7 +25,7 @@ namespace lwt {
 
         const RequestPacket* requestFb = GetAndVerify<RequestPacket>(request);
         auto responseBuilder = PSRAMFlatBufferBuilder();
-        
+
         int32_t statusCode = 200;
         flatbuffers::Offset<flatbuffers::Vector<uint8_t>> dataOffset = 0;
 
@@ -33,18 +34,33 @@ namespace lwt {
             statusCode = 400; // Bad Request
         }
         else {
-            if (m_ServiceRegistry.IsServiceRegistered((Operation)requestFb->operation_id())) {
-                try {
-                    const auto& operationService = m_ServiceRegistry.GetService((Operation)requestFb->operation_id());
-                    auto opResult = operationService(*requestFb);
-                    statusCode = opResult.GetStatus();
-                    if (!opResult.GetResponseData().empty()) {
-                        dataOffset = responseBuilder.CreateVector(std::move(opResult.GetResponseData()));
+            Operation operationId = (Operation)requestFb->operation_id();
+            if (m_ServiceRegistry.IsServiceRegistered(operationId)) {
+                CertRole ownedRoles = CertRole::NONE;
+                {
+                    int ownedRolesRaw = 0;
+                    if (session.GetTag(&CERT_ROLE_MASK_TAG, &ownedRolesRaw)) {
+                        ownedRoles = (CertRole)ownedRolesRaw;
                     }
                 }
-                catch (const std::exception& ex) {
-                    ESP_LOGE("ApplicationServer", "Error processing request for operation ID %u - %s", requestFb->operation_id(), ex.what());
-                    statusCode = 500; // Internal Server Error
+
+                if (!m_ServiceRegistry.CheckOperationAccess(operationId, ownedRoles)) {
+                    ESP_LOGW("ApplicationServer", "Access denied for operation ID %u; owned roles: %u", requestFb->operation_id(), ownedRoles);
+                    statusCode = 403; // Forbidden
+                }
+                else {
+                    try {
+                        const auto& operationService = m_ServiceRegistry.GetService(operationId);
+                        auto opResult = operationService(*requestFb);
+                        statusCode = opResult.GetStatus();
+                        if (!opResult.GetResponseData().empty()) {
+                            dataOffset = responseBuilder.CreateVector(std::move(opResult.GetResponseData()));
+                        }
+                    }
+                    catch (const std::exception& ex) {
+                        ESP_LOGE("ApplicationServer", "Error processing request for operation ID %u - %s", requestFb->operation_id(), ex.what());
+                        statusCode = 500; // Internal Server Error
+                    }
                 }
             }
             else {
@@ -53,7 +69,7 @@ namespace lwt {
             }
         }
 
-        responseBuilder.Finish(CreateResponsePacket(responseBuilder, statusCode, dataOffset));        
+        responseBuilder.Finish(CreateResponsePacket(responseBuilder, statusCode, dataOffset));
 
         return SerializeFlatBuffer(responseBuilder);
     }

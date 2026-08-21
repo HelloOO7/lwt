@@ -5,6 +5,7 @@
 #include <vector>
 #include <utility>
 #include "PSRAMContainers.h"
+#include "lwt_CertRole.h"
 
 namespace lwt {
 
@@ -27,9 +28,14 @@ namespace lwt {
 
     class ServiceRegistry {
     private:
+        struct Registration {
+            OperationFunction m_Callback;
+            CertRole m_RequiredRole{ CertRole::NONE };
+        };
+
         size_t m_OperationMin;
         size_t m_OperationMax;
-        std::vector<OperationFunction> m_OperationCallbacks;
+        std::vector<Registration> m_Operations;
         std::vector<char> m_OperationRegisteredBitmap;
 
     public:
@@ -37,8 +43,8 @@ namespace lwt {
         ServiceRegistry(TOperation operationMin, TOperation operationMax) :
             m_OperationMin(std::to_underlying(operationMin)),
             m_OperationMax(std::to_underlying(operationMax)),
-            m_OperationCallbacks(std::to_underlying(operationMax) - std::to_underlying(operationMin) + 1, NoOpOperation),
-            m_OperationRegisteredBitmap(m_OperationCallbacks.size(), false)
+            m_Operations(std::to_underlying(operationMax) - std::to_underlying(operationMin) + 1, { NoOpOperation, CertRole::NONE }),
+            m_OperationRegisteredBitmap(m_Operations.size(), false)
         {
 
         }
@@ -46,15 +52,16 @@ namespace lwt {
         template<typename TOperation>
         size_t GetOperationIndex(TOperation operation) const {
             auto operationIndex = std::to_underlying(operation) - m_OperationMin;
-            if (operationIndex >= m_OperationCallbacks.size()) {
+            if (operationIndex >= m_Operations.size()) {
                 throw std::out_of_range("Operation ID out of range");
             }
             return operationIndex;
         }
 
         template<typename TOperation, typename TOperationFunc>
-        void RegisterServiceCallback(TOperation operation, TOperationFunc&& func) {
-            m_OperationCallbacks[GetOperationIndex(operation)] = std::forward<TOperationFunc>(func);
+        void RegisterServiceCallback(TOperation operation, TOperationFunc&& func, CertRole requiredRole = CertRole::NONE) {
+            m_Operations[GetOperationIndex(operation)].m_Callback = std::forward<TOperationFunc>(func);
+            m_Operations[GetOperationIndex(operation)].m_RequiredRole = requiredRole;
             m_OperationRegisteredBitmap[GetOperationIndex(operation)] = true;
         }
 
@@ -73,8 +80,18 @@ namespace lwt {
 
         template<typename TOperation>
         const OperationFunction& GetService(TOperation operation) const {
-            return m_OperationCallbacks[GetOperationIndex(operation)];
+            return m_Operations[GetOperationIndex(operation)].m_Callback;
         }
+
+        template<typename TOperation>
+        bool CheckOperationAccess(TOperation operation, CertRole ownedRoles) const {
+            auto requiredRoleMask = m_Operations[GetOperationIndex(operation)].m_RequiredRole;
+            if (requiredRoleMask == CertRole::NONE) {
+                return true;
+            }
+            return (ownedRoles & requiredRoleMask) != CertRole::NONE;
+        }
+
     private:
         static OperationResult NoOpOperation(const RequestPacket& request);
     };

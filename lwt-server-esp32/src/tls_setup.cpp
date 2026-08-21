@@ -3,6 +3,7 @@
 #include <cassert>
 #include "esp_err.h"
 #include "mbedtls/debug.h"
+#include "esp_crt_bundle.h"
 
 TlsEnvironment::TlsEnvironment(const uint8_t* cert_start, const uint8_t* cert_end, const uint8_t* key_start, const uint8_t* key_end) {
     mbedtls_x509_crt_init(&device_cert);
@@ -29,4 +30,6 @@ void setup_tls_config(TlsEnvironment& env, mbedtls_ssl_config& ssl_config) {
 
     assert(mbedtls_ssl_conf_own_cert(&ssl_config, &env.device_cert, &env.device_key) == 0);
     mbedtls_ssl_conf_session_tickets_cb(&ssl_config, mbedtls_ssl_ticket_write, mbedtls_ssl_ticket_parse, &env.tickets);
+    mbedtls_ssl_conf_authmode(&ssl_config, MBEDTLS_SSL_VERIFY_OPTIONAL);
+    esp_crt_bundle_attach(&ssl_config);
 }

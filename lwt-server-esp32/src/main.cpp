@@ -19,7 +19,7 @@
 #include "lwt_ServerAuthenticationService.h"
 #include "lwt_TripInformationService.h"
 #include "lwt_TicketValidationService.h"
-#include "lwtp_StartTLSInterceptor.h"
+#include "lwtp_TLSInterceptor.h"
 #include "lwt_AdvData.h"
 #include "lwdn_BleAdvertiser.h"
 #include "lwt_TripInfoAdvertiser.h"
@@ -39,6 +39,7 @@
 #include "lwdn_WifiNanAdvertiser.h"
 #include "lwdn_WifiNanServer.h"
 #include "NewAndDelete.h"
+#include "lwt_CertRoleInterceptor.h"
 #include <atomic>
 
 static constexpr uint16_t BLE_PSM = 0xD7; // 0x80 + 'W'
@@ -131,6 +132,7 @@ public:
         m_ServiceRegistry.RegisterServices(m_PingService, m_ServerAuthService, m_TripInfoService, m_TicketService);
 
         m_AppServer.AddInterceptor(std::make_unique<lwtp::StartTLSInterceptor>(m_MbedTlsConfig));
+        m_AppServer.AddInterceptor(std::make_unique<lwt::CertRoleInterceptor>());
         m_AppServer.AddSocket(&m_BLEServer, 1, 6144);
         m_AppServer.AddSocket(&m_WifiNanServer, 1, 6144);
     }
