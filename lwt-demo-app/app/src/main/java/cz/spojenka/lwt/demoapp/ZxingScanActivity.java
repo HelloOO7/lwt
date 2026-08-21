@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.ColorStateList;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Vibrator;
 import android.util.Log;
@@ -11,6 +12,7 @@ import android.util.Size;
 import android.view.View;
 
 import androidx.activity.EdgeToEdge;
+import androidx.activity.SystemBarStyle;
 import androidx.activity.result.contract.ActivityResultContract;
 import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
@@ -90,7 +92,7 @@ public class ZxingScanActivity extends AppCompatActivity implements PermissionRe
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        EdgeToEdge.enable(this);
+        EdgeToEdge.enable(this, SystemBarStyle.dark(Color.TRANSPARENT), SystemBarStyle.dark(Color.TRANSPARENT));
         binding = ActivityQrScanBinding.inflate(getLayoutInflater());
         cameraController = new LifecycleCameraController(this);
         viewFinder = binding.viewFinder;

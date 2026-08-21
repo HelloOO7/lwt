@@ -117,7 +117,15 @@
     <string name="ticket_inspection_vehicle_update">Refresh</string>
     <string name="ticket_inspection_syncing_vehicle">Updating data…</string>
     <string name="ticket_inspection_vehicle_lost">Connection with vehicle was lost.</string>
-    <string name="ticket_inspection_vehicle_info_format">Linked with vehicle: line %1$s, %2$s %3$s.</string>
+    <string name="ticket_inspection_vehicle_info_format">Linked with vehicle:\nline %1$s, %2$s %3$s.</string>
     <string name="ticket_inspection_auth_error_title">Authentication failed</string>
     <string name="ticket_inspection_auth_error_desc">Ticket\'s digital signature and/or timestamp did not validate. The ticket may be forged or duplicated.</string>
+    <string name="ticket_inspection_sync_error">Synchronization failed.</string>
+    <string name="ticket_inspection_sync_success">Synchronization complete.</string>
+    <string name="ticket_inspection_detail_title">Ticket details</string>
+    <string name="ticket_inspection_detail_valid_current_zone">Valid in current zone</string>
+    <string name="ticket_inspection_detail_not_valid_current_zone">Not valid in current zone: %1$s</string>
+    <string name="ticket_inspection_detail_not_valid_current_zones">Not valid in any of current zones: %1$s</string>
+    <string name="ticket_inspection_detail_from_current_trip">This connection</string>
+    <string name="ticket_inspection_detail_linsp">Activation vehicle</string>
 </resources>

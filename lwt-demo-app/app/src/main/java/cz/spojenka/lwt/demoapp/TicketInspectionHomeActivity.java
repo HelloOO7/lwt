@@ -1,5 +1,6 @@
 package cz.spojenka.lwt.demoapp;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -10,6 +11,7 @@ import com.google.zxing.BarcodeFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.concurrent.CompletableFuture;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.annotation.NonNull;
@@ -40,6 +42,7 @@ public class TicketInspectionHomeActivity extends BaseActivity {
     private static final String STATE_LINKED_VEHICLE = "linked_vehicle";
     private static final String STATE_CURRENT_VALIDATION_ZONES = "current_validation_zones";
     private static final String STATE_CURRENT_LINE_NAME = "current_line_name";
+    private static final String STATE_CURRENT_TRIP_KEY = "current_trip_key";
 
     private ActivityTicketInspectionHomeBinding binding;
 
@@ -50,6 +53,7 @@ public class TicketInspectionHomeActivity extends BaseActivity {
 
     private LwtDevice linkedVehicle;
     private ArrayList<String> currentValidationZones;
+    private String currentTripKey;
     private String currentLineName;
 
     @Override
@@ -58,17 +62,21 @@ public class TicketInspectionHomeActivity extends BaseActivity {
         binding = ActivityTicketInspectionHomeBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
+        repository = new TicketInspectionRepository(getApplication());
+
         if (savedInstanceState != null) {
             linkedVehicle = BundleCompat.getParcelable(savedInstanceState, STATE_LINKED_VEHICLE, LwtDevice.class);
             currentValidationZones = savedInstanceState.getStringArrayList(STATE_CURRENT_VALIDATION_ZONES);
             currentLineName = savedInstanceState.getString(STATE_CURRENT_LINE_NAME);
+            currentTripKey = savedInstanceState.getString(STATE_CURRENT_TRIP_KEY);
         }
 
         scanQRLauncher = registerForActivityResult(ZxingScanActivity.SCAN_STRING, result -> {
             if (result != null) {
                 try {
+                    Instant time = Instant.now();
                     LitackaETD etd = LitackaETD.parse(result);
-                    if (!repository.verifyTicketAuthenticity(etd, Instant.now())) {
+                    if (!repository.verifyTicketAuthenticity(etd, time)) {
                         new MaterialAlertDialogBuilder(this)
                                 .setIcon(R.drawable.ic_untrusted_48px)
                                 .setTitle(R.string.ticket_inspection_auth_error_title)
@@ -76,7 +84,13 @@ public class TicketInspectionHomeActivity extends BaseActivity {
                                 .setPositiveButton(R.string.ok, null)
                                 .show();
                     } else {
-
+                        startActivity(
+                                new Intent(this, TicketInspectionDetailActivity.class)
+                                        .putExtra(TicketInspectionDetailActivity.EXTRA_ETD, result)
+                                        .putExtra(TicketInspectionDetailActivity.EXTRA_INSPECTION_TIME, time.toEpochMilli())
+                                        .putStringArrayListExtra(TicketInspectionDetailActivity.EXTRA_INSPECTION_ZONES, currentValidationZones)
+                                        .putExtra(TicketInspectionDetailActivity.EXTRA_INSPECTION_TK, currentTripKey)
+                        );
                     }
                 } catch (IllegalArgumentException ex) {
                     Log.e(TAG, "Failed to parse QR code: " + result, ex);
@@ -91,14 +105,10 @@ public class TicketInspectionHomeActivity extends BaseActivity {
             }
         });
 
-        repository = new TicketInspectionRepository(getApplication());
-
-        binding.btnSyncKeys.setOnClickListener(v -> {
-            ProgressDialog.doInBackground(this, R.string.ticket_inspection_syncing_keys, repository.syncWithRemoteAsync());
-        });
+        binding.btnSyncKeys.setOnClickListener(v -> syncKeys(true));
 
         binding.btnScanTicketQR.setOnClickListener(v -> {
-            scanQRLauncher.launch(BarcodeFormat.QR_CODE);
+            ensureNewestKeysAndRun(() -> scanQRLauncher.launch(BarcodeFormat.QR_CODE));
         });
 
         binding.btnLinkVehicle.setOnClickListener(v -> {
@@ -114,12 +124,36 @@ public class TicketInspectionHomeActivity extends BaseActivity {
         updateVehicleInfoUI();
     }
 
+    private void ensureNewestKeysAndRun(Runnable callback) {
+        if (repository.hasSecretForTime(Instant.now())) {
+            callback.run();
+        } else {
+            syncKeys(false).thenAcceptAsync(unused -> callback.run(), getLifecycleExecutor());
+        }
+    }
+
+    private CompletableFuture<Void> syncKeys(boolean showOkDialog) {
+        return ProgressDialog
+                .doInBackground(this, R.string.ticket_inspection_syncing_keys, repository.syncWithRemoteAsync())
+                .whenCompleteAsync((unused, throwable) -> {
+                    if (throwable != null) {
+                        Log.e(TAG, "Failed to sync keys with remote", throwable);
+                        CommonDialogs.newInfoDialog(this, R.string.error, R.string.ticket_inspection_sync_error);
+                    } else {
+                        if (showOkDialog) {
+                            CommonDialogs.newInfoDialog(this, 0, R.string.ticket_inspection_sync_success);
+                        }
+                    }
+                }, getLifecycleExecutor());
+    }
+
     @Override
     protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putParcelable(STATE_LINKED_VEHICLE, linkedVehicle);
         outState.putStringArrayList(STATE_CURRENT_VALIDATION_ZONES, currentValidationZones);
         outState.putString(STATE_CURRENT_LINE_NAME, currentLineName);
+        outState.putString(STATE_CURRENT_TRIP_KEY, currentTripKey);
     }
 
     private void updateVehicleData() {
@@ -157,7 +191,13 @@ public class TicketInspectionHomeActivity extends BaseActivity {
                 }
             }
         }
-        currentLineName = TextMarkupConverter.toPlainText(validationInfo.trip().trip().line().name(), false);
+        var trip = validationInfo.trip().trip();
+        currentLineName = TextMarkupConverter.toPlainText(trip.line().name(), false);
+        currentTripKey = Long.toString(trip.line().globalRefId());
+        if (trip.globalRefId() > 0) {
+            currentLineName += "/" + trip.globalRefId();
+            currentTripKey += "/" + trip.globalRefId();
+        }
         updateVehicleInfoUI();
     }
 

@@ -116,7 +116,15 @@
     <string name="ticket_inspection_syncing_vehicle">Aktualizuji data…</string>
     <string name="ticket_inspection_vehicle_none">Není propojeno s vozidlem</string>
     <string name="ticket_inspection_vehicle_lost">Spojení s vozidlem bylo ztraceno.</string>
-    <string name="ticket_inspection_vehicle_info_format">Spojeno s vozidlem: linka %1$s, %2$s %3$s.</string>
+    <string name="ticket_inspection_vehicle_info_format">Spojeno s vozidlem:\nspoj %1$s, %2$s %3$s.</string>
     <string name="ticket_inspection_auth_error_title">Ověření selhalo</string>
     <string name="ticket_inspection_auth_error_desc">Digitální podpis a/nebo časové razítko jízdenky nesouhlasí. Možná je nepravá nebo duplikovaná.</string>
+    <string name="ticket_inspection_sync_error">Synchronizace se nezdařila.</string>
+    <string name="ticket_inspection_sync_success">Synchronizace dokončena.</string>
+    <string name="ticket_inspection_detail_title">Podrobnosti jízdenky</string>
+    <string name="ticket_inspection_detail_valid_current_zone">Platí v aktuálním pásmu</string>
+    <string name="ticket_inspection_detail_not_valid_current_zone">Neplatí v aktuálním pásmu: %1$s</string>
+    <string name="ticket_inspection_detail_not_valid_current_zones">Neplatí v žádném z akt. pásem: %1$s</string>
+    <string name="ticket_inspection_detail_from_current_trip">Tento spoj</string>
+    <string name="ticket_inspection_detail_linsp">Označující linkospoj</string>
 </resources>

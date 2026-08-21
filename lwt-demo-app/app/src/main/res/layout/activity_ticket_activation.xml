@@ -45,7 +45,6 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="end|center_vertical"
                     android:background="@drawable/fast_activation_countdown_pill"
-                    android:foreground="?android:attr/selectableItemBackground"
                     android:gravity="center"
                     android:textColor="@color/white"
                     app:drawableStartCompat="@drawable/ic_bolt_boost_24px"

@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.res.ColorStateList;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.TextView;
 
 import com.google.android.material.color.MaterialColors;
 import com.google.android.material.shape.ShapeAppearanceModel;
@@ -13,6 +14,8 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 import androidx.annotation.ColorInt;
@@ -31,12 +34,10 @@ public class TicketDisplayActivity extends BaseActivity {
 
     public static final String EXTRA_TICKET = TicketDisplayActivity.class.getName() + ".EXTRA_TICKET";
 
-    private static final DateTimeFormatter CLOCK_FORMAT = DateTimeFormatter.ofPattern("d.M.yyyy HH:mm:ss");
-
     private ActivityTicketDisplayBinding binding;
     private TicketDisplayViewModel viewModel;
 
-    private TickNotifier clockTicker;
+    private ClockView clockView;
     private TickNotifier qrTicker;
 
     private TicketData ticketForClock;
@@ -47,7 +48,8 @@ public class TicketDisplayActivity extends BaseActivity {
         binding = ActivityTicketDisplayBinding.inflate(getLayoutInflater());
         setContentView(ViewUtils.wrapInScrollView(binding.getRoot()));
 
-        clockTicker = new TickNotifier(this, this::updateClockAndProgress, 1000);
+        clockView = new ClockView(binding.tvClock);
+        clockView.addClockCallback(this::updateProgressBar);
 
         EdgeSpinnerDrawable qrLoading = new EdgeSpinnerDrawable(
                 ShapeAppearanceModel.builder()
@@ -84,7 +86,7 @@ public class TicketDisplayActivity extends BaseActivity {
             addInfoView(R.string.ticket_display_valid_until, DateTimeUtils.formatDateTimeLocalized(ticketData.getValidUntil().toLocalDateTime()));
 
             ticketForClock = ticketData;
-            updateClockAndProgress();
+            updateProgressBar();
         });
     }
 
@@ -93,9 +95,7 @@ public class TicketDisplayActivity extends BaseActivity {
             .withDeclension(DateTimeUtils.DateDeclension.ACCUSATIVE)
             .withWeekdayStyle(DateTimeUtils.WeekdayStyle.NONE);
 
-    private void updateClockAndProgress() {
-        binding.tvClock.setText(CLOCK_FORMAT.format(LocalDateTime.now()));
-
+    private void updateProgressBar() {
         if (ticketForClock != null && ticketForClock.getActivatedAt() != null) {
             Context context = this;
             OffsetDateTime now = OffsetDateTime.now();
@@ -172,14 +172,47 @@ public class TicketDisplayActivity extends BaseActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        clockTicker.register();
+        clockView.register();
         qrTicker.register();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        clockTicker.unregister();
+        clockView.unregister();
         qrTicker.unregister();
+    }
+
+    public static class ClockView {
+
+        private static final DateTimeFormatter CLOCK_FORMAT = DateTimeFormatter.ofPattern("d.M.yyyy HH:mm:ss");
+
+        private final TextView textView;
+        private final TickNotifier tickNotifier;
+        private final List<Runnable> callbacks = new ArrayList<>();
+
+        public ClockView(TextView textView) {
+            this.textView = textView;
+            this.tickNotifier = new TickNotifier(textView.getContext(), this::updateClock, 1000);
+        }
+
+        public void addClockCallback(Runnable callback) {
+            callbacks.add(callback);
+        }
+
+        private void updateClock() {
+            textView.setText(CLOCK_FORMAT.format(LocalDateTime.now()));
+            for (Runnable callback : callbacks) {
+                callback.run();
+            }
+        }
+
+        public void register() {
+            tickNotifier.register();
+        }
+
+        public void unregister() {
+            tickNotifier.unregister();
+        }
     }
 }

@@ -50,6 +50,7 @@
         <activity android:name=".ClientCertImportActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
         <activity android:name=".ZxingScanActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
         <activity android:name=".TicketInspectionHomeActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
+        <activity android:name=".TicketInspectionDetailActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
     </application>
 
 </manifest>

@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
@@ -289,6 +290,10 @@ public class TicketActivationActivity extends BaseActivity {
                 binding.fabConfirm.setIcon(defaultBtnActivateIcon);
                 binding.fabConfirm.setForeground(null);
                 binding.fabConfirm.setClickable(true);
+                if (viewModel.isActivationSuccessful()) {
+                    // do not allow clicking again when the activity is finishing
+                    binding.fabConfirm.setEnabled(false);
+                }
             }
         });
 
@@ -557,7 +562,7 @@ public class TicketActivationActivity extends BaseActivity {
                     .setDuration(500)
                     .setInterpolator(interpolator);
 
-            GradientDrawable background = (GradientDrawable) pill.getBackground();
+            GradientDrawable background = (GradientDrawable) ((RippleDrawable) pill.getBackground()).getDrawable(0);
 
             corners = ValueAnimator.ofFloat(defaultHeight / 2f, pill.getContext().getResources().getDimensionPixelSize(R.dimen.section_margin_normal));
 

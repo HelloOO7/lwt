@@ -960,7 +960,6 @@ public class TicketActivationViewModel extends AndroidViewModel {
         );
         currentActivationCall = resultFuture;
         resultFuture.whenCompleteAsync((result, throwable) -> {
-            isActivationInProgress.setValue(false);
             currentActivationCall = null;
             if (throwable != null) {
                 Log.e(TAG, "Failed to activate ticket via LWT", throwable);
@@ -975,6 +974,7 @@ public class TicketActivationViewModel extends AndroidViewModel {
                 activatedTicket.setChosenZones(info.zones());
                 activationResult.setValue(activatedTicket);
             }
+            isActivationInProgress.setValue(false);
         }, getApplication().getMainExecutor());
 
         secureLwtClient.executeAsync(lwtRequestThread);
@@ -986,6 +986,10 @@ public class TicketActivationViewModel extends AndroidViewModel {
 
     public LiveData<TicketData> getActivationResult() {
         return activationResult;
+    }
+
+    public boolean isActivationSuccessful() {
+        return activationResult.getValue() != null;
     }
 
     public LiveData<Throwable> getActivationError() {

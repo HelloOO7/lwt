@@ -175,11 +175,15 @@ public class TicketInspectionRepository {
 
     private byte[] getInspectionSecretForTime(Instant time) {
         for (InspectionSecretResponse secret : getInspectionSecrets()) {
-            if (!secret.validFrom.isAfter(time) && !secret.validTo.isBefore(time)) {
+            if (!secret.validFrom.isAfter(time) && time.isBefore(secret.validTo)) {
                 return secret.data;
             }
         }
         return null;
+    }
+
+    public boolean hasSecretForTime(Instant time) {
+        return getInspectionSecretForTime(time) != null;
     }
 
     public boolean verifyTicketAuthenticity(LitackaETD ticketData, Instant totpInstant) {
