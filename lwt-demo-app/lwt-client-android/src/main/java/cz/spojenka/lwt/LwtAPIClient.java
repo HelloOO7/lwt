@@ -46,85 +46,21 @@ public class LwtAPIClient extends LwtClient {
         return new BluetoothLwdnAddress(device, BLUETOOTH_PSM);
     }
 
-    /**
-     * Enqueues an LWT operation for execution. The operation will be run when execute() is called.
-     *
-     * @param operation the operation, as a LwtAPI method reference, e.g. LwtAPI::ping
-     * @param <T>       the type of the operation result
-     * @return a future that will be completed with the result of the operation once execute() is called
-     */
-    public <T> CompletableFuture<T> enqueue(Function<LwtAPI, CompletableFuture<T>> operation) {
+    private <T> LwtCall<T> newCall(Function<LwtAPI, LwtCall<T>> operation) {
         return operation.apply(api);
     }
 
-    /**
-     * Convenience method to enqueue and immediately execute an LWT operation. This is equivalent to calling
-     * enqueue() followed by execute(). A new LWTP session and LWDN socket will be opened and closed for this operation,
-     * so it is not recommended to use this method for multiple operations in a row, as it will be less
-     * efficient than enqueuing them together and executing once.
-     *
-     * @param operation the operation, as a LwtAPI method reference, e.g. LwtAPI::ping
-     * @param <T>       the type of the operation result
-     * @return a future that will be completed with the result of the operation
-     */
-    public <T> CompletableFuture<T> call(Function<LwtAPI, CompletableFuture<T>> operation) {
-        CompletableFuture<T> future = enqueue(operation);
-        execute();
-        return future;
-    }
-
-    /**
-     * Enqueues an LWT operation that takes a ByteBuffer request. The operation will be run when execute() is called.
-     *
-     * @param operation the operation, as a LwtAPI method reference, e.g. LwtAPI::getTicketValidationInfo
-     * @param request   the ByteBuffer flatbuffer request to pass to the operation
-     * @param <T>       the type of the operation result
-     * @return a future that will be completed with the result of the operation once execute() is called
-     */
-    public <T> CompletableFuture<T> enqueue(BiFunction<LwtAPI, ByteBuffer, CompletableFuture<T>> operation, ByteBuffer request) {
+    private <T> LwtCall<T> newCall(BiFunction<LwtAPI, ByteBuffer, LwtCall<T>> operation, ByteBuffer request) {
         return operation.apply(api, request);
     }
 
-    /**
-     * Convenience method to enqueue and immediately execute an LWT operation that takes a ByteBuffer request. This is equivalent to calling
-     * enqueue() followed by execute(). A new LWTP session and LWDN socket will be opened and closed for this operation,
-     * so it is not recommended to use this method for multiple operations in a row, as it will be less
-     * efficient than enqueuing them together and executing once.
-     *
-     * @param operation the operation, as a LwtAPI method reference, e.g. LwtAPI::getTicketValidationInfo
-     * @param request   the ByteBuffer flatbuffer request to pass to the operation
-     * @param <T>       the type of the operation result
-     * @return a future that will be completed with the result of the operation
-     */
-    public <T> CompletableFuture<T> call(BiFunction<LwtAPI, ByteBuffer, CompletableFuture<T>> operation, ByteBuffer request) {
-        CompletableFuture<T> future = enqueue(operation, request);
-        execute();
-        return future;
-    }
-
-    private <T> CompletableFuture<T> enqueueOrCall(Function<LwtAPI, CompletableFuture<T>> operation, CommType comm) {
-        if (comm == CommType.ENQUEUE) {
-            return enqueue(operation);
-        } else {
-            return call(operation);
-        }
-    }
-
-    private <T> CompletableFuture<T> enqueueOrCall(BiFunction<LwtAPI, ByteBuffer, CompletableFuture<T>> operation, ByteBuffer request, CommType comm) {
-        if (comm == CommType.ENQUEUE) {
-            return enqueue(operation, request);
-        } else {
-            return call(operation, request);
-        }
-    }
-
-    public CompletableFuture<PingResponse> ping(CommType comm) {
-        return enqueueOrCall(LwtAPI::ping, comm);
+    public LwtCall<PingResponse> ping() {
+        return newCall(LwtAPI::ping);
     }
 
     private static final byte[] SERVER_CHALLENGE_SALT = "LwtServerAuthentication".getBytes(StandardCharsets.US_ASCII);
 
-    public CompletableFuture<Boolean> authenticateServer(TLSTrustManager trustManager, CommType comm) {
+    public LwtCall<Boolean> authenticateServer(TLSTrustManager trustManager) {
         byte[] challenge = new byte[32];
         random.nextBytes(challenge);
         FlatBufferBuilder builder = new FlatBufferBuilder();
@@ -134,8 +70,8 @@ public class LwtAPIClient extends LwtClient {
                         ServerAuthenticationRequest.createChallengeVector(builder, challenge)
                 )
         );
-        CompletableFuture<ServerAuthenticationResponse> responseFuture = enqueueOrCall(LwtAPI::authenticateServer, builder.dataBuffer(), comm);
-        return responseFuture.thenApply(authResponse -> {
+        LwtCall<ServerAuthenticationResponse> responseFuture = newCall(LwtAPI::authenticateServer, builder.dataBuffer());
+        return responseFuture.map(authResponse -> {
             try {
                 byte[] saltedChallenge = new byte[SERVER_CHALLENGE_SALT.length + challenge.length];
                 System.arraycopy(SERVER_CHALLENGE_SALT, 0, saltedChallenge, 0, SERVER_CHALLENGE_SALT.length);
@@ -163,12 +99,12 @@ public class LwtAPIClient extends LwtClient {
         });
     }
 
-    public CompletableFuture<TripRouteInfo> getTripRouteInfo(CommType comm) {
-        return enqueueOrCall(LwtAPI::getTripRouteInfo, comm);
+    public LwtCall<TripRouteInfo> getTripRouteInfo() {
+        return newCall(LwtAPI::getTripRouteInfo);
     }
 
-    public CompletableFuture<TicketValidationInfo> getTicketValidationInfo(CommType comm) {
-        return enqueueOrCall(LwtAPI::getTicketValidationInfo, comm);
+    public LwtCall<TicketValidationInfo> getTicketValidationInfo() {
+        return newCall(LwtAPI::getTicketValidationInfo);
     }
 
     private ByteBuffer createPreauthorizationTokensRequest(List<byte[]> activationTokenHashes) {
@@ -186,12 +122,12 @@ public class LwtAPIClient extends LwtClient {
         return builder.dataBuffer();
     }
 
-    public CompletableFuture<Map<byte[], TokenWithExpiration<PreauthorizationTokenResult>>> requestPreauthorizationTokens(List<byte[]> activationTokenHashes, CommType comm) {
-        CompletableFuture<PreauthorizationTokenResponse> responseFuture = enqueueOrCall(LwtAPI::createPreauthorizationToken, createPreauthorizationTokensRequest(activationTokenHashes), comm);
+    public LwtCall<Map<byte[], TokenWithExpiration<PreauthorizationTokenResult>>> requestPreauthorizationTokens(List<byte[]> activationTokenHashes) {
+        LwtCall<PreauthorizationTokenResponse> responseFuture = newCall(LwtAPI::createPreauthorizationToken, createPreauthorizationTokensRequest(activationTokenHashes));
         RTTExecutionObserver rtt = new RTTExecutionObserver(responseFuture);
         addExecutionObserver(rtt);
-        responseFuture.whenCompleteAsync((r, e) -> removeExecutionObserver(rtt));
-        return responseFuture.thenApply(response -> {
+        responseFuture.onFinished(() -> removeExecutionObserver(rtt));
+        return responseFuture.map(response -> {
             RemoteTime remoteTime = new RemoteTime(rtt.getRoundTripStartTime(), Instant.ofEpochMilli(response.issuedAt()), rtt.getRoundTripDuration());
 
             Instant issuedAt = remoteTime.remoteToLocal(Instant.ofEpochMilli(response.issuedAt()));
@@ -212,12 +148,12 @@ public class LwtAPIClient extends LwtClient {
         });
     }
 
-    public CompletableFuture<TokenWithExpiration<PreauthorizationTokenResult>> requestPreauthorizationToken(byte[] activationToken, CommType comm) {
-        return requestPreauthorizationTokens(List.of(activationToken), comm)
-                .thenApply(tokenMap -> tokenMap.get(activationToken));
+    public LwtCall<TokenWithExpiration<PreauthorizationTokenResult>> requestPreauthorizationToken(byte[] activationToken) {
+        return requestPreauthorizationTokens(List.of(activationToken))
+                .map(tokenMap -> tokenMap.get(activationToken));
     }
 
-    public CompletableFuture<TicketActivationResponse> activateTicket(TicketActivationParams params, CommType comm) {
+    public LwtCall<TicketActivationResponse> activateTicket(TicketActivationParams params) {
         FlatBufferBuilder builder = new FlatBufferBuilder();
         int activationTokenOffset = ActivationToken.createActivationToken(builder, ActivationToken.createDataVector(builder, params.getActivationToken()));
         int zonesOffset = params.getActivationZones() != null ? builder.createString(String.join(",", params.getActivationZones())) : -1;
@@ -238,6 +174,12 @@ public class LwtAPIClient extends LwtClient {
         }
         builder.finish(TicketActivationRequest.endTicketActivationRequest(builder));
 
-        return enqueueOrCall(LwtAPI::activateTicket, builder.dataBuffer(), comm);
+        return newCall(LwtAPI::activateTicket, builder.dataBuffer());
+    }
+
+    public LwtCall<SetRazziaResponse> setRazzia(boolean razziaState) {
+        FlatBufferBuilder builder = new FlatBufferBuilder();
+        builder.finish(SetRazziaRequest.createSetRazziaRequest(builder, razziaState));
+        return newCall(LwtAPI::setRazzia, builder.dataBuffer());
     }
 }

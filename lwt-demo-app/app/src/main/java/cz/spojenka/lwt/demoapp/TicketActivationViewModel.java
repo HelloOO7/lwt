@@ -17,7 +17,6 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import java.util.function.Function;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLException;
@@ -33,10 +32,11 @@ import cz.spojenka.android.system.livedata.LiveList;
 import cz.spojenka.android.util.AsyncUtils;
 import cz.spojenka.android.util.LiveDataUtils;
 import cz.spojenka.lwdn.LwdnScanException;
-import cz.spojenka.lwt.CommType;
 import cz.spojenka.lwt.LwtAPIClient;
+import cz.spojenka.lwt.LwtCall;
 import cz.spojenka.lwt.LwtDevice;
 import cz.spojenka.lwt.LwtDeviceType;
+import cz.spojenka.lwt.LwtSession;
 import cz.spojenka.lwt.PreauthorizationTokenResult;
 import cz.spojenka.lwt.PreauthorizationTokenStatus;
 import cz.spojenka.lwt.StopReference;
@@ -111,6 +111,12 @@ public class TicketActivationViewModel extends AndroidViewModel {
         devicesViewModel = new DeviceListViewModel(application);
 
         devicesViewModel.setDeviceTypes(List.of(LwtDeviceType.VEHICLE));
+        devicesViewModel.setDeviceFilter(dev -> {
+            if (dev instanceof LwtDevice.Vehicle vehicle) {
+                return vehicle.getAdvData().isCanUseTicketing();
+            }
+            return false;
+        });
         devicesViewModel.setUseContinuousScan(true);
         devicesViewModel.startScan();
 
@@ -242,16 +248,19 @@ public class TicketActivationViewModel extends AndroidViewModel {
             secureLwtClient = lwtClient;
         }
 
+        LwtSession insecureSession = lwtClient.newSession();
+        LwtSession secureSession = secureLwtClient.newSession();
+
         List<CompletableFuture<?>> requestsForLoadingIndicator = new ArrayList<>();
 
-        requestsForLoadingIndicator.add(enqueueDataDownloadRequest(lwtClient::getTicketValidationInfo, deviceValidationInfo).thenAcceptAsync(tvi -> {
+        requestsForLoadingIndicator.add(enqueueDataDownloadRequest(insecureSession, lwtClient.getTicketValidationInfo(), deviceValidationInfo).thenAcceptAsync(tvi -> {
             defaultActivationTimeForTviStop = LwtTime.convertLocalDateTime(tvi.scheduledActivationTime());
             tviActivationStop = tvi.trip().currentDepartureStop();
             forceUseTviStop |= isShouldUseTicketValidationStop(tvi);
             canNotUseTicketWithDevice = checkAllDeviceZonesNotApplicable(tvi);
             commitDefaultActivationStopIfAllData();
         }, getApplication().getMainExecutor()));
-        requestsForLoadingIndicator.add(enqueueDataDownloadRequest(lwtClient::getTripRouteInfo, deviceRouteInfo).thenAcceptAsync(tri -> {
+        requestsForLoadingIndicator.add(enqueueDataDownloadRequest(insecureSession, lwtClient.getTripRouteInfo(), deviceRouteInfo).thenAcceptAsync(tri -> {
             if (!forceUseTviStop) {
                 // tvi may overwrite this if it arrives later
                 defaultActivationStop = calcDefaultActivationStopWithPrepaid(tri);
@@ -259,12 +268,12 @@ public class TicketActivationViewModel extends AndroidViewModel {
             commitDefaultActivationStopIfAllData();
         }, getApplication().getMainExecutor()));
 
-        enqueueDataDownloadRequest((commType) -> secureLwtClient.requestPreauthorizationToken(ticket.getActivationToken(), commType), devicePreauthToken)
+        enqueueDataDownloadRequest(secureSession, secureLwtClient.requestPreauthorizationToken(ticket.getActivationToken()), devicePreauthToken)
                 .thenAcceptAsync(token -> updatePreauthExpirationTime(), getApplication().getMainExecutor());
 
         Log.d(TAG, "Starting async data download from device " + device.getAddress());
-        CompletableFuture<Void> dataDownloadFuture = lwtClient.executeAsync(lwtRequestThread);
-        CompletableFuture<Void> secureDataDownloadFuture = secureLwtClient.executeAsync(lwtRequestThread);
+        CompletableFuture<Void> dataDownloadFuture = insecureSession.executeAsync(lwtRequestThread);
+        CompletableFuture<Void> secureDataDownloadFuture = secureSession.executeAsync(lwtRequestThread);
 
         dataDownloadFuture.whenCompleteAsync((unused, throwable) -> {
             Log.d(TAG, "Cleartext data download completed.");
@@ -484,8 +493,8 @@ public class TicketActivationViewModel extends AndroidViewModel {
         return selectedAutoActivationDevice.getValue();
     }
 
-    private <T> CompletableFuture<T> enqueueDataDownloadRequest(Function<CommType, CompletableFuture<T>> enqueueFunc, MutableLiveData<T> resultsLiveData) {
-        return enqueueFunc.apply(CommType.ENQUEUE).whenCompleteAsync((result, throwable) -> {
+    private <T> CompletableFuture<T> enqueueDataDownloadRequest(LwtSession session, LwtCall<T> call, MutableLiveData<T> resultsLiveData) {
+        return call.enqueue(session).whenCompleteAsync((result, throwable) -> {
             if (AsyncUtils.unwrapCompletionException(throwable) instanceof CancellationException) {
                 // something upstream was cancelled
                 return;
@@ -955,9 +964,8 @@ public class TicketActivationViewModel extends AndroidViewModel {
                         .setActivateNowIfEarlier(info.isCurrentStop())
                         .setActivationZones(info.zones())
                         .setPreauthorizationToken(info.preauthorizationToken())
-                        .build(),
-                CommType.ENQUEUE
-        );
+                        .build()
+        ).executeAsync(lwtRequestThread);
         currentActivationCall = resultFuture;
         resultFuture.whenCompleteAsync((result, throwable) -> {
             currentActivationCall = null;
@@ -976,8 +984,6 @@ public class TicketActivationViewModel extends AndroidViewModel {
             }
             isActivationInProgress.setValue(false);
         }, getApplication().getMainExecutor());
-
-        secureLwtClient.executeAsync(lwtRequestThread);
     }
 
     public LiveData<Boolean> getIsActivationInProgress() {

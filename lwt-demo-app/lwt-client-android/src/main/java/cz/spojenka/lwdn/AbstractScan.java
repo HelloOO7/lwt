@@ -3,7 +3,7 @@ package cz.spojenka.lwdn;
 import java.util.ArrayList;
 import java.util.List;
 
-public abstract class AbstractScan<R, E extends Exception, THIS extends AbstractScan<R, E, THIS>> {
+public abstract class AbstractScan<R extends IScanResult, E extends Exception, THIS extends AbstractScan<R, E, THIS>> {
 
     private final List<R> results = new ArrayList<>();
     private boolean isFinished = false;
@@ -51,14 +51,40 @@ public abstract class AbstractScan<R, E extends Exception, THIS extends Abstract
         return (THIS) this;
     }
 
+    private int findExistingResultIndex(R result) {
+        for (int i = 0; i < results.size(); i++) {
+            if (results.get(i).addressEquals(result)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     protected synchronized void addResult(R result) {
         if (isFinished()) {
             // not accepting any more results
             return;
         }
-        results.add(result);
+        int existingIndex = findExistingResultIndex(result);
+        if (existingIndex != -1) {
+            results.set(existingIndex, result);
+        } else {
+            results.add(result);
+        }
         for (var listener : resultListeners) {
             listener.onResult(getThis(), result);
+        }
+    }
+
+    protected synchronized void removeResult(R result) {
+        if (isFinished()) {
+            // not accepting any more results
+            return;
+        }
+        if (results.removeIf(r -> r.addressEquals(result))) {
+            for (var listener : resultListeners) {
+                listener.onResultLost(getThis(), result);
+            }
         }
     }
 
@@ -108,14 +134,18 @@ public abstract class AbstractScan<R, E extends Exception, THIS extends Abstract
 
     protected abstract void onCancel();
 
-    protected static interface OnResultListener<S extends AbstractScan<R, E, S>, R, E extends Exception> {
+    protected static interface OnResultListener<S extends AbstractScan<R, E, S>, R extends IScanResult, E extends Exception> {
 
         void onResult(S scan, R result);
+
+        default void onResultLost(S scan, R result) {
+            // optional
+        }
 
         void onFailure(S scan, E e);
     }
 
-    protected static interface OnFinishedListener<S extends AbstractScan<R, E, S>, R, E extends Exception> {
+    protected static interface OnFinishedListener<S extends AbstractScan<R, E, S>, R extends IScanResult, E extends Exception> {
 
         void onFinished(S scan);
 

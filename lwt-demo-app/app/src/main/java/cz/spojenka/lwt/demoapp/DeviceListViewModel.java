@@ -6,12 +6,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.Predicate;
 
 import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import cz.spojenka.android.system.livedata.LiveList;
+import cz.spojenka.lwdn.AbstractScan;
 import cz.spojenka.lwdn.LwdnAddress;
 import cz.spojenka.lwdn.LwdnScanException;
 import cz.spojenka.lwt.LwtDevice;
@@ -29,6 +31,7 @@ public class DeviceListViewModel extends AndroidViewModel implements LwtScan.OnR
     private final MutableLiveData<LwdnScanException> scanError = new MutableLiveData<>();
 
     private boolean showInactiveDevies = false;
+    private Predicate<LwtDevice> deviceFilter = dev -> true;
     private final List<LwdnAddress> hiddenAddresses = new ArrayList<>();
 
     public DeviceListViewModel(@NonNull Application application) {
@@ -64,6 +67,10 @@ public class DeviceListViewModel extends AndroidViewModel implements LwtScan.OnR
 
     public void setShowInactiveDevies(boolean showInactiveDevies) {
         this.showInactiveDevies = showInactiveDevies;
+    }
+
+    public void setDeviceFilter(Predicate<LwtDevice> deviceFilter) {
+        this.deviceFilter = deviceFilter;
     }
 
     public void hideDevicesWithAddress(LwdnAddress address) {
@@ -108,7 +115,7 @@ public class DeviceListViewModel extends AndroidViewModel implements LwtScan.OnR
 
     private int getDeviceIndexByAddress(LwtDevice device) {
         for (int i = 0; i < deviceResults.size(); i++) {
-            if (deviceResults.get(i).getAddress().equals(device.getAddress())) {
+            if (deviceResults.get(i).addressEquals(device)) {
                 return i;
             }
         }
@@ -134,7 +141,8 @@ public class DeviceListViewModel extends AndroidViewModel implements LwtScan.OnR
     }
 
     private void insertResult(LwtDevice device) {
-        if (isDeviceHidden(device) || (!showInactiveDevies && isDeviceInactive(device))) {
+        if (isDeviceHidden(device) || (!showInactiveDevies && isDeviceInactive(device)) || !deviceFilter.test(device)) {
+            removeResult(device);
             return;
         }
 
@@ -153,6 +161,13 @@ public class DeviceListViewModel extends AndroidViewModel implements LwtScan.OnR
             insertIndex = -insertIndex - 1;
         }
         deviceResults.add(insertIndex, device);
+    }
+
+    private void removeResult(LwtDevice device) {
+        int existingIndex = getDeviceIndexByAddress(device);
+        if (existingIndex != -1) {
+            deviceResults.remove(existingIndex);
+        }
     }
 
     public void startScan() {
@@ -195,6 +210,11 @@ public class DeviceListViewModel extends AndroidViewModel implements LwtScan.OnR
     @Override
     public void onResult(LwtScan scan, LwtDevice result) {
         insertResult(result);
+    }
+
+    @Override
+    public void onResultLost(LwtScan scan, LwtDevice result) {
+        removeResult(result);
     }
 
     @Override

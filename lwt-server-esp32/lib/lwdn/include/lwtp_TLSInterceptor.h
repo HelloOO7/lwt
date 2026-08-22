@@ -2,17 +2,26 @@
 
 #include "lwtp_Server.h"
 #include "mbedtls/ssl.h"
+#include "lwdn_TLSSocket.h"
 
 namespace lwtp {
 
-    extern Server::SocketSession::Tag TLS_CONTEXT_TAG;
+    extern SocketSession::Tag TLS_CONTEXT_TAG;
+
+    extern SocketInterceptor::Event EVENT_CERT_VERIFY;
+
+    struct TLSEventCertVerify {
+        mbedtls_x509_crt* crt;
+        int depth;
+        uint32_t* flags;
+    };
 
     /**
      * @brief Add this interceptor to a plain text server socket to allow clients to request a TLS upgrade using the START_TLS control command.
      */
     class StartTLSInterceptor : public SocketInterceptor {
     private:
-        mbedtls_ssl_config& m_SSLConfig;
+        lwdn::TLSConfig& m_SSLConfig;
     public:
         /**
          * @brief Create a StartTLSInterceptor. The SSL configuration is not owned by the interceptor - it must
@@ -21,10 +30,10 @@ namespace lwtp {
          *
          * @param sslConfig the SSL config
          */
-        StartTLSInterceptor(mbedtls_ssl_config& sslConfig);
+        StartTLSInterceptor(lwdn::TLSConfig& sslConfig);
 
-        Packet Intercept(Server::SocketSession& session, const Packet& request, SocketInterceptor::Chain& chain) override;
-        int InterceptError(Server::SocketSession& session, int error, SocketInterceptor::Chain& chain) override;
+        Packet Intercept(SocketSession& session, const Packet& request, SocketInterceptor::Chain& chain) override;
+        int InterceptError(SocketSession& session, int error, SocketInterceptor::Chain& chain) override;
     };
 
     /**
@@ -34,12 +43,12 @@ namespace lwtp {
      */
     class ImplicitTLSInterceptor : public SocketInterceptor {
     private:
-        mbedtls_ssl_config& m_SSLConfig;
+        lwdn::TLSConfig& m_SSLConfig;
     public:
-        ImplicitTLSInterceptor(mbedtls_ssl_config& sslConfig);
+        ImplicitTLSInterceptor(lwdn::TLSConfig& sslConfig);
 
-        Packet Intercept(Server::SocketSession& session, const Packet& request, SocketInterceptor::Chain& chain) override;
-        void InterceptOpenSocket(Server::SocketSession& session, SocketInterceptor::Chain& chain) override;
+        Packet Intercept(SocketSession& session, const Packet& request, SocketInterceptor::Chain& chain) override;
+        void InterceptSocketEvent(SocketSession& session, SocketInterceptor::Event* event, void* eventData, SocketInterceptor::Chain& chain) override;
     };
 
     /**
@@ -51,7 +60,7 @@ namespace lwtp {
      */
     class ContextTagTLSInterceptor : public SocketInterceptor {
     public:
-        Packet Intercept(Server::SocketSession& session, const Packet& request, SocketInterceptor::Chain& chain) override;
-        void InterceptOpenSocket(Server::SocketSession& session, SocketInterceptor::Chain& chain) override;
+        Packet Intercept(SocketSession& session, const Packet& request, SocketInterceptor::Chain& chain) override;
+        void InterceptSocketEvent(SocketSession& session, SocketInterceptor::Event* event, void* eventData, SocketInterceptor::Chain& chain) override;
     };
 }

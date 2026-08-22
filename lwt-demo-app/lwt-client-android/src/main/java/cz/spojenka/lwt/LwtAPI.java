@@ -1,28 +1,30 @@
 package cz.spojenka.lwt;
 
 import java.nio.ByteBuffer;
-import java.util.concurrent.CompletableFuture;
 
 public interface LwtAPI {
 
     @LwtOperation(Operation.Ping)
-    public CompletableFuture<PingResponse> ping();
+    public LwtCall<PingResponse> ping();
 
     @LwtOperation(Operation.GetTicketValidationInfo)
-    public CompletableFuture<TicketValidationInfo> getTicketValidationInfo(ByteBuffer request);
+    public LwtCall<TicketValidationInfo> getTicketValidationInfo(ByteBuffer request);
 
     @LwtOperation(Operation.AuthenticateServer)
-    public CompletableFuture<ServerAuthenticationResponse> authenticateServer(ByteBuffer request);
+    public LwtCall<ServerAuthenticationResponse> authenticateServer(ByteBuffer request);
 
     @LwtOperation(Operation.GetTripRouteInfo)
-    public CompletableFuture<TripRouteInfo> getTripRouteInfo();
+    public LwtCall<TripRouteInfo> getTripRouteInfo();
 
     @LwtOperation(Operation.GetTicketValidationInfo)
-    public CompletableFuture<TicketValidationInfo> getTicketValidationInfo();
+    public LwtCall<TicketValidationInfo> getTicketValidationInfo();
 
     @LwtOperation(Operation.CreatePreauthorizationToken)
-    public CompletableFuture<PreauthorizationTokenResponse> createPreauthorizationToken(ByteBuffer request);
+    public LwtCall<PreauthorizationTokenResponse> createPreauthorizationToken(ByteBuffer request);
 
     @LwtOperation(Operation.ActivateTicket)
-    public CompletableFuture<TicketActivationResponse> activateTicket(ByteBuffer request);
+    public LwtCall<TicketActivationResponse> activateTicket(ByteBuffer request);
+
+    @LwtOperation(Operation.SetRazzia)
+    public LwtCall<SetRazziaResponse> setRazzia(ByteBuffer request);
 }

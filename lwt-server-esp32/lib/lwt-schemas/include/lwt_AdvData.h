@@ -10,7 +10,8 @@ namespace lwt {
     struct AdvDataBasic {
         static constexpr uint8_t PACKED_SIZE = 20;
 
-        static constexpr uint8_t FLAG_IS_AT_STOP = 0x1;
+        static constexpr uint8_t FLAG_IS_AT_STOP = (1 << 0);
+        static constexpr uint8_t FLAG_CAN_USE_TICKETING = (1 << 1);
 
         LineType line_type;
         uint32_t line_license_number;

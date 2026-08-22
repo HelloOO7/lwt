@@ -6,6 +6,7 @@
 #include "ticket_validation_generated.h"
 #include <string>
 #include <deque>
+#include <atomic>
 #include "lwt_ServiceRegistry.h"
 #include "lwt_PreauthorizationTokenManager.h"
 #include "lwt_TicketSignatureVerifier.h"
@@ -57,12 +58,17 @@ namespace lwt {
     class TicketValidationService : Observer<TripRouteInfo>, Observer<vdv301::SubscriberTVS::CurrentTariffStop>, Observer<vdv301::SubscriberTVS::RazziaState>
     {
     private:
+        static constexpr int64_t RAZZIA_HEARTBEAT_MAX_SECONDS = 30;
+
         struct ParsedActivationToken {
             static constexpr uint32_t FLAG_DISALLOW_PREAUTH = (1 << 0);
 
             uint64_t TicketId;
             uint32_t Flags;
         };
+
+        static constexpr int RAZZIA_TVS_BIT = (1 << 0);
+        static constexpr int RAZZIA_LOCAL_BIT = (1 << 1);
 
     private:
         TicketValidationConfig m_Config;
@@ -82,7 +88,9 @@ namespace lwt {
         std::string m_TariffZonesForValidation;
         std::vector<std::string> m_NextTariffZonesFromRoute;
         std::string m_NextTariffZonesForValidation;
-        bool m_IsRazzia{ false };
+
+        std::atomic<int> m_IsRazzia{ 0 };
+        int64_t m_LastLocalRazziaOnTime{ 0 };
 
         flatbuffers::FlatBufferBuilder m_ValidationInfoFBB{ PSRAMFlatBufferBuilder() };
 
@@ -119,5 +127,9 @@ namespace lwt {
         void ReadActivationTokenSignature(const ActivationToken& activationToken, ByteSpan* pData, ByteSpan* pSignature, uint32_t* pKeyId);
         SHA256Hash HashActivationToken(const ByteSpan& token);
         ParsedActivationToken ParseActivationToken(const ByteSpan& tokenData);
+
+        bool IsRazziaNoLock();
+        bool SetRazziaBit(int bit, bool value);
+        void ClearLocalRazziaIfExpired();
     };
 }

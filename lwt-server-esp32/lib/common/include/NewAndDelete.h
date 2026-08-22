@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <new>
+#include "esp_heap_caps.h"
 
 /**
  * @brief Initializes the new and delete operators to use the ESP32 heap capabilities.

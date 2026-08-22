@@ -52,7 +52,8 @@ table PreauthorizationToken {
 
 enum PreauthorizationTokenStatus : ubyte {
     Ok,
-    RequestedTooOften
+    RequestedTooOften,
+    RequestedDuringRazzia
 }
 
 table PreauthorizationTokenResult {
@@ -122,4 +123,24 @@ table TicketActivationResponse {
     valid_until_time: LwtOffsetDateTime (required);
     /// Time at which the activation was recorded by the activation server.
     activated_at_time: LwtOffsetDateTime (required);
+}
+
+table SetRazziaRequest {
+    /// Whether to enter or exit ticket inspection razzia mode.
+    /// This will only affect the LWT server. With TicketValidationService,
+    /// it is no longer possible to alter the global razzia state by
+    /// subscribers (unlike the old TicketingService).
+    is_razzia: bool;
+}
+
+table SetRazziaResponse {
+    /// Maximum period in seconds after which the ticket inspection client must
+    /// re-send the SetRazziaRequest to maintain the requested state.
+    /// This is implemented so that a vehicle does not remain in razzia
+    /// mode if a ticket inspector inadvertently forgets to turn off
+    /// the mode, or loses connection.
+    /// The LWT server will turn off the razzia mode immediately after this period expires.
+    /// It is therefore recommended to send the heartbeat at least 5 seconds in advance.
+    /// If the value is 0, it is not needed to send a heartbeat.
+    requested_heartbeat: int;
 }

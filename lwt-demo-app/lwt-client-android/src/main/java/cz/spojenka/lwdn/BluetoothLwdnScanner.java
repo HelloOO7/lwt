@@ -106,6 +106,8 @@ public class BluetoothLwdnScanner implements LwdnScanner {
         private TimeoutScanCallback callback;
         private final LwdnScan scan;
 
+        private final Map<BluetoothLwdnAddress, Runnable> deviceLostTimeoutCallbacks = new HashMap<>();
+
         public ScanController(BluetoothLeScanner scanner, LwdnScan scan) {
             this.scanner = scanner;
             this.scan = scan;
@@ -122,17 +124,24 @@ public class BluetoothLwdnScanner implements LwdnScanner {
                         return;
                     }
 
-                    if (scan.getResultCount() < config.getMaxDevices()) {
-                        if (result.getScanRecord() != null) {
-                            Map<LwdnServiceID, byte[]> serviceData = new HashMap<>();
-                            for (var e : result.getScanRecord().getServiceData().entrySet()) {
-                                serviceData.put(new LwdnServiceID.UUID(e.getKey().getUuid()), e.getValue());
+                    BluetoothLwdnAddress address = new BluetoothLwdnAddress(result.getDevice(), addressPsm);
+
+                    if (callbackType != ScanSettings.CALLBACK_TYPE_MATCH_LOST) {
+                        if (scan.getResultCount() < config.getMaxDevices()) {
+                            if (result.getScanRecord() != null) {
+                                Map<LwdnServiceID, byte[]> serviceData = new HashMap<>();
+                                for (var e : result.getScanRecord().getServiceData().entrySet()) {
+                                    serviceData.put(new LwdnServiceID.UUID(e.getKey().getUuid()), e.getValue());
+                                }
+                                scan.addResult(new LwdnScanResult(address, result.getRssi(), serviceData));
                             }
-                            scan.addResult(new LwdnScanResult(new BluetoothLwdnAddress(result.getDevice(), addressPsm), result.getRssi(), serviceData));
+                            updateDeviceLostTimeout(address, config);
                         }
-                    }
-                    if (scan.getResultCount() >= config.getMaxDevices()) {
-                        stopScan();
+                        if (scan.getResultCount() >= config.getMaxDevices()) {
+                            stopScan();
+                        }
+                    } else {
+                        scan.removeResult(new LwdnScanResult(address, 0, Map.of()));
                     }
                 }
 
@@ -167,6 +176,22 @@ public class BluetoothLwdnScanner implements LwdnScanner {
             } catch (SecurityException ex) {
                 scan.markFailed(new LwdnScanException(ScanErrorCode.NOT_PERMITTED, ex));
             }
+        }
+
+        private void updateDeviceLostTimeout(BluetoothLwdnAddress deviceAddress, LwdnScanConfig config) {
+            if (config.getDeviceLostTimeout() == null) {
+                return;
+            }
+            Runnable currentCallback = deviceLostTimeoutCallbacks.get(deviceAddress);
+            if (currentCallback != null) {
+                handler.removeCallbacks(currentCallback);
+            }
+            Runnable newCallback = () -> {
+                scan.removeResult(new LwdnScanResult(deviceAddress, 0, Map.of()));
+                deviceLostTimeoutCallbacks.remove(deviceAddress);
+            };
+            deviceLostTimeoutCallbacks.put(deviceAddress, newCallback);
+            handler.postDelayed(newCallback, config.getDeviceLostTimeout().toMillis());
         }
 
         private ScanSettings.Builder buildScanSettings(LwdnScanConfig config) {

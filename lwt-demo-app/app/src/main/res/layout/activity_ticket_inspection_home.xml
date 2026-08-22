@@ -71,21 +71,33 @@
         app:layout_constraintEnd_toEndOf="@+id/llSpringboard"
         app:layout_constraintStart_toStartOf="@+id/llSpringboard"
         app:layout_constraintTop_toBottomOf="@+id/llSpringboard"
-        app:layout_constraintBottom_toTopOf="@id/btnRefreshVehicleData" />
+        app:layout_constraintBottom_toTopOf="@id/switchRazzia" />
+
+    <androidx.appcompat.widget.SwitchCompat
+        android:id="@+id/switchRazzia"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        style="?attr/materialSwitchStyle"
+        android:text="@string/ticket_inspection_toggle_razzia"
+        app:switchPadding="@dimen/item_margin_normal"
+        android:layout_marginTop="@dimen/item_margin_normal"
+        app:layout_constraintBottom_toTopOf="@id/btnRefreshVehicleData"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tvVehicleInfo" />
 
     <Button
         android:id="@+id/btnRefreshVehicleData"
         style="@style/Widget.MaterialComponents.Button.OutlinedButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/item_margin_normal"
         android:text="@string/ticket_inspection_vehicle_update"
         android:visibility="gone"
         app:icon="@drawable/ic_sync_24px"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="@+id/tvVehicleInfo"
         app:layout_constraintStart_toStartOf="@+id/tvVehicleInfo"
-        app:layout_constraintTop_toBottomOf="@+id/tvVehicleInfo"
+        app:layout_constraintTop_toBottomOf="@+id/switchRazzia"
         tools:visibility="visible" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

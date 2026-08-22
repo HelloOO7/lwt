@@ -29,6 +29,11 @@ public class LwtScan extends AbstractScan<LwtDevice, LwdnScanException, LwtScan>
             }
 
             @Override
+            public void onResultLost(LwdnScan scan, LwdnScanResult result) {
+                removeResult(new LwtDevice.Vehicle(result, null));
+            }
+
+            @Override
             public void onFailure(LwdnScan lwdnScan, LwdnScanException e) {
                 // ignore - handle in onFinishedListener
             }
@@ -52,6 +57,11 @@ public class LwtScan extends AbstractScan<LwtDevice, LwdnScanException, LwtScan>
             @Override
             public void onResult(LwtScan scan, LwtDevice result) {
                 mapper.mapResult(scan, result, LwtScan.this);
+            }
+
+            @Override
+            public void onResultLost(LwtScan scan, LwtDevice result) {
+                mapper.mapResultLost(scan, result, LwtScan.this);
             }
 
             @Override
@@ -151,6 +161,10 @@ public class LwtScan extends AbstractScan<LwtDevice, LwdnScanException, LwtScan>
 
         public void mapResult(LwtScan scan, LwtDevice result, LwtScan destScan) {
             destScan.addResult(result);
+        }
+
+        public void mapResultLost(LwtScan scan, LwtDevice result, LwtScan destScan) {
+            destScan.removeResult(result);
         }
 
         public void mapFinished(LwtScan scan, LwtScan destScan) {

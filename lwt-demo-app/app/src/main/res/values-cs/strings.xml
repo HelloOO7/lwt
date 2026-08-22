@@ -112,7 +112,7 @@
     <string name="ticket_inspection_syncing_keys">Synchronizuji…</string>
     <string name="ticket_inspection_invalid_format">Formát QR kódu nebyl rozpoznán</string>
     <string name="ticket_inspection_link_vehicle">Propojit s vozidlem</string>
-    <string name="ticket_inspection_vehicle_update">Obnovit</string>
+    <string name="ticket_inspection_vehicle_update">Obnovit informace</string>
     <string name="ticket_inspection_syncing_vehicle">Aktualizuji data…</string>
     <string name="ticket_inspection_vehicle_none">Není propojeno s vozidlem</string>
     <string name="ticket_inspection_vehicle_lost">Spojení s vozidlem bylo ztraceno.</string>
@@ -127,4 +127,8 @@
     <string name="ticket_inspection_detail_not_valid_current_zones">Neplatí v žádném z akt. pásem: %1$s</string>
     <string name="ticket_inspection_detail_from_current_trip">Tento spoj</string>
     <string name="ticket_inspection_detail_linsp">Označující linkospoj</string>
+    <string name="ticket_inspection_toggle_razzia">Režim kontroly jízdenek</string>
+    <string name="ticket_inspection_razzia_error">Změna režimu kontroly jízdenek se nezdařila.</string>
+    <string name="ticket_inspection_razzia_entering">Aktivace režimu kontroly jízdenek</string>
+    <string name="ticket_inspection_razzia_exiting">Ukončování režimu kontroly jízdenek</string>
 </resources>

@@ -114,7 +114,7 @@
     <string name="ticket_inspection_invalid_format">Unrecognized QR code format</string>
     <string name="ticket_inspection_link_vehicle">Link with vehicle</string>
     <string name="ticket_inspection_vehicle_none">No vehicle linked</string>
-    <string name="ticket_inspection_vehicle_update">Refresh</string>
+    <string name="ticket_inspection_vehicle_update">Refresh info</string>
     <string name="ticket_inspection_syncing_vehicle">Updating data…</string>
     <string name="ticket_inspection_vehicle_lost">Connection with vehicle was lost.</string>
     <string name="ticket_inspection_vehicle_info_format">Linked with vehicle:\nline %1$s, %2$s %3$s.</string>
@@ -128,4 +128,8 @@
     <string name="ticket_inspection_detail_not_valid_current_zones">Not valid in any of current zones: %1$s</string>
     <string name="ticket_inspection_detail_from_current_trip">This connection</string>
     <string name="ticket_inspection_detail_linsp">Activation vehicle</string>
+    <string name="ticket_inspection_toggle_razzia">Ticket control mode</string>
+    <string name="ticket_inspection_razzia_error">Unable to update ticket control mode.</string>
+    <string name="ticket_inspection_razzia_entering">Entering ticket control mode</string>
+    <string name="ticket_inspection_razzia_exiting">Exiting ticket control mode</string>
 </resources>

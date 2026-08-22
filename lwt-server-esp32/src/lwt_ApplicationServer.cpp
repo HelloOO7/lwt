@@ -15,7 +15,7 @@ namespace lwt {
 
     }
 
-    lwtp::PacketData ApplicationServer::ServeRequest(lwtp::Server::SocketSession& session, const lwtp::PacketData& request) {
+    lwtp::PacketData ApplicationServer::ServeRequest(lwtp::SocketSession& session, const lwtp::PacketData& request) {
         // debug
         printf("request: ");
         for (auto& byte : request) {

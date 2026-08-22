@@ -73,10 +73,7 @@ namespace lwt {
             Operation_CreatePreauthorizationToken,
             ApplicationServer::CreateOperationServiceFunc<PreauthorizationTokenRequest>(
                 [&](const PreauthorizationTokenRequest& request, flatbuffers::FlatBufferBuilder& fbb) -> ResponseStatus {
-                    if (IsRazzia()) {
-                        ESP_LOGW(TAG, "Refusing to create preauthorization token during razzia");
-                        return 403;
-                    }
+                    bool isRazzia = IsRazzia();
 
                     std::lock_guard lock(m_TokenGeneratorMutex);
 
@@ -116,6 +113,7 @@ namespace lwt {
                     for (auto&& tokenHash : tokenHashes) {
                         int64_t existingTokenTimestamp = 0;
                         int64_t tokenExpiryTime = newTokenExpiryTime;
+                        bool ignoreRazzia = false;
 
                         if (!m_PreauthRateLimiter.IsTokenHashAllowed(tokenHash, currentTime, &existingTokenTimestamp)) {
                             tokenExpiryTime = existingTokenTimestamp + m_Config.PreauthorizationGracePeriodUs;
@@ -131,20 +129,29 @@ namespace lwt {
                             }
                             else {
                                 ESP_LOGW(TAG, "Activation token hash has already been used and can still be valid, returning token with adjusted validity");
+                                ignoreRazzia = true;
                             }
                         }
-                        else {
+                        else if (!isRazzia) {
                             m_PreauthRateLimiter.RegisterTokenHashUsed(tokenHash, currentTime);
                         }
 
-                        auto preauthTokenBlob = m_TokenManager.CreatePreauthorizationToken(tokenHash, tokenExpiryTime);
+                        if (!isRazzia || ignoreRazzia) {
+                            auto preauthTokenBlob = m_TokenManager.CreatePreauthorizationToken(tokenHash, tokenExpiryTime);
 
-                        tokenOffsets.push_back(CreatePreauthorizationTokenResult(
-                            fbb,
-                            PreauthorizationTokenStatus_Ok,
-                            CreatePreauthorizationToken(fbb, fbb.CreateVector(preauthTokenBlob)),
-                            tokenExpiryTime / 1000
-                        ));
+                            tokenOffsets.push_back(CreatePreauthorizationTokenResult(
+                                fbb,
+                                PreauthorizationTokenStatus_Ok,
+                                CreatePreauthorizationToken(fbb, fbb.CreateVector(preauthTokenBlob)),
+                                tokenExpiryTime / 1000
+                            ));
+                        }
+                        else {
+                            tokenOffsets.push_back(CreatePreauthorizationTokenResult(
+                                fbb,
+                                PreauthorizationTokenStatus_RequestedDuringRazzia
+                            ));
+                        }
                     }
 
                     auto finishedTime = esp_timer_get_time();
@@ -240,12 +247,70 @@ namespace lwt {
                 }
             )
         );
+
+        registry.RegisterServiceCallback(
+            Operation_SetRazzia,
+            ApplicationServer::CreateOperationServiceFunc<SetRazziaRequest>(
+                [&](const SetRazziaRequest& request, flatbuffers::FlatBufferBuilder& fbb) -> ResponseStatus {
+                    if (request.is_razzia()) {
+                        ESP_LOGI(TAG, "Ticket inspector requested to enter razzia mode");
+                    }
+                    else {
+                        ESP_LOGW(TAG, "Ticket inspector requested to exit razzia mode");
+                    }
+
+                    std::lock_guard lock(m_DataMutex);
+
+                    if (SetRazziaBit(RAZZIA_LOCAL_BIT, request.is_razzia())) {
+                        UpdateValidationInfo();
+                    }
+
+                    if (request.is_razzia()) {
+                        m_LastLocalRazziaOnTime = esp_timer_get_time();
+                    }
+
+                    fbb.Finish(CreateSetRazziaResponse(fbb, RAZZIA_HEARTBEAT_MAX_SECONDS));
+
+                    return 200;
+                }
+            ),
+            CertRole::TICKET_INSPECTOR
+        );
+    }
+
+    void TicketValidationService::ClearLocalRazziaIfExpired() {
+        if (m_LastLocalRazziaOnTime > 0 && (m_IsRazzia & RAZZIA_LOCAL_BIT) != 0) {
+            auto currentTime = esp_timer_get_time();
+            if (currentTime - m_LastLocalRazziaOnTime > RAZZIA_HEARTBEAT_MAX_SECONDS * 1000 * 1000) {
+                SetRazziaBit(RAZZIA_LOCAL_BIT, false);
+                m_LastLocalRazziaOnTime = 0; //reset to avoid infinite recursion
+                UpdateValidationInfo();
+            }
+        }
     }
 
     bool TicketValidationService::IsRazzia()
     {
         std::lock_guard lock(m_DataMutex);
-        return m_IsRazzia;
+
+        return IsRazziaNoLock();
+    }
+
+    bool TicketValidationService::IsRazziaNoLock()
+    {
+        ClearLocalRazziaIfExpired();
+
+        return m_IsRazzia != 0;
+    }
+
+    bool TicketValidationService::SetRazziaBit(int bit, bool value)
+    {
+        if (value) {
+            return (m_IsRazzia.fetch_or(bit) & bit) == 0; //changed if not set
+        }
+        else {
+            return m_IsRazzia.fetch_and(~bit) & bit; // changed if was set
+        }
     }
 
     void TicketValidationService::OnChanged(const TripRouteInfo* result)
@@ -302,25 +367,22 @@ namespace lwt {
     void TicketValidationService::OnChanged(const SubscriberTVS::CurrentTariffStop* result) {
         std::lock_guard lock(m_DataMutex);
 
-        bool ok = false;
-
         if (result) {
             ESP_LOGI(TAG, "Updating ticket validation info from TVS CurrentTariffStop data");
             m_HasTVSData = true;
             auto&& scheduledDep = result->CurrentTariffStop.DepartureScheduled;
             if (scheduledDep && !scheduledDep->Value.empty()) {
                 m_TimeForTicketValidityStart = LocalDateTime::parse(scheduledDep->Value).to_epoch_seconds() + m_CurTripDelay * 60;
-                ok = true;
+            }
+            else {
+                m_TimeForTicketValidityStart = 0;
             }
             m_TariffZonesForValidation = GetTariffZonesOnlyMyTariffSystem(TripInformationService::BuildTariffZonesString(result->CurrentTariffStop));
             m_NextTariffZonesForValidation = ReduceNextTariffZones(m_NextTariffZonesFromRoute, m_TariffZonesForValidation);
         }
         else {
+            // use m_TimeForTicketValidityStart and m_TariffZonesForValidation from TripRouteInfo, if available
             m_HasTVSData = false;
-        }
-
-        if (!ok) {
-            m_TimeForTicketValidityStart = 0;
         }
 
         UpdateValidationInfo();
@@ -329,8 +391,9 @@ namespace lwt {
     void TicketValidationService::OnChanged(const SubscriberTVS::RazziaState* razziaState) {
         std::lock_guard lock(m_DataMutex);
 
-        m_IsRazzia = razziaState && razziaState->RazziaState == IBIS_IP_TicketValidationService_V2_2::TicketRazziaInformationEnumeration::razzia;
+        bool isRazzia = razziaState && razziaState->RazziaState == IBIS_IP_TicketValidationService_V2_2::TicketRazziaInformationEnumeration::razzia;
 
+        SetRazziaBit(RAZZIA_TVS_BIT, isRazzia);
         UpdateValidationInfo();
     }
 
@@ -400,7 +463,9 @@ namespace lwt {
             &validityStart,
             m_ValidationInfoFBB.CreateString(m_TariffZonesForValidation),
             m_ValidationInfoFBB.CreateString(m_NextTariffZonesForValidation),
-            m_IsRazzia
+            // do not call IsRazziaNoLock() here, as we do not want to trigger a recursive data rebuild.
+            // just read the raw value currently present in the field.
+            m_IsRazzia != 0
         ));
 
         if (GetCurrentTripKey() != oldTripKey) {

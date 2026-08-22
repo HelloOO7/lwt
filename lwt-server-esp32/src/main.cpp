@@ -62,6 +62,7 @@ class AppMain {
 private:
     TlsEnvironment m_TlsCredentials;
     mbedtls_ssl_config m_MbedTlsConfig;
+    lwdn::TLSConfig m_TLSConfig;
     vdv301::ServiceDiscovery m_HttpServiceDiscovery;
     vdv301::SubscriberCIS m_CISSubscriber;
     vdv301::SubscriberTVS m_TVSSubscriber;
@@ -91,6 +92,7 @@ public:
             get_debug_device_crt_start(), get_debug_device_crt_end(),
             TLS_LWT_SERVER_KEY_DEBUG_START, TLS_LWT_SERVER_KEY_DEBUG_END
         ),
+        m_TLSConfig(m_MbedTlsConfig),
         m_HttpServiceDiscovery{ vdv301::HttpServiceDiscovery() },
         m_CISSubscriber(
             m_HttpServiceDiscovery,
@@ -107,7 +109,7 @@ public:
         m_PreauthTokenManager(LoadOrCreateHmacKey("pat_hmac_key", 32)),
         m_TicketVerifier(),
         m_MOSClient("https://ticketing.mos.ropid:8080", { get_debug_device_crt_start(), get_debug_device_crt_end() }, { TLS_LWT_SERVER_KEY_DEBUG_START, TLS_LWT_SERVER_KEY_DEBUG_END }),
-        m_TicketService(TICKETING_CONFIG, m_PreauthTokenManager, m_TicketVerifier, m_MOSClient, m_TripInfoService, &m_TVSSubscriber), //TVS not yet implemented
+        m_TicketService(TICKETING_CONFIG, m_PreauthTokenManager, m_TicketVerifier, m_MOSClient, m_TripInfoService, &m_TVSSubscriber),
         m_BLETripAdvertiserLegacy(0, BLE_SERVICE_UUID_VEHICLE, lwdn::BleAdvertiser::Flags::INCLUDE_DEVICE_NAME | lwdn::BleAdvertiser::Flags::USE_LEGACY_ADVERTISING),
         m_BLETripAdvertiserExt(1, BLE_SERVICE_UUID_VEHICLE_EXTENDED, lwdn::BleAdvertiser::Flags::INCLUDE_DEVICE_NAME),
         m_BLEServer(BLE_PSM, lwtp::MAX_PACKET_SIZE),
@@ -121,17 +123,18 @@ public:
         ),
         m_WifiNanAdvertiser(m_WifiNanPublisher),
         m_WifiNanServer(m_WifiNanPublisher, WIFI_NAN_PORT),
-        m_TripInfoAdvertiser(m_CISSubscriber, { &m_BLETripAdvertiserLegacy, &m_BLETripAdvertiserExt, &m_WifiNanAdvertiser })
+        m_TripInfoAdvertiser(m_CISSubscriber, m_TVSSubscriber, { &m_BLETripAdvertiserLegacy, &m_BLETripAdvertiserExt, &m_WifiNanAdvertiser })
     {
         lwt::ensure_generated_types_linked();
 
         setup_tls_config(m_TlsCredentials, m_MbedTlsConfig);
+        m_TLSConfig.EnableSessionTickets(&m_TlsCredentials.tickets);
 
         m_TicketVerifier.RegisterPublicKey(0, { TICKET_SIGNING_KEY_PUB_START, TICKET_SIGNING_KEY_PUB_END });
 
         m_ServiceRegistry.RegisterServices(m_PingService, m_ServerAuthService, m_TripInfoService, m_TicketService);
 
-        m_AppServer.AddInterceptor(std::make_unique<lwtp::StartTLSInterceptor>(m_MbedTlsConfig));
+        m_AppServer.AddInterceptor(std::make_unique<lwtp::StartTLSInterceptor>(m_TLSConfig));
         m_AppServer.AddInterceptor(std::make_unique<lwt::CertRoleInterceptor>());
         m_AppServer.AddSocket(&m_BLEServer, 1, 6144);
         m_AppServer.AddSocket(&m_WifiNanServer, 1, 6144);

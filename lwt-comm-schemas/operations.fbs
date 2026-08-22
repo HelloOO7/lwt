@@ -10,5 +10,6 @@ enum Operation : ushort {
     CreatePreauthorizationToken,
     AuthenticateServer,
     ActivateTicket,
-    GetAdvertisingInfo
+    GetAdvertisingInfo,
+    SetRazzia
 }

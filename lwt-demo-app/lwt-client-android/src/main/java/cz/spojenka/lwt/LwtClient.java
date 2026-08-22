@@ -2,8 +2,6 @@ package cz.spojenka.lwt;
 
 import android.content.Context;
 
-import com.google.flatbuffers.FlatBufferBuilder;
-
 import java.io.Closeable;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -24,7 +22,6 @@ import java.util.function.BiConsumer;
 import cz.spojenka.lwdn.LwdnAddress;
 import cz.spojenka.lwdn.LwdnSocketFactory;
 import cz.spojenka.lwdn.TLSLwdnSocketFactory;
-import cz.spojenka.lwt.util.FlatbufferUtils;
 import cz.spojenka.lwtp.LwtpPacket;
 import cz.spojenka.lwtp.LwtpSession;
 import cz.spojenka.lwtp.LwtpTLSConfig;
@@ -38,10 +35,10 @@ public class LwtClient implements Closeable {
     private final LwdnAddress address;
     private final LwdnSocketFactory baseSocketFactory;
 
-    private LwtpSession lwtpSession = new LwtpSession();
+    private LwtpSession baseSession = new LwtpSession();
     private LwdnSocketFactory socketFactory;
 
-    private WeakHashMap<LwtpPacket, CompletableFuture<?>> packetToResultMap = new WeakHashMap<>();
+    private final WeakHashMap<LwtpPacket, LwtCall<?>> packetToResultMap = new WeakHashMap<>();
 
     private final List<ExecutionObserver> observers = new ArrayList<>();
 
@@ -74,7 +71,7 @@ public class LwtClient implements Closeable {
      * @see LwtpSession#setWatchdogTimeout(Duration)
      */
     public void setSocketWatchdogTimeout(Duration timeout) {
-        lwtpSession.setWatchdogTimeout(timeout);
+        baseSession.setWatchdogTimeout(timeout);
     }
 
     public void useTLS(LwtpTLSConfig tlsConfig) {
@@ -109,18 +106,18 @@ public class LwtClient implements Closeable {
     }
 
     public synchronized void addSessionExecutionObserver(LwtpSession.ExecutionObserver observer) {
-        lwtpSession.addObserver(observer);
+        baseSession.addObserver(observer);
     }
 
     public synchronized void removeSessionExecutionObserver(LwtpSession.ExecutionObserver observer) {
-        lwtpSession.removeObserver(observer);
+        baseSession.removeObserver(observer);
     }
 
     private void changeSession(LwtpSession newSession) {
-        Duration wdTimeout = lwtpSession.getWatchdogTimeout();
-        lwtpSession = newSession;
-        lwtpSession.setWatchdogTimeout(wdTimeout);
-        lwtpSession.addObserver(new LwtpSession.ExecutionObserver() {
+        Duration wdTimeout = baseSession.getWatchdogTimeout();
+        baseSession = newSession;
+        baseSession.setWatchdogTimeout(wdTimeout);
+        baseSession.addObserver(new LwtpSession.ExecutionObserver() {
             @Override
             public void onStartRequest(LwtpPacket request) {
                 invokeObservers(request, ExecutionObserver::onStartRequest);
@@ -143,11 +140,14 @@ public class LwtClient implements Closeable {
         });
     }
 
-    private synchronized void invokeObservers(LwtpPacket key, BiConsumer<ExecutionObserver, CompletableFuture<?>> action) {
-        CompletableFuture<?> future = packetToResultMap.get(key);
-        if (future != null) {
+    private synchronized void invokeObservers(LwtpPacket key, BiConsumer<ExecutionObserver, LwtCall<?>> action) {
+        LwtCall<?> call;
+        synchronized (packetToResultMap) {
+            call = packetToResultMap.get(key);
+        }
+        if (call != null) {
             for (ExecutionObserver observer : observers) {
-                action.accept(observer, future);
+                action.accept(observer, call);
             }
         }
     }
@@ -169,12 +169,7 @@ public class LwtClient implements Closeable {
                         realArgs = EMPTY_ARGS;
                     }
                     if (realArgs.length == 1 && realArgs[0] != null && realArgs[0] instanceof ByteBuffer bb) {
-                        ByteBuffer req = createRequestFlatbuffer(opAnnot.value(), bb);
-                        LwtpPacket lwtpReq = new LwtpPacket(req);
-                        CompletableFuture<LwtpPacket> baseFuture = lwtpSession.add(lwtpReq);
-                        CompletableFuture<?> responseFuture = createResponseFuture(baseFuture, getResponseType(method));
-                        packetToResultMap.put(lwtpReq, responseFuture);
-                        return responseFuture;
+                        return newCall(opAnnot.value(), bb, getResponseType(method));
                     } else {
                         throw new IllegalArgumentException("Method " + method + " must have exactly one non-null argument of type ByteBuffer (returned from FlatBufferBuilder)");
                     }
@@ -183,34 +178,37 @@ public class LwtClient implements Closeable {
         });
     }
 
-    public void execute() {
-        LwtpSession execSession = lwtpSession;
-        lwtpSession = lwtpSession.cloneAsEmpty();
-        execSession.execute(socketFactory);
+    private <T> LwtCallImpl<T> newCall(int operationId, ByteBuffer requestPacket, Class<T> responseType) {
+        return new LwtCallImpl<T>(this, operationId, requestPacket, responseType);
     }
 
-    /**
-     * Execute all pending requests asynchronously. After this is called, the client
-     * can be reused for configuring new sessions even while the previous session is
-     * still being executed.
-     *
-     * @param executor the executor to run the execution on. If null, the default executor will be used.
-     * @return Future that will be completed when all requests finish,
-     * and which can be used to cancel all execution.
-     */
-    public CompletableFuture<Void> executeAsync(Executor executor) {
-        LwtpSession execSession = lwtpSession;
-        lwtpSession = lwtpSession.cloneAsEmpty();
-        CompletableFuture<Void> future = execSession.executeAsync(socketFactory, executor);
+    public LwtSession newSession() {
+        return new LwtSession(this, baseSession.cloneAsEmpty());
+    }
+
+    void execute(LwtpSession session) {
+        CompletableFuture<Void> dummyFuture = new CompletableFuture<>();
+        trackAsyncExecution(dummyFuture);
+        try {
+            session.execute(socketFactory);
+        } finally {
+            dummyFuture.complete(null);
+        }
+    }
+
+    CompletableFuture<Void> executeAsync(LwtpSession session, Executor executor) {
+        CompletableFuture<Void> future = session.executeAsync(socketFactory, executor);
         trackAsyncExecution(future);
         return future;
     }
 
-    public CompletableFuture<Void> executeAsync() {
-        return executeAsync(null);
+    void registerPendingRequest(LwtpPacket request, LwtCall<?> result) {
+        synchronized (packetToResultMap) {
+            packetToResultMap.put(request, result);
+        }
     }
 
-    private void trackAsyncExecution(CompletableFuture<?> execution) {
+    void trackAsyncExecution(CompletableFuture<?> execution) {
         synchronized (runningAsyncSessions) {
             runningAsyncSessions.add(execution);
             execution.whenComplete((result, ex) -> {
@@ -221,68 +219,35 @@ public class LwtClient implements Closeable {
         }
     }
 
-    private <T> CompletableFuture<T> createResponseFuture(CompletableFuture<LwtpPacket> baseFuture, Class<T> responseType) {
-        CompletableFuture<T> responseFuture = new CompletableFuture<>();
-        baseFuture.whenComplete((lwtpResp, ex) -> {
-            if (ex != null) {
-                responseFuture.completeExceptionally(ex);
-            } else {
-                try {
-                    ByteBuffer respData = unwrapResponseFlatbuffer(lwtpResp.getPayload());
-                    T responseObj = FlatbufferUtils.reflectOpenFlatbuffer(respData, responseType);
-                    responseFuture.complete(responseObj);
-                } catch (Throwable e) {
-                    responseFuture.completeExceptionally(e);
-                }
-            }
-        });
-        return responseFuture;
-    }
-
-    private ByteBuffer createRequestFlatbuffer(int operationId, ByteBuffer data) {
-        FlatBufferBuilder builder = new FlatBufferBuilder();
-        int dataVec = builder.createByteVector(data);
-        builder.finish(RequestPacket.createRequestPacket(builder, operationId, dataVec));
-        return builder.dataBuffer();
-    }
-
-    private ByteBuffer unwrapResponseFlatbuffer(ByteBuffer response) throws LwtStatusException {
-        ResponsePacket respPacket = ResponsePacket.getRootAsResponsePacket(response);
-        if (!LwtStatus.isOK(respPacket.statusCode())) {
-            throw new LwtStatusException(respPacket.statusCode());
-        }
-        return respPacket.dataAsByteBuffer();
-    }
-
     private Class<?> getResponseType(Method method) {
         Type returnType = method.getGenericReturnType();
         if (returnType instanceof ParameterizedType pt) {
             Type rawType = pt.getRawType();
-            if (rawType == CompletableFuture.class) {
+            if (rawType == LwtCall.class) {
                 Type[] typeArgs = pt.getActualTypeArguments();
                 if (typeArgs.length == 1 && typeArgs[0] instanceof Class<?> clazz) {
                     return clazz;
                 }
             }
         }
-        throw new IllegalArgumentException("Method " + method + " must return CompletableFuture<T> for some T");
+        throw new IllegalArgumentException("Method " + method + " must return LwtCall<T> for some T");
     }
 
     public static interface ExecutionObserver {
 
-        public default void onStartRequest(CompletableFuture<?> future) {
+        public default void onStartRequest(LwtCall<?> future) {
 
         }
 
-        public default void onRequestSent(CompletableFuture<?> future) {
+        public default void onRequestSent(LwtCall<?> future) {
 
         }
 
-        public default void onStartResponse(CompletableFuture<?> future) {
+        public default void onStartResponse(LwtCall<?> future) {
 
         }
 
-        public default void onResponseReceived(CompletableFuture<?> future) {
+        public default void onResponseReceived(LwtCall<?> future) {
 
         }
     }

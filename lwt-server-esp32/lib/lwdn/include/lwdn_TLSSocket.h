@@ -3,8 +3,79 @@
 #include "lwdn_Socket.h"
 #include <memory>
 #include "mbedtls/ssl.h"
+#include "mbedtls/ssl_ticket.h"
+#include "PSRAMContainers.h"
+#include <span>
+#include <functional>
+#include <optional>
 
 namespace lwdn {
+
+    class TLSContext;
+
+    class TLSConfig {
+        friend class TLSContext;
+    private:
+        mbedtls_ssl_config& m_SSLConfig;
+        mbedtls_ssl_ticket_context* m_TicketContext{ nullptr };
+
+    public:
+        TLSConfig(mbedtls_ssl_config& sslConfig);
+
+        void EnableSessionTickets(mbedtls_ssl_ticket_context* ticketContext);
+    };
+
+    class TLSContext {
+    public:
+        using CertVerifyCallback = std::function<void(mbedtls_x509_crt* crt, int depth, uint32_t* flags)>;
+
+    private:
+        using VerifyFunc = int (*)(void*, mbedtls_x509_crt*, int, uint32_t*);
+
+        mbedtls_ssl_config  m_Config; //we need to create our own copy of the config, because it stores the pointer to the ticket context
+        mbedtls_ssl_context m_SSLContext;
+
+        mbedtls_ssl_ticket_context* m_TicketContext{ nullptr };
+        psram_vector<uint8_t> m_TicketExtraData;
+
+        VerifyFunc m_OriginalVerifyFunc{ nullptr };
+        void* m_OriginalVerifyCtx{ nullptr };
+
+        std::optional<CertVerifyCallback> m_CustomVerifyCallback;
+
+    public:
+        TLSContext(TLSConfig& config);
+        ~TLSContext();
+
+        mbedtls_ssl_context* GetSSLContext();
+        const mbedtls_ssl_context* GetSSLContext() const;
+
+        operator mbedtls_ssl_context* ();
+        operator const mbedtls_ssl_context* () const;
+
+        const std::span<const uint8_t> GetTicketExtraData() const;
+        void AddTicketExtraData(const std::span<const uint8_t>& data);
+
+        void SetCustomVerifyCallback(CertVerifyCallback&& callback);
+
+    private:
+        int WriteSSLTicket(const mbedtls_ssl_session* session, unsigned char* start, const unsigned char* end, size_t* tlen, uint32_t* lifetime);
+        int ParseSSLTicket(mbedtls_ssl_session* session, unsigned char* buf, size_t len);
+        int VerifyCertificate(mbedtls_x509_crt* crt, int depth, uint32_t* flags);
+
+        static int SSLTicketWriteFunc(
+            void* p_ticket, const mbedtls_ssl_session* session,
+            unsigned char* start, const unsigned char* end, size_t* tlen,
+            uint32_t* lifetime
+        );
+
+        static int SSLTicketParseFunc(
+            void* p_ticket, mbedtls_ssl_session* session,
+            unsigned char* buf, size_t len
+        );
+
+        static int SSLVerifyFunc(void* ctx, mbedtls_x509_crt* crt, int depth, uint32_t* flags);
+    };
 
     /**
      * @brief A socket wrapper implementing TLS transport over a regular socket.
@@ -18,13 +89,13 @@ namespace lwdn {
     class TLSSocket : public Socket {
     private:
         std::unique_ptr<Socket> m_Base;
-        mbedtls_ssl_context m_SSLContext;
+        TLSContext m_TLSContext;
         bool m_SSLReady{ false };
         bool m_ReceivedCloseNotify{ false };
         int m_LastError{ 0 };
 
     public:
-        TLSSocket(std::unique_ptr<Socket> base, mbedtls_ssl_config& sslConfig);
+        TLSSocket(std::unique_ptr<Socket> base, TLSConfig& sslConfig);
         ~TLSSocket() override;
 
         Socket& GetBaseSocket();
@@ -32,12 +103,12 @@ namespace lwdn {
          * @brief Obtains the underlying socket used for transport, releasing ownership from the TLSSocket.
          * This means that the socket will not be closed when the TLSSocket destructor is run.
          * After calling this method, the TLSSocket must not be used anymore in any way other than being destroyed.
-         * 
-         * @return std::unique_ptr<Socket> 
+         *
+         * @return std::unique_ptr<Socket>
          */
         std::unique_ptr<Socket> ExtractBaseSocket();
 
-        mbedtls_ssl_context& GetSSLContext();
+        TLSContext& GetTLSContext();
         bool IsCloseNotifyReceived() const;
 
         int Write(const void* data, size_t len, size_t* sentLen = nullptr) override;

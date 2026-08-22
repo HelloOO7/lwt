@@ -101,7 +101,7 @@ namespace lwdn {
     {
         std::unique_lock lock(m_GlobalEventLock);
 
-        ESP_LOGI(TAG, "ReadChannel: chan=%p, requested_len=%d, timeout=%d", channel->m_Chan, len, timeout);
+        ESP_LOGD(TAG, "ReadChannel: chan=%p, requested_len=%d, timeout=%d", channel->m_Chan, len, timeout);
 
         if (OS_MBUF_PKTLEN(channel->m_MainRxBuf) == 0) {
             if (channel->m_Closed) {
@@ -139,7 +139,7 @@ namespace lwdn {
     {
         std::unique_lock lock(m_GlobalEventLock);
 
-        ESP_LOGI(TAG, "WriteChannel: chan=%p, data_len=%d", channel->m_Chan, len);
+        ESP_LOGD(TAG, "WriteChannel: chan=%p, data_len=%d", channel->m_Chan, len);
 
         if (channel->m_Closed) {
             return ECONNRESET;
@@ -230,7 +230,7 @@ namespace lwdn {
                 channel->m_Chan = event->accept.chan;
                 ble_l2cap_chan_info channelInfo;
                 if (ble_l2cap_get_chan_info(channel->m_Chan, &channelInfo) == 0) {
-                    ESP_LOGI(TAG, "Channel info: scid=%d, dcid=%d, our_l2cap_mtu=%d, peer_l2cap_mtu=%d, psm=%d, our_coc_mtu=%d, peer_coc_mtu=%d",
+                    ESP_LOGD(TAG, "Channel info: scid=%d, dcid=%d, our_l2cap_mtu=%d, peer_l2cap_mtu=%d, psm=%d, our_coc_mtu=%d, peer_coc_mtu=%d",
                         channelInfo.scid, channelInfo.dcid, channelInfo.our_l2cap_mtu, channelInfo.peer_l2cap_mtu,
                         channelInfo.psm, channelInfo.our_coc_mtu, channelInfo.peer_coc_mtu);
                 }
@@ -242,7 +242,7 @@ namespace lwdn {
         }
         case BLE_L2CAP_EVENT_COC_DATA_RECEIVED:
         {
-            ESP_LOGI(TAG, "Data received: chan=%p, len=%d", event->receive.chan, OS_MBUF_PKTLEN(event->receive.sdu_rx));
+            ESP_LOGD(TAG, "Data received: chan=%p, len=%d", event->receive.chan, OS_MBUF_PKTLEN(event->receive.sdu_rx));
             Channel* channel = FindChannel(event->receive.chan, false);
             if (!channel) {
                 ESP_LOGE(TAG, "Channel not registered: chan=%p", event->receive.chan);

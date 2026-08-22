@@ -8,6 +8,8 @@ namespace lwtp {
 
     static constexpr const char* TAG = "LWTP Server";
 
+    SocketInterceptor::Event EVENT_SOCKET_ACCEPTED{};
+
     Packet::Packet(const PacketHeader& header, PacketData&& payload) :
         m_Header(header),
         m_Payload(std::move(payload))
@@ -55,52 +57,52 @@ namespace lwtp {
         return m_SocketFilter == INVALID_SERVER_SOCKET || m_SocketFilter == socket;
     }
 
-    Server::SocketSession::SocketSession(std::unique_ptr<lwdn::Socket> socket)
+    SocketSession::SocketSession(std::unique_ptr<lwdn::Socket> socket)
         : m_Socket(std::move(socket))
     {
     }
 
-    lwdn::Socket& Server::SocketSession::GetSocket()
+    lwdn::Socket& SocketSession::GetSocket()
     {
         return *m_Socket;
     }
 
-    std::unique_ptr<lwdn::Socket> Server::SocketSession::ExtractSocket()
+    std::unique_ptr<lwdn::Socket> SocketSession::ExtractSocket()
     {
         return std::move(m_Socket);
     }
 
-    void Server::SocketSession::ChangeSocket(std::unique_ptr<lwdn::Socket> newSocket)
+    void SocketSession::ChangeSocket(std::unique_ptr<lwdn::Socket> newSocket)
     {
         m_Socket = std::move(newSocket);
     }
 
-    void Server::SocketSession::SetTag(Tag* key, const psram_string& value)
+    void SocketSession::SetTag(Tag* key, const psram_string& value)
     {
         auto& tag = FindOrAddTag(key);
         tag.m_Value = value;
     }
 
-    void Server::SocketSession::SetTag(Tag* key, int value)
+    void SocketSession::SetTag(Tag* key, int value)
     {
         auto& tag = FindOrAddTag(key);
         tag.m_Value = value;
     }
 
-    void Server::SocketSession::SetTag(Tag* key, void* value)
+    void SocketSession::SetTag(Tag* key, void* value)
     {
         auto& tag = FindOrAddTag(key);
         tag.m_Value = value;
     }
 
-    void Server::SocketSession::SetTag(Tag* key)
+    void SocketSession::SetTag(Tag* key)
     {
         auto& tag = FindOrAddTag(key);
         tag.m_Value = std::monostate{};
     }
 
     template<typename T>
-    bool Server::SocketSession::GetTagImpl(Tag* key, T* outValue) const
+    bool SocketSession::GetTagImpl(Tag* key, T* outValue) const
     {
         auto tag = FindTag(key);
         if (!tag) {
@@ -115,38 +117,38 @@ namespace lwtp {
         return false;
     }
 
-    bool Server::SocketSession::GetTag(Tag* key, psram_string* outValue) const
+    bool SocketSession::GetTag(Tag* key, psram_string* outValue) const
     {
         return GetTagImpl(key, outValue);
     }
 
-    bool Server::SocketSession::GetTag(Tag* key, int* outValue) const
+    bool SocketSession::GetTag(Tag* key, int* outValue) const
     {
         return GetTagImpl(key, outValue);
     }
 
-    bool Server::SocketSession::GetTag(Tag* key, void** outValue) const
+    bool SocketSession::GetTag(Tag* key, void** outValue) const
     {
         return GetTagImpl(key, outValue);
     }
 
-    bool Server::SocketSession::GetTag(Tag* key) const
+    bool SocketSession::GetTag(Tag* key) const
     {
         auto tag = FindTag(key);
         return tag != nullptr && std::holds_alternative<std::monostate>(tag->m_Value);
     }
 
-    bool Server::SocketSession::HasTag(Tag* key) const
+    bool SocketSession::HasTag(Tag* key) const
     {
         return FindTag(key) != nullptr;
     }
 
-    void Server::SocketSession::RemoveTag(Tag* key)
+    void SocketSession::RemoveTag(Tag* key)
     {
         std::erase_if(m_Tags, [key](const TagEntry& tag) { return tag.m_Key == key; });
     }
 
-    Server::SocketSession::TagEntry& Server::SocketSession::FindOrAddTag(Tag* key)
+    SocketSession::TagEntry& SocketSession::FindOrAddTag(Tag* key)
     {
         TagEntry* tag = FindTag(key);
         if (tag) {
@@ -157,7 +159,7 @@ namespace lwtp {
         return m_Tags.back();
     }
 
-    Server::SocketSession::TagEntry* Server::SocketSession::FindTag(Tag* key)
+    SocketSession::TagEntry* SocketSession::FindTag(Tag* key)
     {
         for (auto& tag : m_Tags) {
             if (tag.m_Key == key) {
@@ -168,7 +170,7 @@ namespace lwtp {
         return nullptr;
     }
 
-    const Server::SocketSession::TagEntry* Server::SocketSession::FindTag(Tag* key) const
+    const SocketSession::TagEntry* SocketSession::FindTag(Tag* key) const
     {
         for (auto& tag : m_Tags) {
             if (tag.m_Key == key) {
@@ -220,7 +222,7 @@ namespace lwtp {
     {
         SocketInterceptor::Chain interceptors(*this, m_Interceptors, socketHandle);
 
-        interceptors.TraverseOpenSocket(session);
+        interceptors.Traverse(session, &EVENT_SOCKET_ACCEPTED, nullptr);
 
         int numServed = 0;
 
@@ -411,25 +413,43 @@ namespace lwtp {
         return m_SocketHandle;
     }
 
-    Packet SocketInterceptor::Chain::Traverse(Server::SocketSession& session, const Packet& request)
+    size_t SocketInterceptor::Chain::BeginTraverse()
     {
+        // back up and restore so that it is possible to traverse a chain within a chain
+        auto oldIndex = m_CurrentIndex;
         m_CurrentIndex = 0;
-        return Proceed(session, request);
+        return oldIndex;
     }
 
-    int SocketInterceptor::Chain::Traverse(Server::SocketSession& session, int error)
+    void SocketInterceptor::Chain::FinishTraverse(size_t oldIndex)
     {
-        m_CurrentIndex = 0;
-        return Proceed(session, error);
+        m_CurrentIndex = oldIndex;
     }
 
-    void SocketInterceptor::Chain::TraverseOpenSocket(Server::SocketSession& session)
+    Packet SocketInterceptor::Chain::Traverse(SocketSession& session, const Packet& request)
     {
-        m_CurrentIndex = 0;
-        ProceedOpenSocket(session);
+        auto oldIndex = BeginTraverse();
+        auto result = Proceed(session, request);
+        FinishTraverse(oldIndex);
+        return result;
     }
 
-    Packet SocketInterceptor::Chain::Proceed(Server::SocketSession& session, const Packet& request)
+    int SocketInterceptor::Chain::Traverse(SocketSession& session, int error)
+    {
+        auto oldIndex = BeginTraverse();
+        auto result = Proceed(session, error);
+        FinishTraverse(oldIndex);
+        return result;
+    }
+
+    void SocketInterceptor::Chain::Traverse(SocketSession& session, Event* event, void* eventData)
+    {
+        auto oldIndex = BeginTraverse();
+        Proceed(session, event, eventData);
+        FinishTraverse(oldIndex);
+    }
+
+    Packet SocketInterceptor::Chain::Proceed(SocketSession& session, const Packet& request)
     {
         if (m_CurrentIndex < m_Interceptors.size()) {
             size_t index = m_CurrentIndex++;
@@ -441,7 +461,7 @@ namespace lwtp {
         }
     }
 
-    int SocketInterceptor::Chain::Proceed(Server::SocketSession& session, int error)
+    int SocketInterceptor::Chain::Proceed(SocketSession& session, int error)
     {
         if (m_CurrentIndex < m_Interceptors.size()) {
             size_t index = m_CurrentIndex++;
@@ -453,23 +473,28 @@ namespace lwtp {
         }
     }
 
-    void SocketInterceptor::Chain::ProceedOpenSocket(Server::SocketSession& session)
+    void SocketInterceptor::Chain::Proceed(SocketSession& session, Event* event, void* eventData)
     {
         if (m_CurrentIndex < m_Interceptors.size()) {
             size_t index = m_CurrentIndex++;
             auto& interceptor = m_Interceptors[index];
-            interceptor->InterceptOpenSocket(session, *this);
+            interceptor->InterceptSocketEvent(session, event, eventData, *this);
         }
     }
 
-    int SocketInterceptor::InterceptError(Server::SocketSession& session, int error, Chain& chain)
+    Packet SocketInterceptor::Intercept(SocketSession& session, const Packet& request, Chain& chain)
+    {
+        return chain.Proceed(session, request);
+    }
+
+    int SocketInterceptor::InterceptError(SocketSession& session, int error, Chain& chain)
     {
         return error;
     }
 
-    void SocketInterceptor::InterceptOpenSocket(Server::SocketSession& session, Chain& chain)
+    void SocketInterceptor::InterceptSocketEvent(SocketSession& session, Event* event, void* eventData, Chain& chain)
     {
-
+        chain.Proceed(session, event, eventData);
     }
 
     ScopedSocketInterceptor::ScopedSocketInterceptor(std::unique_ptr<SocketInterceptor> base, ServerSocketHandle socketFilter) :
@@ -478,7 +503,7 @@ namespace lwtp {
     {
     }
 
-    int ScopedSocketInterceptor::InterceptError(Server::SocketSession& session, int error, Chain& chain)
+    int ScopedSocketInterceptor::InterceptError(SocketSession& session, int error, Chain& chain)
     {
         if (IsSocketMatched(chain.GetCurrentSocketHandle())) {
             return m_Base->InterceptError(session, error, chain);
@@ -488,13 +513,23 @@ namespace lwtp {
         }
     }
 
-    Packet ScopedSocketInterceptor::Intercept(Server::SocketSession& session, const Packet& request, Chain& chain)
+    Packet ScopedSocketInterceptor::Intercept(SocketSession& session, const Packet& request, Chain& chain)
     {
         if (IsSocketMatched(chain.GetCurrentSocketHandle())) {
             return m_Base->Intercept(session, request, chain);
         }
         else {
             return chain.Proceed(session, request);
+        }
+    }
+
+    void ScopedSocketInterceptor::InterceptSocketEvent(SocketSession& session, Event* event, void* eventData, Chain& chain)
+    {
+        if (IsSocketMatched(chain.GetCurrentSocketHandle())) {
+            m_Base->InterceptSocketEvent(session, event, eventData, chain);
+        }
+        else {
+            chain.Proceed(session, event, eventData);
         }
     }
 }

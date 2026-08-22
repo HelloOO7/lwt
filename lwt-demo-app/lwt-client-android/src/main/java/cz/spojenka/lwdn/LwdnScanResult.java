@@ -6,16 +6,18 @@ import android.os.Parcelable;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.os.ParcelCompat;
 
 public record LwdnScanResult(
         LwdnAddress deviceAddress,
         int rssi,
         Map<LwdnServiceID, byte[]> serviceData
-) implements Parcelable {
+) implements Parcelable, IScanResult {
 
     public static final Creator<LwdnScanResult> CREATOR = new Creator<>() {
         @Override
@@ -52,5 +54,10 @@ public record LwdnScanResult(
             dest.writeParcelable(entry.getKey(), flags);
             dest.writeByteArray(entry.getValue());
         }
+    }
+
+    @Override
+    public boolean addressEquals(IScanResult other) {
+        return other instanceof LwdnScanResult otherResult && deviceAddress.equals(otherResult.deviceAddress);
     }
 }

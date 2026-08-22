@@ -4,6 +4,7 @@
 #include "ISO8601.h"
 #include <esp_log.h>
 #include <cstdio>
+#include <cstring>
 #include "FNVHash.h"
 #include "lwt_TripInformationService.h"
 #include "lwdn_BleAdvertiser.h"
@@ -15,16 +16,21 @@ namespace lwt {
     using namespace vdv301;
     using namespace IBIS_IP_CustomerInformationService_V2_3CZ1_0;
 
-    TripInfoAdvertiser::TripInfoAdvertiser(SubscriberCIS& cisSubscriber, std::initializer_list<lwdn::Advertiser*> advertisers) :
+    TripInfoAdvertiser::TripInfoAdvertiser(SubscriberCIS& cisSubscriber, SubscriberTVS& tvsSubscriber, std::initializer_list<lwdn::Advertiser*> advertisers) :
         m_CISSubscriber{ cisSubscriber },
-        m_Advertisers{ advertisers }
+        m_TVSSubscriber{ tvsSubscriber },
+        m_Advertisers{ advertisers },
+        m_Data{ {} }
     {
+        memset(static_cast<AdvDataBasic*>(&m_Data), 0, sizeof(AdvDataBasic));
         ESP_LOGI("TripInfoAdvertiser", "Created TripInfoAdvertiser with %zu advertisers", m_Advertisers.size());
         m_CISSubscriber.ObserveAllData(*this);
+        m_TVSSubscriber.ObserveCurrentTariffStop(*this);
     }
 
     TripInfoAdvertiser::~TripInfoAdvertiser() {
         m_CISSubscriber.RemoveObserver(*this);
+        m_TVSSubscriber.RemoveObserver(*this);
     }
 
     void TripInfoAdvertiser::OnChanged(const SubscriberCIS::AllData* result)
@@ -37,11 +43,10 @@ namespace lwt {
             }
         }
         else {
-            AdvDataBasic basicData = CreateBasicAdvData(*result);
-            AdvDataExtended extData = CreateExtendedAdvData(basicData, *result);
-
-            UpdateLegacyData(basicData);
-            UpdateExtendedData(extData);
+            m_Data = CreateExtendedAdvData(CreateBasicAdvData(*result), *result);
+            m_CISCanUseTicketing = !result->TripInformation.empty() && result->CurrentStopIndex.Value != result->TripInformation.back().StopSequence.StopPoint.back().StopIndex.Value;
+            UpdateTicketingAvailabilityFlag();
+            UpdateDataBuffers();
 
             // dump hex of extended data
             for (size_t i = 0; i < m_ExtDataBuffer.size(); ++i) {
@@ -64,6 +69,34 @@ namespace lwt {
                 }
                 advertiser->Start();
             }
+        }
+    }
+
+    void TripInfoAdvertiser::OnChanged(const SubscriberTVS::CurrentTariffStop* result)
+    {
+        std::lock_guard lock(m_DataMutex);
+
+        if (result) {
+            m_IsTVSAvailable = true;
+            m_TVSCanUseTicketing = result->CurrentTariffStop.DepartureScheduled && !result->CurrentTariffStop.FareZone.empty();
+            UpdateTicketingAvailabilityFlag();
+            UpdateDataBuffers();
+        }
+        else {
+            m_IsTVSAvailable = false;
+            m_TVSCanUseTicketing = false;
+        }
+    }
+
+    void TripInfoAdvertiser::UpdateTicketingAvailabilityFlag()
+    {
+        bool canUse = m_IsTVSAvailable ? m_TVSCanUseTicketing : m_CISCanUseTicketing;
+
+        if (canUse) {
+            m_Data.flags |= AdvDataBasic::FLAG_CAN_USE_TICKETING;
+        }
+        else {
+            m_Data.flags &= ~AdvDataBasic::FLAG_CAN_USE_TICKETING;
         }
     }
 
@@ -163,6 +196,12 @@ namespace lwt {
     {
         m_ExtDataBuffer.resize(extData.calc_size());
         extData.pack(m_ExtDataBuffer.data());
+    }
+
+    void TripInfoAdvertiser::UpdateDataBuffers()
+    {
+        UpdateLegacyData(m_Data);
+        UpdateExtendedData(m_Data);
     }
 
     uint32_t TripInfoAdvertiser::FindCisNumberByRef(const std::string& ref, const SubscriberCIS::AllData& result)

@@ -8,10 +8,11 @@ import java.io.IOException;
 
 import androidx.annotation.NonNull;
 import androidx.core.os.ParcelCompat;
+import cz.spojenka.lwdn.IScanResult;
 import cz.spojenka.lwdn.LwdnAddress;
 import cz.spojenka.lwdn.LwdnScanResult;
 
-public sealed abstract class LwtDevice implements Parcelable permits LwtDevice.Vehicle {
+public sealed abstract class LwtDevice implements Parcelable, IScanResult permits LwtDevice.Vehicle {
 
     private final LwdnScanResult scanResult;
 
@@ -28,6 +29,11 @@ public sealed abstract class LwtDevice implements Parcelable permits LwtDevice.V
     }
 
     public abstract LwtDeviceType getType();
+
+    @Override
+    public boolean addressEquals(IScanResult other) {
+        return other instanceof LwtDevice otherDevice && scanResult.addressEquals(otherDevice.scanResult);
+    }
 
     public static final class Vehicle extends LwtDevice {
 

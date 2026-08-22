@@ -244,7 +244,7 @@ public class MainActivity extends BaseActivity {
         try (LwtAPIClient client = new LwtAPIClient(this, foundDevice.getAddress())) {
             client.setSocketWatchdogTimeout(Duration.ofSeconds(5));
             client.disableTLS();
-            client.authenticateServer(GlobalTrustManager.getInstance(getApplication()), CommType.ENQUEUE).whenCompleteAsync((trusted, error) -> {
+            client.authenticateServer(GlobalTrustManager.getInstance(getApplication())).executeAsync().whenCompleteAsync((trusted, error) -> {
                 if (error != null) {
                     Log.e(TAG, "Server auth operation error", error);
                     setButtonsEnabled(true);
@@ -252,8 +252,9 @@ public class MainActivity extends BaseActivity {
                     Log.i(TAG, "Server authentication result: " + trusted);
                 }
             }, getMainExecutor());
-            enqueueTestOperations(client);
-            executeOps(client);
+            LwtSession session = client.newSession();
+            enqueueTestOperations(client, session);
+            executeOps(session);
         }
     }
 
@@ -267,8 +268,9 @@ public class MainActivity extends BaseActivity {
                             .setSSLContext(sslContext)
                             .build()
             );
-            enqueueTestOperations(client);
-            executeOps(client);
+            LwtSession session = client.newSession();
+            enqueueTestOperations(client, session);
+            executeOps(session);
         }
     }
 
@@ -277,22 +279,22 @@ public class MainActivity extends BaseActivity {
         Log.i(TAG, "Testing bluetooth communication with device: " + foundDevice.getAddress());
     }
 
-    private void enqueueTestOperations(LwtAPIClient client) {
+    private void enqueueTestOperations(LwtAPIClient client, LwtSession session) {
         for (int i = 0; i < 1; i++) {
-            client.ping(CommType.ENQUEUE).thenAccept(pingResponse -> {
+            client.ping().enqueue(session).thenAccept(pingResponse -> {
                 Log.i(TAG, "Ping response received: dev=" + pingResponse.deviceId() + ", time=" + pingResponse.deviceTime());
             }).exceptionally(ex -> {
                 Log.e(TAG, "LWT operation failed", ex);
                 return null;
             });
         }
-        client.getTripRouteInfo(CommType.ENQUEUE).thenAccept(tripRouteInfo -> {
+        client.getTripRouteInfo().enqueue(session).thenAccept(tripRouteInfo -> {
             Log.i(TAG, "Trip route info received: " + routeInfoToString(tripRouteInfo));
         }).exceptionally(ex -> {
             Log.e(TAG, "LWT operation failed", ex);
             return null;
         });
-        client.getTicketValidationInfo(CommType.ENQUEUE).thenAccept(tvi -> {
+        client.getTicketValidationInfo().enqueue(session).thenAccept(tvi -> {
             Log.i(TAG, "Ticket validation info received: zone " + tvi.tariffZones() + ", act. time=" + LwtTime.convertLocalDateTime(tvi.scheduledActivationTime()));
         }).exceptionally(ex -> {
             Log.e(TAG, "LWT operation failed", ex);
@@ -305,8 +307,8 @@ public class MainActivity extends BaseActivity {
                 + t.stopsLength() + " stops";
     }
 
-    private void executeOps(LwtAPIClient client) {
-        client.executeAsync().whenCompleteAsync((unused, throwable) -> {
+    private void executeOps(LwtSession session) {
+        session.executeAsync().whenCompleteAsync((unused, throwable) -> {
             setButtonsEnabled(true);
         }, getMainExecutor());
     }

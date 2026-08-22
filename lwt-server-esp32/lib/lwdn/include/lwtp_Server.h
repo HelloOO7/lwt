@@ -36,47 +36,10 @@ namespace lwtp {
     static constexpr ServerSocketHandle INVALID_SERVER_SOCKET = 0;
 
     class SocketInterceptor;
+    class SocketSession;
 
     class Server {
-    public:
-        class SocketSession {
-        public:
-            using Tag = const int;
-        private:
-            struct TagEntry {
-                Tag* m_Key;
-                std::variant<std::monostate, psram_string, int, void*> m_Value;
-            };
-
-            std::unique_ptr<lwdn::Socket> m_Socket;
-            std::vector<TagEntry> m_Tags;
-
-        public:
-            SocketSession(std::unique_ptr<lwdn::Socket> socket);
-
-            lwdn::Socket& GetSocket();
-            std::unique_ptr<lwdn::Socket> ExtractSocket();
-            void ChangeSocket(std::unique_ptr<lwdn::Socket> newSocket);
-
-            void SetTag(Tag* key, const psram_string& value);
-            void SetTag(Tag* key, int value);
-            void SetTag(Tag* key, void* value);
-            void SetTag(Tag* key);
-            bool GetTag(Tag* key, psram_string* outValue) const;
-            bool GetTag(Tag* key, int* outValue) const;
-            bool GetTag(Tag* key) const;
-            bool GetTag(Tag* key, void** outValue) const;
-            bool HasTag(Tag* key) const;
-            void RemoveTag(Tag* key);
-
-        private:
-            TagEntry& FindOrAddTag(Tag* key);
-            TagEntry* FindTag(Tag* key);
-            const TagEntry* FindTag(Tag* key) const;
-
-            template<typename T>
-            bool GetTagImpl(Tag* key, T* outValue) const;
-        };
+        friend class SocketSession;
     private:
         struct SocketTask {
             ServerSocketHandle m_SocketHandle;
@@ -133,8 +96,49 @@ namespace lwtp {
         static void SocketTaskFunc(void* param);
     };
 
+    class SocketSession {
+    public:
+        using Tag = const int;
+    private:
+        struct TagEntry {
+            Tag* m_Key;
+            std::variant<std::monostate, psram_string, int, void*> m_Value;
+        };
+
+        std::unique_ptr<lwdn::Socket> m_Socket;
+        std::vector<TagEntry> m_Tags;
+
+    public:
+        SocketSession(std::unique_ptr<lwdn::Socket> socket);
+
+        lwdn::Socket& GetSocket();
+        std::unique_ptr<lwdn::Socket> ExtractSocket();
+        void ChangeSocket(std::unique_ptr<lwdn::Socket> newSocket);
+
+        void SetTag(Tag* key, const psram_string& value);
+        void SetTag(Tag* key, int value);
+        void SetTag(Tag* key, void* value);
+        void SetTag(Tag* key);
+        bool GetTag(Tag* key, psram_string* outValue) const;
+        bool GetTag(Tag* key, int* outValue) const;
+        bool GetTag(Tag* key) const;
+        bool GetTag(Tag* key, void** outValue) const;
+        bool HasTag(Tag* key) const;
+        void RemoveTag(Tag* key);
+
+    private:
+        TagEntry& FindOrAddTag(Tag* key);
+        TagEntry* FindTag(Tag* key);
+        const TagEntry* FindTag(Tag* key) const;
+
+        template<typename T>
+        bool GetTagImpl(Tag* key, T* outValue) const;
+    };
+
     class SocketInterceptor {
     public:
+        using Event = const int;
+
         class Chain {
             friend class Server;
         private:
@@ -147,21 +151,26 @@ namespace lwtp {
             Chain(Server& server, std::vector<std::unique_ptr<SocketInterceptor>>& interceptors, ServerSocketHandle socketHandle);
         public:
             ServerSocketHandle GetCurrentSocketHandle();
-            Packet Traverse(Server::SocketSession& session, const Packet& request);
-            int Traverse(Server::SocketSession& session, int error);
-            void TraverseOpenSocket(Server::SocketSession& session);
-            Packet Proceed(Server::SocketSession& session, const Packet& request);
-            int Proceed(Server::SocketSession& session, int error);
-            void ProceedOpenSocket(Server::SocketSession& session);
+            Packet Traverse(SocketSession& session, const Packet& request);
+            int Traverse(SocketSession& session, int error);
+            void Traverse(SocketSession& session, Event* event, void* eventData);
+            Packet Proceed(SocketSession& session, const Packet& request);
+            int Proceed(SocketSession& session, int error);
+            void Proceed(SocketSession& session, Event* event, void* eventData);
+        private:
+            size_t BeginTraverse();
+            void FinishTraverse(size_t oldIndex);
         };
 
     public:
         virtual ~SocketInterceptor() = default;
 
-        virtual Packet Intercept(Server::SocketSession& session, const Packet& request, Chain& chain) = 0;
-        virtual int InterceptError(Server::SocketSession& session, int error, Chain& chain);
-        virtual void InterceptOpenSocket(Server::SocketSession& session, Chain& chain);
+        virtual Packet Intercept(SocketSession& session, const Packet& request, Chain& chain);
+        virtual int InterceptError(SocketSession& session, int error, Chain& chain);
+        virtual void InterceptSocketEvent(SocketSession& session, Event* event, void* eventData, Chain& chain);
     };
+
+    extern SocketInterceptor::Event EVENT_SOCKET_ACCEPTED;
 
     class ScopedSocketInterceptor : public SocketInterceptor {
     private:
@@ -172,7 +181,8 @@ namespace lwtp {
 
         bool IsSocketMatched(ServerSocketHandle socket) const;
 
-        Packet Intercept(Server::SocketSession& session, const Packet& request, Chain& chain) override;
-        int InterceptError(Server::SocketSession& session, int error, Chain& chain) override;
+        Packet Intercept(SocketSession& session, const Packet& request, Chain& chain) override;
+        int InterceptError(SocketSession& session, int error, Chain& chain) override;
+        void InterceptSocketEvent(SocketSession& session, Event* event, void* eventData, Chain& chain) override;
     };
 }

@@ -172,6 +172,18 @@ public class WifiAwareLwdnScanner implements LwdnScanner {
                                     }
                                 }
 
+                                private final Map<PeerHandle, WifiAwareLwdnAddress> knownPeers = new HashMap<>();
+
+                                @Override
+                                public void onServiceLost(@NonNull PeerHandle peerHandle, int reason) {
+                                    WifiAwareLwdnAddress address = knownPeers.get(peerHandle);
+                                    if (address != null) {
+                                        Log.d(TAG, "Service lost for peer: " + peerHandle + ", address: " + address + ", reason: " + reason);
+                                        scan.removeResult(new LwdnScanResult(address, 0, Map.of()));
+                                        knownPeers.remove(peerHandle);
+                                    }
+                                }
+
                                 private final Map<PeerHandle, PendingPeerInfo> pendingPeers = new HashMap<>();
 
                                 private void handlePublisherFound(PeerHandle peer, LwdnServiceID serviceID, byte[] ssi, int rssi) {
@@ -213,6 +225,7 @@ public class WifiAwareLwdnScanner implements LwdnScanner {
                                         byte[] innerSsi = Arrays.copyOfRange(serviceSpecificInfo, peerMacAddress.length, serviceSpecificInfo.length);
                                         WifiAwareLwdnAddress finalAddress = WifiAwareLwdnAddress.create(mySession, peerHandle, servicePort).withKnownAddress(peerMacAddress);
                                         Log.d(TAG, "Found LWDN device: " + finalAddress + ", rssi=" + rssi + ", serviceID=" + serviceID);
+                                        knownPeers.put(peerHandle, finalAddress);
                                         scan.addResult(new LwdnScanResult(
                                                 finalAddress,
                                                 rssi,

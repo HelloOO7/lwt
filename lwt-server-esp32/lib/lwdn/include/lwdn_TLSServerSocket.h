@@ -16,9 +16,9 @@ namespace lwdn {
     class TLSServerSocket : public ServerSocket {
     private:
         ServerSocket& m_Base;
-        mbedtls_ssl_config& m_SSLConfig;
+        TLSConfig& m_SSLConfig;
     public:
-        TLSServerSocket(ServerSocket& base, mbedtls_ssl_config& sslConfig);
+        TLSServerSocket(ServerSocket& base, TLSConfig& sslConfig);
 
         std::unique_ptr<Socket> Accept() override;
 

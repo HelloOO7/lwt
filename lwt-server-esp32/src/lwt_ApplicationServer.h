@@ -14,7 +14,7 @@ namespace lwt {
     public:
         ApplicationServer(ServiceRegistry& serviceRegistry);
 
-        lwtp::PacketData ServeRequest(lwtp::Server::SocketSession& session, const lwtp::PacketData& request) override;
+        lwtp::PacketData ServeRequest(lwtp::SocketSession& session, const lwtp::PacketData& request) override;
 
         template<typename TRequestPacket, typename TOperationFunc>
         static OperationFunction CreateOperationServiceFunc(TOperationFunc&& service) {
