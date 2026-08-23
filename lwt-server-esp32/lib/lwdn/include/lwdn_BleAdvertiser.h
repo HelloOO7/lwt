@@ -6,6 +6,7 @@
 #include "host/ble_gap.h"
 #include "lwdn_BleLink.h"
 #include "EnumBitflags.h"
+#include "CommonTypes.h"
 
 namespace lwdn {
 
@@ -43,7 +44,7 @@ namespace lwdn {
         Flags GetFlags() const;
 
         virtual size_t GetMaxAdvDataSize() const override;
-        virtual bool SetLwdnAdvData(const std::span<const uint8_t>& data) override;
+        virtual bool SetLwdnAdvData(const ByteSpan& data) override;
 
         virtual LinkAdapter* GetLinkAdapter() const override { return &BLE_ADAPTER; }
 

@@ -5,7 +5,7 @@
 #include "esp_timer.h"
 #include "esp_netif.h"
 #include "esp_log.h"
-#include "lwt_CryptoTypes.h"
+#include "CryptoTypes.h"
 #include "mbedtls/md.h"
 
 namespace lwt {
@@ -14,16 +14,16 @@ namespace lwt {
 
     static constexpr const char* CHALLENGE_SALT = "LwtServerAuthentication";
 
-    ServerAuthenticationService::ServerAuthenticationService(uint8_t* certString, mbedtls_pk_context& signingKey) :
-        m_CertString(certString),
-        m_SigningKey(signingKey)
+    ServerAuthenticationService::ServerAuthenticationService(uint8_t* certString, DigitalSignature& signingKey) :
+        m_CertString{ certString },
+        m_SigningKey{ signingKey }
     {
     }
 
     void ServerAuthenticationService::Register(ServiceRegistry& registry) {
         registry.RegisterServiceCallback(Operation_AuthenticateServer, ApplicationServer::CreateOperationServiceFunc<ServerAuthenticationRequest>(
             [this](const ServerAuthenticationRequest& req, flatbuffers::FlatBufferBuilder& fbb) -> ResponseStatus {
-                auto signedChallenge = SignChallenge(req.challenge()->data(), req.challenge()->size());
+                auto signedChallenge = SignChallenge(flatbuffers::make_span(req.challenge()));
                 if (signedChallenge.empty()) {
                     return 550;
                 }
@@ -36,30 +36,20 @@ namespace lwt {
         ));
     }
 
-    psram_vector<uint8_t> ServerAuthenticationService::SignChallenge(const uint8_t* challenge, size_t challengeLen) {
+    psram_vector<uint8_t> ServerAuthenticationService::SignChallenge(const ByteSpan& challenge) {
         psram_vector<uint8_t> saltedChallenge;
-        saltedChallenge.reserve(strlen(CHALLENGE_SALT) + challengeLen);
+        saltedChallenge.reserve(strlen(CHALLENGE_SALT) + challenge.size());
         saltedChallenge.insert(saltedChallenge.end(), CHALLENGE_SALT, CHALLENGE_SALT + strlen(CHALLENGE_SALT));
-        saltedChallenge.insert(saltedChallenge.end(), challenge, challenge + challengeLen);
+        saltedChallenge.insert(saltedChallenge.end(), challenge.data(), challenge.data() + challenge.size());
 
-        SHA256Hash saltedChallengeHash;
-
-        int err = mbedtls_md(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), saltedChallenge.data(), saltedChallenge.size(), saltedChallengeHash.data());
-        if (err != 0) {
-            ESP_LOGE(TAG, "Failed to compute SHA-256 hash of challenge: -0x%04X", -err);
+        psram_vector<uint8_t> signature;
+        int res = m_SigningKey.Sign(saltedChallenge, &signature, MBEDTLS_MD_SHA256);
+        if (res != 0) {
+            ESP_LOGE(TAG, "Failed to sign challenge, error code: %d", res);
             return {};
         }
 
-        psram_vector<uint8_t> signature(MBEDTLS_PK_SIGNATURE_MAX_SIZE);
-        size_t signatureLen;
-        ESP_LOGI(TAG, "Signing challenge");
-        err = mbedtls_pk_sign(&m_SigningKey, MBEDTLS_MD_SHA256, saltedChallengeHash.data(), saltedChallengeHash.size(), signature.data(), signature.size(), &signatureLen);
-        if (err != 0) {
-            ESP_LOGE(TAG, "Failed to sign challenge: -0x%04X", -err);
-            return {};
-        }
-        ESP_LOGI(TAG, "Challenge signed successfully, signature length: %d", signatureLen);
-        signature.resize(signatureLen);
+        ESP_LOGI(TAG, "Challenge signed successfully, signature length: %d", signature.size());
         return signature;
     }
 }

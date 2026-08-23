@@ -83,7 +83,7 @@ namespace lwdn {
         return m_ServiceId != 0;
     }
 
-    void WifiNanPublisher::UpdateSSI(const std::span<const uint8_t>& ssi)
+    void WifiNanPublisher::UpdateSSI(const ByteSpan& ssi)
     {
         std::lock_guard lock(m_ConfigLock);
 
@@ -105,7 +105,7 @@ namespace lwdn {
     {
         std::lock_guard lock(m_ConfigLock);
 
-        Message message(*this, std::span<const uint8_t>(event->ssi, event->ssi_len), event);
+        Message message(*this, ByteSpan(event->ssi, event->ssi_len), event);
 
         for (auto&& handler : m_MessageHandlers) {
             handler(message);
@@ -140,8 +140,8 @@ namespace lwdn {
         }
     }
 
-    WifiNanPublisher::Message::Message(WifiNanPublisher& pub, const std::span<const uint8_t>& data, wifi_event_nan_receive_t* recvEvent) :
-        std::span<const uint8_t>(data),
+    WifiNanPublisher::Message::Message(WifiNanPublisher& pub, const ByteSpan& data, wifi_event_nan_receive_t* recvEvent) :
+        ByteSpan(data),
         m_Publisher(pub),
         m_ReceiveEvent(recvEvent)
     {
@@ -152,12 +152,12 @@ namespace lwdn {
         return m_ReplySent;
     }
 
-    std::span<const uint8_t> WifiNanPublisher::Message::GetCurrentPublisherSSI()
+    ByteSpan WifiNanPublisher::Message::GetCurrentPublisherSSI()
     {
         return m_Publisher.m_Config.SSI;
     }
 
-    void WifiNanPublisher::Message::Reply(const std::span<const uint8_t>& data)
+    void WifiNanPublisher::Message::Reply(const ByteSpan& data)
     {
         if (WasReplySent()) {
             ESP_LOGW(TAG, "Warning: Reply has already been sent for this message, ignoring subsequent reply");

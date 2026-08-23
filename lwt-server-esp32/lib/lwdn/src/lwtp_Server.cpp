@@ -192,7 +192,7 @@ namespace lwtp {
         m_SocketTasks.clear();
     }
 
-    ServerSocketHandle Server::AddSocket(lwdn::ServerSocket* socket, size_t taskCount, size_t taskStackSize)
+    ServerSocketHandle Server::AddSocket(lwdn::ServerSocket* socket, size_t taskCount, const SocketTaskConfig& taskConfig)
     {
         std::lock_guard lock(m_Lock);
         ServerSocketHandle handle = m_NextSocketHandle++;
@@ -201,7 +201,7 @@ namespace lwtp {
             task->m_SocketHandle = handle;
             task->m_Socket = socket;
             task->m_Server = this;
-            xTaskCreateStaticPSRAM(SocketTaskFunc, "LWTP Socket task", taskStackSize, task.get(), tskIDLE_PRIORITY + 1, &task->m_Task);
+            xTaskCreateStaticPSRAM(SocketTaskFunc, "LWTP Socket task", taskConfig.m_StackSize, task.get(), taskConfig.m_Priority, &task->m_Task);
             m_SocketTasks.push_back(std::move(task));
         }
         return handle;

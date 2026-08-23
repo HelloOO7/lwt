@@ -11,5 +11,8 @@ enum Operation : ushort {
     AuthenticateServer,
     ActivateTicket,
     GetAdvertisingInfo,
-    SetRazzia
+    SetRazzia,
+    CICOCheckIn,
+    CICORefresh,
+    CICOCheckOut
 }

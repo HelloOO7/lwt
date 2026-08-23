@@ -10,6 +10,7 @@
 #include <functional>
 #include <mutex>
 #include <span>
+#include "CommonTypes.h"
 
 namespace lwdn {
 
@@ -31,7 +32,7 @@ namespace lwdn {
             psram_vector<uint8_t> SSI;
         };
 
-        class Message : public std::span<const uint8_t> {
+        class Message : public ByteSpan {
             friend class WifiNanPublisher;
         private:
             WifiNanPublisher& m_Publisher;
@@ -39,14 +40,14 @@ namespace lwdn {
             bool m_ReplySent{ false };
 
         private:
-            Message(WifiNanPublisher& pub, const std::span<const uint8_t>& data, wifi_event_nan_receive_t* recvEvent);
+            Message(WifiNanPublisher& pub, const ByteSpan& data, wifi_event_nan_receive_t* recvEvent);
 
             bool WasReplySent() const;
 
         public:
-            std::span<const uint8_t> GetCurrentPublisherSSI();
+            ByteSpan GetCurrentPublisherSSI();
 
-            void Reply(const std::span<const uint8_t>& data);
+            void Reply(const ByteSpan& data);
         };
 
         using MessageHandler = std::function<void(Message&)>;
@@ -70,7 +71,7 @@ namespace lwdn {
         void Cancel();
         bool IsPublishing() const;
 
-        void UpdateSSI(const std::span<const uint8_t>& ssi);
+        void UpdateSSI(const ByteSpan& ssi);
 
         void RegisterMessageHandler(MessageHandler&& handler);
 

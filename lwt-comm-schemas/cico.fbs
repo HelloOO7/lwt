@@ -1,0 +1,101 @@
+include "lwdn.fbs";
+include "datetime.fbs";
+
+namespace lwt;
+
+table CheckInRequest {
+    /// Private token issued by the ticketing system to
+    /// start check-in, signed by MOS. This is issued on-demand when a client app
+    /// connects to the ticketing system and requests a refresh.
+    /// For safety, it should be refreshed as often as possible, but this
+    /// is up to the client to decide (failure to refresh could only harm
+    /// the customer, by way of paying for someone else's rides).
+    account_checkin_token: [ubyte] (required);
+}
+
+table CICOTicketFragment {
+    /// List of all LWDN addresses of the fragment issuer.
+    issuer_addresses: [LwdnAddress] (required);
+    /// PEM data of the certificate of the fragment issuer.
+    /// This is sent to follow-up peers in CICORefresh requests
+    /// so that they can verify that the preceding fragment was
+    /// signed by a legitimate issuer.
+    issuer_certificate: [ubyte] (required);
+    /// The ephemereal electronic ticket data to be shown during inspection.
+    /// The signature in this ETD is not using the MOS signing key, but rather
+    /// using the LWT device's local key. Since the certificate is quite large
+    /// (about 0.5 kB), it is not embedded in the ETD, rather, the ticket inspector
+    /// must request it from the vehicle.
+    etd: [ubyte] (required);
+    /// TOTP seed for dynamic QR codes. The derivation secret is not the same as
+    /// with standard tickets - the keys used here are local to the
+    /// device and can only be obtained by the ticket inspector via
+    /// local communication.
+    totp_seed: [ubyte] (required);
+    /// Signed refresh token used to create continuation fragments.
+    /// This token is opaque, but contains much of the information also present
+    /// in this flatbuffer, digitally signed.
+    refresh_token: [ubyte] (required);
+    /// Time when the fragment was issued, in milliseconds of server time.
+    issued_at: long;
+    /// Time when the fragment was issued, as an absolute timestamp.
+    /// This may not be present if the device does not have access to an
+    /// NTP server. In those cases, the fragment can not be continued
+    /// with on another vehicle in state of ticket inspection.
+    issued_at_absolute: LwtOffsetDateTime;
+    /// Validity period of the refresh token, in milliseconds.
+    /// The refresh token is still valid for tariffication purposes even after the TTL
+    /// expires (such as during long transfers), but it can no longer bypass ticket inspection
+    /// during check-in.
+    ttl: long;
+}
+
+table CICOFragmentRefreshRequest {
+    /// Raw data of the fragment's refresh token.
+    refresh_token: [ubyte] (required);
+    /// Issuer certificate, for use during transfers (changes of vehicles).
+    issuer_certificate: [ubyte] (required);
+}
+
+table CICORefreshRequest {
+    /// One or more fragments that should be refreshed. The response will
+    /// always be one fragment, but it can potentially follow up on multiple preceding fragments.
+    /// This is so that ambiguous scenarios (lots of vehicles in close proximity) can be reconciled
+    /// into one ticket after the situation changes.
+    fragments: [CICOFragmentRefreshRequest] (required);
+}
+
+table CheckOutRequest {
+    /// Refresh token of the fragment used to terminate the CICO session.
+    /// Only one needs to be sent, as parallel fragments are all still part of one session.
+    /// Usage of a refresh token after check-out is not prohibited in a technical manner.
+    /// It can still be used and will be billed. The check out is more of a way for the passenger
+    /// to indicate "I am off the network, please finalize my fare", which triggers the ticketing
+    /// system to evaluate their fare and allow viewing it as a finished journey. Ticket fragments
+    /// are still valid up until their TTL expires, and no pending billing will be reversed.
+    fragment: CICOFragmentRefreshRequest (required);
+}
+
+table CICOSeedDerivationSecret {
+    /// The secret contents.
+    data: [ubyte] (required);
+    /// Start of validity, in ms. of server time.
+    valid_from: long;
+    /// End of validity, in ms. of server time.
+    valid_to: long;
+}
+
+table CICOInspectionData {
+    /// Certificate for the private key used by the device to sign
+    /// ticket fragments and refresh tokens. This can potentially be its own
+    /// cert., albeit at the moment it is the same as the TLS certificate.
+    device_certificate: [ubyte] (required);
+    /// Seed derivation secrets for ticket TOTPs. There may be multiple,
+    /// (for a few minutes before all old ticket fragments have expired),
+    /// in which case the issued-at attribute from the ETD selects which
+    /// one should be used, similarly to normal ticket, where the "valid from"
+    /// attribute fulfills this purpose.
+    seed_derivation_secrets: [CICOSeedDerivationSecret] (required);
+    /// Server timestamp for use with RTT measuring to translate local times to absolute.
+    server_time: long;
+}

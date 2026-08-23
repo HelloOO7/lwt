@@ -3,14 +3,15 @@
 #include <span>
 #include <cstdint>
 #include <map>
-#include "mbedtls/pk.h"
-#include "lwt_CommonTypes.h"
+#include <memory>
+#include "DigitalSignature.h"
+#include "CommonTypes.h"
 
 namespace lwt {
 
     class TicketSignatureVerifier {
     private:
-        std::map<uint32_t, mbedtls_pk_context> m_PublicKeys;
+        std::map<uint32_t, std::unique_ptr<DigitalSignature>> m_PublicKeys;
 
     public:
         void RegisterPublicKey(uint32_t keyId, const ByteSpan& publicKeyPem);

@@ -40,6 +40,8 @@
 #include "lwdn_WifiNanServer.h"
 #include "NewAndDelete.h"
 #include "lwt_CertRoleInterceptor.h"
+#include "lwt_TaskPriorities.h"
+#include "DigitalSignature.h"
 #include <atomic>
 
 static constexpr uint16_t BLE_PSM = 0xD7; // 0x80 + 'W'
@@ -61,6 +63,7 @@ static const lwt::TicketValidationConfig TICKETING_CONFIG = {
 class AppMain {
 private:
     TlsEnvironment m_TlsCredentials;
+    DigitalSignature m_SigningKey;
     mbedtls_ssl_config m_MbedTlsConfig;
     lwdn::TLSConfig m_TLSConfig;
     vdv301::ServiceDiscovery m_HttpServiceDiscovery;
@@ -92,8 +95,9 @@ public:
             get_debug_device_crt_start(), get_debug_device_crt_end(),
             TLS_LWT_SERVER_KEY_DEBUG_START, TLS_LWT_SERVER_KEY_DEBUG_END
         ),
+        m_SigningKey(ByteSpan(TLS_LWT_SERVER_KEY_DEBUG_START, TLS_LWT_SERVER_KEY_DEBUG_END), DigitalSignature::KeyUsage::SIGN),
         m_TLSConfig(m_MbedTlsConfig),
-        m_HttpServiceDiscovery{ vdv301::HttpServiceDiscovery() },
+        m_HttpServiceDiscovery{ vdv301::HttpServiceDiscovery(TASK_PRIORITY_BACKGROUND_SYNC) },
         m_CISSubscriber(
             m_HttpServiceDiscovery,
             vdv301::SubscriberCIS::Operation::GetAllData
@@ -104,7 +108,7 @@ public:
         ),
         m_ServiceRegistry(lwt::Operation_MIN, lwt::Operation_MAX),
         m_AppServer(m_ServiceRegistry),
-        m_ServerAuthService(get_debug_device_crt_start(), m_TlsCredentials.device_key),
+        m_ServerAuthService(get_debug_device_crt_start(), m_SigningKey),
         m_TripInfoService(m_CISSubscriber),
         m_PreauthTokenManager(LoadOrCreateHmacKey("pat_hmac_key", 32)),
         m_TicketVerifier(),
@@ -136,8 +140,14 @@ public:
 
         m_AppServer.AddInterceptor(std::make_unique<lwtp::StartTLSInterceptor>(m_TLSConfig));
         m_AppServer.AddInterceptor(std::make_unique<lwt::CertRoleInterceptor>());
-        m_AppServer.AddSocket(&m_BLEServer, 1, 6144);
-        m_AppServer.AddSocket(&m_WifiNanServer, 1, 6144);
+
+        lwtp::Server::SocketTaskConfig socketTaskConfig{
+            .m_StackSize = 6144,
+            .m_Priority = TASK_PRIORITY_CLIENT_SERVER
+        };
+
+        m_AppServer.AddSocket(&m_BLEServer, 1, socketTaskConfig);
+        m_AppServer.AddSocket(&m_WifiNanServer, 1, socketTaskConfig);
     }
 
     void StartAdvertising() {

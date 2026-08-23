@@ -40,6 +40,12 @@ namespace lwtp {
 
     class Server {
         friend class SocketSession;
+    public:
+        struct SocketTaskConfig {
+            size_t m_StackSize{ 4096 };
+            int m_Priority{ tskIDLE_PRIORITY + 1 };
+        };
+
     private:
         struct SocketTask {
             ServerSocketHandle m_SocketHandle;
@@ -62,7 +68,7 @@ namespace lwtp {
         Server() = default;
         virtual ~Server();
 
-        ServerSocketHandle AddSocket(lwdn::ServerSocket* socket, size_t taskCount = 1, size_t taskStackSize = 4096);
+        ServerSocketHandle AddSocket(lwdn::ServerSocket* socket, size_t taskCount, const SocketTaskConfig& taskConfig);
         void AddInterceptor(std::unique_ptr<SocketInterceptor> interceptor, ServerSocketHandle socketFilter = INVALID_SERVER_SOCKET);
 
         /**

@@ -5,8 +5,8 @@
 #include <array>
 #include <climits>
 #include <span>
-#include "lwt_CryptoTypes.h"
-#include "lwt_CommonTypes.h"
+#include "CryptoTypes.h"
+#include "CommonTypes.h"
 #include "psa/crypto.h"
 #include "PSRAMContainers.h"
 

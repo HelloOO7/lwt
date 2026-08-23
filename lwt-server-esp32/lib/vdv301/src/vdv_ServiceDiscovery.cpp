@@ -240,8 +240,8 @@ namespace vdv301
     static std::mutex g_GlobalAsyncQueryMutex;
     static std::unordered_map<mdns_search_once_t*, ServiceDiscovery*> g_AsyncQueryToInstanceMap;
 
-    ServiceDiscovery::ServiceDiscovery(const std::string& serviceType, Protocol protocol) :
-        m_EventQueue{ "ServiceDiscovery", 10 },
+    ServiceDiscovery::ServiceDiscovery(const std::string& serviceType, Protocol protocol, int taskPriority) :
+        m_EventQueue{ "ServiceDiscovery", 10, 4096, taskPriority },
         m_ServiceType{ "_" + serviceType },
         m_Protocol{ protocol },
         m_ProtocolStr{ ProtocolToAddressString(protocol) },
@@ -792,8 +792,8 @@ namespace vdv301
         return true;
     }
 
-    ServiceDiscovery HttpServiceDiscovery()
+    ServiceDiscovery HttpServiceDiscovery(int taskPriority)
     {
-        return ServiceDiscovery("ibisip_http", ServiceDiscovery::Protocol::TCP);
+        return ServiceDiscovery("ibisip_http", ServiceDiscovery::Protocol::TCP, taskPriority);
     }
 }

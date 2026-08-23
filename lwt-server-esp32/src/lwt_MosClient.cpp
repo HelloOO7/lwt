@@ -77,7 +77,7 @@ namespace lwt {
 
         std::cout << "<---" << status << " MOS::ActivateTicket ---" << std::endl;
 
-        if (status >= 400) {
+        if (status != 200) {
             std::cout << body << std::endl;
             return status;
         }

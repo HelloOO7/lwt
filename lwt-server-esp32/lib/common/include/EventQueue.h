@@ -18,8 +18,7 @@ public:
     static constexpr EventTag EVENT_TAG_NONE = -1;
     using EventCallback = std::function<void()>;
 
-    static constexpr size_t STACK_PSRAM_BIT = 0x80000000;
-    static constexpr size_t STACK_SIZE_MASK = ~STACK_PSRAM_BIT;
+    static constexpr int DEFAULT_TASK_PRIORITY = tskIDLE_PRIORITY + 1;
 
 private:
     struct EventRegistration {
@@ -43,7 +42,7 @@ private:
 
     bool m_Closed{ false };
 public:
-    EventQueue(const std::string& name, size_t capacity, size_t stackSize = 4096, size_t priority = tskIDLE_PRIORITY + 1);
+    EventQueue(const std::string& name, size_t capacity, size_t stackSize = 4096, int priority = DEFAULT_TASK_PRIORITY);
     ~EventQueue();
 
     /**

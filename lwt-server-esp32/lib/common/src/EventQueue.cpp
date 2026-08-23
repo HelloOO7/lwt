@@ -1,6 +1,6 @@
 #include "EventQueue.h"
 
-EventQueue::EventQueue(const std::string& name, size_t capacity, size_t stackSize, size_t priority) :
+EventQueue::EventQueue(const std::string& name, size_t capacity, size_t stackSize, int priority) :
     m_Name(name),
     m_Capacity(capacity)
 {

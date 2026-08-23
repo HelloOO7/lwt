@@ -3,6 +3,7 @@
 #include <bit>
 #include <cstring>
 #include <span>
+#include "CommonTypes.h"
 
 template<std::endian TOrder>
 class BitConverter {
@@ -161,15 +162,15 @@ public:
             return Read<int64_t>();
         }
 
-        std::span<const uint8_t> ReadBytes(size_t size) {
-            std::span<const uint8_t> bytes(m_Data, size);
+        ByteSpan ReadBytes(size_t size) {
+            ByteSpan bytes(m_Data, size);
             m_Data += size;
             return bytes;
         }
 
         template<size_t N>
-        std::span<const uint8_t, N> ReadBytes() {
-            std::span<const uint8_t, N> bytes(m_Data, N);
+        ByteSpan ReadBytes() {
+            ByteSpan bytes(m_Data, N);
             m_Data += N;
             return bytes;
         }
@@ -234,7 +235,7 @@ public:
             m_Data += size;
         }
 
-        void WriteBytes(const std::span<const uint8_t>& bytes) {
+        void WriteBytes(const ByteSpan& bytes) {
             WriteBytes(bytes.data(), bytes.size());
         }
 

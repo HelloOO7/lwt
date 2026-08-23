@@ -8,6 +8,7 @@
 #include "lwdn_WifiNanPublisher.h"
 #include "lwdn_ServerSocket.h"
 #include "PSRAMContainers.h"
+#include "CommonTypes.h"
 
 namespace lwdn {
 
@@ -26,7 +27,7 @@ namespace lwdn {
         virtual bool IsAdvertising() const override;
 
         virtual size_t GetMaxAdvDataSize() const override;
-        virtual bool SetLwdnAdvData(const std::span<const uint8_t>& data) override;
+        virtual bool SetLwdnAdvData(const ByteSpan& data) override;
 
         virtual LinkAdapter* GetLinkAdapter() const override { return &WIFI_NAN_ADAPTER; }
     };

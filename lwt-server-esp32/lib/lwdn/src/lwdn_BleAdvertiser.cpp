@@ -103,7 +103,7 @@ namespace lwdn {
         return advertiser->HandleGapEvent(event);
     }
 
-    bool BleAdvertiser::SetLwdnAdvData(const std::span<const uint8_t>& data) {
+    bool BleAdvertiser::SetLwdnAdvData(const ByteSpan& data) {
         std::vector<uint8_t> advData;
         advData.reserve(GetRawFieldsMaxSize());
 
@@ -129,7 +129,7 @@ namespace lwdn {
 
         for (size_t dataOffset = 0; dataOffset < data.size(); dataOffset += chunkMaxInnerSize) {
             size_t chunkSize = std::min(data.size() - dataOffset, chunkMaxInnerSize);
-            std::span<const uint8_t> chunk = data.subspan(dataOffset, chunkSize);
+            ByteSpan chunk = data.subspan(dataOffset, chunkSize);
 
             advData.push_back(uuidSize + 1 + chunkSize); // length of the service data + 1 byte for the type
             advData.push_back(advType); // type for service data

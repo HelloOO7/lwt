@@ -3,6 +3,7 @@
 #include <span>
 #include <cstdint>
 #include "lwdn_Link.h"
+#include "CommonTypes.h"
 
 namespace lwdn {
 
@@ -16,6 +17,6 @@ namespace lwdn {
         virtual bool IsAdvertising() const = 0;
 
         virtual size_t GetMaxAdvDataSize() const = 0;
-        virtual bool SetLwdnAdvData(const std::span<const uint8_t>& data) = 0;
+        virtual bool SetLwdnAdvData(const ByteSpan& data) = 0;
     };
 }

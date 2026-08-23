@@ -1,22 +1,13 @@
 #include "lwt_TicketSignatureVerifier.h"
 #include "esp_log.h"
-#include "lwt_CryptoTypes.h"
+#include "CryptoTypes.h"
 
 namespace lwt {
 
     static constexpr const char* TAG = "TicketSignatureVerifier";
 
     void TicketSignatureVerifier::RegisterPublicKey(uint32_t keyId, const ByteSpan& publicKeyPem) {
-        mbedtls_pk_context pk;
-        mbedtls_pk_init(&pk);
-        int rc = mbedtls_pk_parse_public_key(&pk, publicKeyPem.data(), publicKeyPem.size());
-        if (rc != 0) {
-            mbedtls_pk_free(&pk);
-            ESP_LOGE(TAG, "Failed to parse public key ID: %u", keyId);
-        }
-        else {
-            m_PublicKeys[keyId] = std::move(pk);
-        }
+        m_PublicKeys[keyId] = std::make_unique<DigitalSignature>(publicKeyPem, DigitalSignature::KeyUsage::VERIFY);
     }
 
     bool TicketSignatureVerifier::VerifyHashSignature(const ByteSpan& digest, mbedtls_md_type_t digestType, const ByteSpan& signature, uint32_t keyId) {
@@ -26,9 +17,9 @@ namespace lwt {
             return false; // Key not found
         }
 
-        mbedtls_pk_context& pk = it->second;
+        auto&& signatureVerifier = it->second;
 
-        int rc = mbedtls_pk_verify(&pk, digestType, digest.data(), digest.size(), signature.data(), signature.size());
+        int rc = signatureVerifier->VerifyDigest(digest, digestType, signature);
         if (rc != 0) {
             ESP_LOGW(TAG, "Signature verification failed for key ID: %u, result: %d", keyId, rc);
         }

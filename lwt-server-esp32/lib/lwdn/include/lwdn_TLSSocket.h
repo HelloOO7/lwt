@@ -5,9 +5,9 @@
 #include "mbedtls/ssl.h"
 #include "mbedtls/ssl_ticket.h"
 #include "PSRAMContainers.h"
-#include <span>
 #include <functional>
 #include <optional>
+#include "CommonTypes.h"
 
 namespace lwdn {
 
@@ -53,8 +53,8 @@ namespace lwdn {
         operator mbedtls_ssl_context* ();
         operator const mbedtls_ssl_context* () const;
 
-        const std::span<const uint8_t> GetTicketExtraData() const;
-        void AddTicketExtraData(const std::span<const uint8_t>& data);
+        ByteSpan GetTicketExtraData() const;
+        void AddTicketExtraData(const ByteSpan& data);
 
         void SetCustomVerifyCallback(CertVerifyCallback&& callback);
 

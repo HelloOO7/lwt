@@ -52,10 +52,14 @@ namespace lwt {
                                 }
 
                                 infoOffsets.push_back(
-                                    lwt::CreateAdvertisingInfo(
+                                    CreateAdvertisingInfo(
                                         fbb,
                                         ConvertChannelTypeToFlatbuffer(channelInfo.m_Type),
-                                        fbb.CreateVector(channelInfo.m_MACAddress.data(), channelInfo.m_MACAddress.size()),
+                                        CreateLwdnAddress(
+                                            fbb,
+                                            channelInfo.m_Type == TripInfoAdvertiser::ChannelType::WIFI_NAN ? LwdnLinkType_WifiAware : LwdnLinkType_BluetoothLe,
+                                            fbb.CreateVector(channelInfo.m_MACAddress.data(), channelInfo.m_MACAddress.size())
+                                        ),
                                         advDataOffset
                                     )
                                 );

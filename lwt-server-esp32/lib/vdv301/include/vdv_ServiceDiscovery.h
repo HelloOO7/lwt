@@ -149,8 +149,9 @@ namespace vdv301
          *
          * @param serviceType service type without leading underscore and without trailing "._tcp" or "._udp", e.g. "my-service"
          * @param protocol protocol which the service is using
+         * @param taskPriority priority for the internal event queue task
          */
-        ServiceDiscovery(const std::string& serviceType, Protocol protocol);
+        ServiceDiscovery(const std::string& serviceType, Protocol protocol, int taskPriority = EventQueue::DEFAULT_TASK_PRIORITY);
         ~ServiceDiscovery();
 
         /**
@@ -195,5 +196,5 @@ namespace vdv301
         void UpdateBrowseResultsAsync();
     };
 
-    ServiceDiscovery HttpServiceDiscovery();
+    ServiceDiscovery HttpServiceDiscovery(int taskPriority = EventQueue::DEFAULT_TASK_PRIORITY);
 }

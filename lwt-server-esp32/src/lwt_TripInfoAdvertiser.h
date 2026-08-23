@@ -7,7 +7,7 @@
 #include "vdv_SubscriberTVS.h"
 #include "flatbuffer_util.h"
 #include "lwt_AdvData.h"
-#include "lwt_CommonTypes.h"
+#include "CommonTypes.h"
 #include "PSRAMContainers.h"
 #include <array>
 #include <functional>

@@ -1,0 +1,13 @@
+namespace lwt;
+
+enum LwdnLinkType : ubyte {
+    BluetoothLe,
+    WifiAware
+}
+
+table LwdnAddress {
+    /// Type of the data link layer on which the MAC address can be used.
+    link_type: LwdnLinkType;
+    /// MAC address of the LWDN endpoint where a socket can be opened.
+    mac: [ubyte] (required);
+}

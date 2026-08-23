@@ -62,11 +62,11 @@ namespace lwdn {
         return &m_SSLContext;
     }
 
-    const std::span<const uint8_t> TLSContext::GetTicketExtraData() const {
+    ByteSpan TLSContext::GetTicketExtraData() const {
         return m_TicketExtraData;
     }
 
-    void TLSContext::AddTicketExtraData(const std::span<const uint8_t>& data) {
+    void TLSContext::AddTicketExtraData(const ByteSpan& data) {
         m_TicketExtraData.insert(m_TicketExtraData.end(), data.begin(), data.end());
     }
 

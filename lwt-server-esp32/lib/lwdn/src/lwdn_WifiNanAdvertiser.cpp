@@ -31,7 +31,7 @@ namespace lwdn {
         return ESP_WIFI_MAX_SVC_SSI_LEN - LinkAddress{}.size();
     }
 
-    bool WifiNanAdvertiser::SetLwdnAdvData(const std::span<const uint8_t>& data) {
+    bool WifiNanAdvertiser::SetLwdnAdvData(const ByteSpan& data) {
         auto macAddress = GetLinkAdapter()->GetLinkAddress();
         m_DynamicSSI.resize(macAddress.size() + data.size());
         std::copy(macAddress.begin(), macAddress.end(), m_DynamicSSI.begin());

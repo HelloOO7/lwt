@@ -2,7 +2,7 @@
 
 #include <string>
 #include <cstdint>
-#include "lwt_CommonTypes.h"
+#include "CommonTypes.h"
 #include "esp_http_client.h"
 #include "PSRAMContainers.h"
 #include "ISO8601.h"
@@ -38,6 +38,29 @@ namespace lwt {
         OffsetDateTime ActivationTime;
     };
 
+    enum class MOSCICOEventType {
+        CHECK_IN,
+        CHECK_OUT,
+        REFRESH,
+    };
+
+    struct MOSCICOEvent {
+        UUID EventId;
+        UUID PreviousEventId;
+        UUID SessionId;
+        uint32_t AccountId;
+
+        int64_t LocalTimestamp;
+        
+        MOSCICOEventType EventType;
+        psram_string LwtMetadata;
+    };
+
+    struct MOSCICOEventBatch {
+        psram_vector<MOSCICOEvent> Events;
+        int64_t CurrentLocalTimestamp;
+    };
+
     class MOSClient {
     private:
         std::string m_BaseUrl;
@@ -47,6 +70,7 @@ namespace lwt {
         MOSClient(const std::string& baseUrl, const ByteSpan& tlsClientCertChain, const ByteSpan& tlsClientPrivateKey);
 
         int ActivateTicket(uint64_t ticketId, const MOSTicketActivationParams& params, MOSTicket* pActivatedTicket);
+        int PushCICOEvents(const MOSCICOEventBatch& eventBatch);
 
     private:
         /**
