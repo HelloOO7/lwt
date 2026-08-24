@@ -973,14 +973,19 @@ public class TicketActivationViewModel extends AndroidViewModel {
                 Log.e(TAG, "Failed to activate ticket via LWT", throwable);
                 activationError.setValue(throwable);
             } else {
-                TicketData activatedTicket = new TicketData(ticket);
-                activatedTicket.setActivatedAt(LwtTime.convertOffsetDateTime(result.activatedAtTime()));
-                activatedTicket.setValidSince(LwtTime.convertOffsetDateTime(result.validSinceTime()));
-                activatedTicket.setValidUntil(LwtTime.convertOffsetDateTime(result.validUntilTime()));
-                activatedTicket.setEtd(ByteBufferUtils.toByteArray(result.signedEtdAsByteBuffer()));
-                activatedTicket.setTotpSeed(ByteBufferUtils.toByteArray(result.totpSeedAsByteBuffer()));
-                activatedTicket.setChosenZones(info.zones());
-                activationResult.setValue(activatedTicket);
+                try {
+                    TicketData activatedTicket = new TicketData(ticket);
+                    activatedTicket.setActivatedAt(LwtTime.convertOffsetDateTime(result.activatedAtTime()));
+                    activatedTicket.setValidSince(LwtTime.convertOffsetDateTime(result.validSinceTime()));
+                    activatedTicket.setValidUntil(LwtTime.convertOffsetDateTime(result.validUntilTime()));
+                    activatedTicket.setEtd(ByteBufferUtils.toByteArray(result.signedEtdAsByteBuffer()));
+                    activatedTicket.setTotpSeed(ByteBufferUtils.toByteArray(result.totpSeedAsByteBuffer()));
+                    activatedTicket.setChosenZones(info.zones());
+                    activationResult.setValue(activatedTicket);
+                } catch (Exception ex) {
+                    Log.e(TAG, "Failed to process activated ticket data", ex);
+                    activationError.setValue(ex);
+                }
             }
             isActivationInProgress.setValue(false);
         }, getApplication().getMainExecutor());

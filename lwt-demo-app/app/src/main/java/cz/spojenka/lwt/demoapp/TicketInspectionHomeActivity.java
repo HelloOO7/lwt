@@ -67,6 +67,8 @@ public class TicketInspectionHomeActivity extends BaseActivity {
 
     private ViewModel viewModel;
 
+    private boolean isRazziaDialogUp = false;
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -139,11 +141,8 @@ public class TicketInspectionHomeActivity extends BaseActivity {
         });
 
         viewModel.getRazziaStateLiveData().observe(this, state -> {
-            if (state.isProcessing()) {
-                binding.switchRazzia.setEnabled(false);
-            } else {
-                binding.switchRazzia.setEnabled(true);
-            }
+            // if the dialog is up, keep it enabled to avoid flickering animations
+            binding.switchRazzia.setEnabled(!state.isProcessing() || isRazziaDialogUp);
             binding.switchRazzia.setChecked(state.isRazzia());
 
             if (state.error() != null) {
@@ -156,11 +155,12 @@ public class TicketInspectionHomeActivity extends BaseActivity {
         binding.switchRazzia.setOnClickListener(v -> {
             // use onClick and not onCheckedChangeListener to avoid triggering when we programmatically change the checked state
             boolean isChecked = binding.switchRazzia.isChecked();
+            isRazziaDialogUp = true;
             ProgressDialog.doInBackground(
                     this,
                     isChecked ? R.string.ticket_inspection_razzia_entering : R.string.ticket_inspection_razzia_exiting,
                     viewModel.setRazzia(isChecked)
-            );
+            ).whenCompleteAsync((unused, throwable) -> isRazziaDialogUp = false, getLifecycleExecutor());
         });
 
         updateVehicleInfoUI();

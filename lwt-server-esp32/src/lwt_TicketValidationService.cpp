@@ -225,7 +225,7 @@ namespace lwt {
                     MOSTicket activatedTicket;
 
                     int mosResult = m_MOSClient.ActivateTicket(parsedToken.TicketId, activationParams, &activatedTicket);
-                    if (mosResult >= 400) {
+                    if (mosResult != 200) {
                         ESP_LOGW(TAG, "MOS ticket activation failed with HTTP status %d", mosResult);
                         return mosResult;
                     }

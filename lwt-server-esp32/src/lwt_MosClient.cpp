@@ -75,10 +75,12 @@ namespace lwt {
 
         int status = PerformHttpRequest(HTTP_METHOD_POST, "/tickets/" + std::to_string(ticketId) + "/activate", body, &body); //reuse request memory for response
 
-        std::cout << "<---" << status << " MOS::ActivateTicket ---" << std::endl;
+        std::cout << "<--- " << status << " MOS::ActivateTicket ---" << std::endl;
 
         if (status != 200) {
-            std::cout << body << std::endl;
+            if (status > 0) {
+                std::cout << body << std::endl;
+            }
             return status;
         }
 
