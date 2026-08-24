@@ -42,7 +42,7 @@ namespace vdv301
 
     ServiceDiscovery::Result::Result(const mdns_result_t* result) :
         m_InstanceName(result->instance_name),
-        m_HostName(result->hostname),
+        m_HostName(result->hostname ? result->hostname : ""),
         m_Port(result->port),
         m_Interface(result->esp_netif)
     {
@@ -419,7 +419,7 @@ namespace vdv301
                 }
                 if (!instanceMatched && result->instance_name) {
                     m_DNSCache.emplace_back(result);
-                    if (!result->addr) {
+                    if (!result->addr && result->hostname) {
                         auto* existingSameHost = FindAnyResultByHostName(result->hostname);
                         if (existingSameHost) {
                             m_DNSCache.back().m_IPAddresses = existingSameHost->m_IPAddresses;
@@ -706,6 +706,120 @@ namespace vdv301
             }
         }
         return true;
+    }
+
+    ServiceDiscovery::ServiceInfoBuilder::ServiceInfoBuilder()
+    {
+
+    }
+
+    ServiceDiscovery::ServiceInfoBuilder& ServiceDiscovery::ServiceInfoBuilder::SetInstanceName(const std::string& instanceName)
+    {
+        m_Info.m_InstanceName = instanceName;
+        return *this;
+    }
+
+    ServiceDiscovery::ServiceInfoBuilder& ServiceDiscovery::ServiceInfoBuilder::SetHostName(const std::string& hostName)
+    {
+        m_Info.m_HostName = hostName;
+        return *this;
+    }
+
+    ServiceDiscovery::ServiceInfoBuilder& ServiceDiscovery::ServiceInfoBuilder::SetPort(uint16_t port)
+    {
+        m_Info.m_Port = port;
+        return *this;
+    }
+
+    ServiceDiscovery::ServiceInfoBuilder& ServiceDiscovery::ServiceInfoBuilder::AddTxtRecord(const std::string& key, const std::string& value)
+    {
+        m_Info.m_TxtRecords.emplace_back(key, value);
+        return *this;
+    }
+
+    ServiceDiscovery::ServiceInfo ServiceDiscovery::ServiceInfoBuilder::Build() const
+    {
+        return m_Info;
+    }
+
+    ServiceDiscovery::PublishHandle ServiceDiscovery::PublishService(const ServiceInfo& info) {
+        std::lock_guard lock(m_PublishStateMutex);
+
+        std::vector<mdns_txt_item_t> txtItems;
+        for (auto&& [key, value] : info.m_TxtRecords) {
+            txtItems.push_back({ key.c_str(), value.c_str() });
+        }
+
+        auto hostName = !info.m_HostName.empty() ? info.m_HostName.c_str() : nullptr;
+
+        if (mdns_service_exists_with_instance(info.m_InstanceName.c_str(), m_ServiceType.c_str(), m_ProtocolStr.c_str(), info.m_HostName.c_str())) {
+            ESP_ERROR_CHECK(mdns_service_port_set_for_host(
+                info.m_InstanceName.c_str(),
+                m_ServiceType.c_str(),
+                m_ProtocolStr.c_str(),
+                hostName,
+                info.m_Port
+            ));
+            ESP_ERROR_CHECK(mdns_service_txt_set_for_host(
+                info.m_InstanceName.c_str(),
+                m_ServiceType.c_str(),
+                m_ProtocolStr.c_str(),
+                hostName,
+                txtItems.data(),
+                txtItems.size()
+            ));
+            return FindPublishHandle(info.m_InstanceName, info.m_HostName);
+        }
+        else {
+            ESP_ERROR_CHECK(mdns_service_add_for_host(
+                info.m_InstanceName.c_str(),
+                m_ServiceType.c_str(),
+                m_ProtocolStr.c_str(),
+                hostName,
+                info.m_Port,
+                txtItems.data(),
+                txtItems.size()
+            ));
+
+            PublishHandle handle = m_NextPublishHandle++;
+            m_ActivePublishes.push_back({ handle, info.m_InstanceName, info.m_HostName });
+            return handle;
+        }
+    }
+
+    void ServiceDiscovery::StopPublish(PublishHandle handle) {
+        std::lock_guard lock(m_PublishStateMutex);
+        auto find = std::find_if(
+            m_ActivePublishes.begin(),
+            m_ActivePublishes.end(),
+            [handle](const PublishState& state) {
+                return state.m_Handle == handle;
+            }
+        );
+        if (find != m_ActivePublishes.end()) {
+            ESP_LOGI(TAG, "Unpublishing service instance %s on host %s", find->m_InstanceName.c_str(), find->m_HostName.c_str());
+            mdns_service_remove_for_host(
+                find->m_InstanceName.c_str(),
+                m_ServiceType.c_str(),
+                m_ProtocolStr.c_str(),
+                find->m_HostName.empty() ? nullptr : find->m_HostName.c_str()
+            );
+            m_ActivePublishes.erase(find);
+        }
+        else {
+            ESP_LOGW(TAG, "Attempted to stop publish for unknown handle %u", handle);
+        }
+    }
+
+    ServiceDiscovery::PublishHandle ServiceDiscovery::FindPublishHandle(const std::string& instanceName, const std::string& hostName) const {
+        auto find = std::find_if(
+            m_ActivePublishes.begin(),
+            m_ActivePublishes.end(),
+            [&instanceName, &hostName](const PublishState& state) {
+                return state.m_InstanceName == instanceName && state.m_HostName == hostName;
+            }
+        );
+        return find != m_ActivePublishes.end() ? find->m_Handle : 0;
     }
 
     void ServiceDiscovery::OnIPAddressAssigned(ip_event_got_ip_t* eventData) {

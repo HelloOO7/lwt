@@ -1,8 +1,15 @@
 #include "vdv_HttpPushServer.h"
 
+#include "esp_netif.h"
+#include "esp_log.h"
+
 namespace vdv301 {
 
-    HttpPushServer::HttpPushServer(uint16_t port) : m_Port(port)
+    static constexpr const char* TAG = "HttpPushServer";
+
+    HttpPushServer::HttpPushServer(const std::string& ifkey, uint16_t port) :
+        m_IfKey(ifkey),
+        m_Port(port)
     {
 
     }
@@ -16,6 +23,16 @@ namespace vdv301 {
 
         httpd_config_t config = HTTPD_DEFAULT_CONFIG();
         config.server_port = m_Port;
+        ifreq ifr;
+        if (!m_IfKey.empty()) {
+            auto ethif = esp_netif_get_handle_from_ifkey(m_IfKey.c_str());
+            if (ethif) {
+                esp_netif_get_netif_impl_name(ethif, ifr.ifr_name);
+                config.if_name = &ifr;
+            } else {
+                ESP_LOGE(TAG, "Failed to get network interface for ifkey %s", m_IfKey.c_str());
+            }
+        }
         ESP_ERROR_CHECK(httpd_start(&m_Httpd, &config));
     }
 

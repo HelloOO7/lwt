@@ -17,6 +17,7 @@ namespace vdv301 {
         using PushConsumer = std::function<void(const PushBody& body)>;
 
     private:
+        std::string m_IfKey;
         uint16_t m_Port;
         httpd_handle_t m_Httpd { nullptr };
         std::mutex m_Mutex;
@@ -24,7 +25,7 @@ namespace vdv301 {
         std::unordered_map<std::string, PushConsumer> m_PushEndpoints;
 
     public:
-        HttpPushServer(uint16_t port);
+        HttpPushServer(const std::string& ifkey, uint16_t port);
 
         void Start();
         void Stop();

@@ -10,7 +10,7 @@ namespace vdv301
 
     static constexpr uint16_t SUBSCRIBER_PUSH_SERVER_PORT = 31415;
 
-    HttpPushServer g_SubcriberPushServer(SUBSCRIBER_PUSH_SERVER_PORT);
+    HttpPushServer g_SubcriberPushServer("ETH_DEF", SUBSCRIBER_PUSH_SERVER_PORT);
 
     static constexpr EventQueue::EventTag SERVICE_UPDATE_EVENT_TAG = 1;
 

@@ -238,8 +238,8 @@ extern "C" void app_main() {
 
     ethernet_init();
     ethernet_init_netif();
-
     mdns_init();
+    mdns_hostname_set("lwt-esp32");
     psa_crypto_init();
 
     std::cout << "Services initialized, free memory before app launch=" << esp_get_free_internal_heap_size() << " bytes" << std::endl;

@@ -103,6 +103,33 @@ namespace vdv301
         using BrowseCallback = std::function<void(const ResultSetAccessor& results)>;
         using BrowseHandle = size_t;
 
+        class ServiceInfoBuilder;
+
+        class ServiceInfo {
+            friend class ServiceInfoBuilder;
+            friend class ServiceDiscovery;
+        private:
+            std::string m_InstanceName;
+            std::string m_HostName;
+            uint16_t m_Port{ 0 };
+            TxtRecordSet m_TxtRecords;
+        };
+
+        class ServiceInfoBuilder {
+        private:
+            ServiceInfo m_Info;
+        public:
+            ServiceInfoBuilder();
+
+            ServiceInfoBuilder& SetInstanceName(const std::string& instanceName);
+            ServiceInfoBuilder& SetHostName(const std::string& hostName);
+            ServiceInfoBuilder& SetPort(uint16_t port);
+            ServiceInfoBuilder& AddTxtRecord(const std::string& key, const std::string& value);
+            ServiceInfo Build() const;
+        };
+
+        using PublishHandle = size_t;
+
     private:
         struct QueryBrowseState {
             BrowseHandle m_Handle;
@@ -117,6 +144,12 @@ namespace vdv301
             int m_Type;
         };
 
+        struct PublishState {
+            PublishHandle m_Handle;
+            std::string m_InstanceName;
+            std::string m_HostName;
+        };
+
     private:
         EventQueue m_EventQueue;
 
@@ -127,7 +160,7 @@ namespace vdv301
         bool m_TrustNANPeers{ false };
 
         std::mutex m_BrowseStateMutex;
-        size_t m_NextBrowseHandle{ 1 };
+        BrowseHandle m_NextBrowseHandle{ 1 };
         std::vector<QueryBrowseState> m_ActiveBrowses;
         mdns_browse_t* m_SdkBrowseHandle{ nullptr };
 
@@ -136,6 +169,10 @@ namespace vdv301
 
         std::mutex m_AdditionalQueryMutex;
         std::vector<AdditionalQueryState> m_ActiveAdditionalQueries;
+
+        std::mutex m_PublishStateMutex;
+        std::vector<PublishState> m_ActivePublishes;
+        PublishHandle m_NextPublishHandle{ 1 };
 
         esp_event_handler_instance_t m_EthIPEventInstance;
         esp_event_handler_instance_t m_StaIPEventInstance;
@@ -158,14 +195,17 @@ namespace vdv301
          * @brief Enable trusting NAN (Wi-Fi Aware) peers during service discovery.
          * This is disabled by default, as it would allow NAN devices connected over a datapath
          * to inject themselves into service discovery, which may not be desirable.
-         * 
-         * @param trust 
+         *
+         * @param trust
          */
         void SetTrustNANPeers(bool trust);
 
         BrowseHandle StartBrowse(const Query& query, BrowseCallback callback);
         void StopBrowse(BrowseHandle handle);
         void RestartAllBrowses();
+
+        PublishHandle PublishService(const ServiceInfo& info);
+        void StopPublish(const PublishHandle handle);
 
         static const char* ProtocolToAddressString(Protocol protocol);
         static std::string BuildMdnsAddress(const std::string& serviceType, Protocol protocol);
@@ -186,6 +226,7 @@ namespace vdv301
         static void GlobalAsyncResultNotifyCallback(mdns_search_once_t* search);
         const Result* FindAnyResultByHostName(const std::string& hostName);
         std::string FindInstanceNameForSearchHandle(mdns_search_once_t* searchHandle);
+        PublishHandle FindPublishHandle(const std::string& instanceName, const std::string& hostName) const;
         void OnIPAddressAssigned(ip_event_got_ip_t* data);
         void OnIPAddressAssigned(ip_event_got_ip6_t* data);
         static bool DeviceHasAnyIPAddress();
