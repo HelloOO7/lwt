@@ -391,7 +391,7 @@ namespace lwt {
     void TicketValidationService::OnChanged(const SubscriberTVS::RazziaState* razziaState) {
         std::lock_guard lock(m_DataMutex);
 
-        bool isRazzia = razziaState && razziaState->RazziaState == IBIS_IP_TicketValidationService_V2_2::TicketRazziaInformationEnumeration::razzia;
+        bool isRazzia = razziaState && razziaState->RazziaState == TVS::TicketRazziaInformationEnumeration::razzia;
 
         SetRazziaBit(RAZZIA_TVS_BIT, isRazzia);
         UpdateValidationInfo();

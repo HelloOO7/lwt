@@ -15,6 +15,7 @@ namespace vdv301
             "TicketValidationService",
             ServiceDiscovery::QueryBuilder()
             .FilterInstanceName("TicketValidationService*")
+            // mDNS version is 2.2, actual data is a mix of 2.2 and 2.3CZ1.0, has to be regex'd (see below)
             .FilterTxtRecord("ver", "2.2")
             .Build(),
             std::to_underlying(subscribedOps),
@@ -62,18 +63,21 @@ namespace vdv301
         }
     }
 
-    static std::regex CTS_ROOT_FIX("TicketValidationService\\.GetCurrentStopPointResponse");
-    static std::regex EXPECTED_FIX(R"(<[A-Za-z]+Expected>\s*<Value>\s*[^<]+\s*</Value>\s*</[A-Za-z]+Expected>)");
+    static std::regex FARE_ZONE_FIX(R"(<FareZone>\s*<Value>\s*[^<]+\s*</Value>\s*)");
+    static std::regex ADD_GLOBAL_STOP_REF(R"(<CurrentTariffStop>)");
 
     psram_string FixupCtsXml(const psram_string& input) {
-        psram_string output = std::regex_replace(input, CTS_ROOT_FIX, "TicketValidationService.GetCurrentTariffStopResponse");
-        output = std::regex_replace(output, EXPECTED_FIX, "");
-        return output;
+        // add missing Language to FareZone, add missing GlobalStopRef
+        return std::regex_replace(
+            std::regex_replace(input, FARE_ZONE_FIX, "$0<Language>cs</Language>"),
+            ADD_GLOBAL_STOP_REF,
+            "$0<GlobalStopRef><Value>-1</Value></GlobalStopRef>"
+        );
     }
 
     void SubscriberTVS::OnOperationResult(const OperationResult& result)
     {
-        using namespace IBIS_IP_TicketValidationService_V2_2;
+        using namespace TVS;
 
         try {
             switch (result.GetOperationID<Operation>())

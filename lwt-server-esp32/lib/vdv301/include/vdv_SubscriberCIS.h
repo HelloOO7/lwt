@@ -7,13 +7,14 @@
 
 namespace vdv301
 {
+    namespace CIS = IBIS_IP_CustomerInformationService_V2_3CZ1_0;
 
-    class SubscriberCIS : public SubscriberHttp, private Observable<IBIS_IP_CustomerInformationService_V2_3CZ1_0::CustomerInformationService_AllData>
+    class SubscriberCIS : public SubscriberHttp, private Observable<CIS::CustomerInformationService_AllData>
     {
     private:
-        using AllDataResponse = IBIS_IP_CustomerInformationService_V2_3CZ1_0::CustomerInformationService_GetAllDataResponseStructure;
+        using AllDataResponse = CIS::CustomerInformationService_GetAllDataResponseStructure;
     public:
-        using AllData = IBIS_IP_CustomerInformationService_V2_3CZ1_0::CustomerInformationService_AllData;
+        using AllData = CIS::CustomerInformationService_AllData;
 
         enum class Operation : SubscriberHttp::OperationIDType {
             GetAllData = (1 << 0),
@@ -37,16 +38,16 @@ namespace vdv301
         void ObserveAllData(Observer<AllData>& observer);
         void RemoveObserver(Observer<AllData>& observer);
 
-        static bool IsTripRefPresent(const IBIS_IP_CustomerInformationService_V2_3CZ1_0::TripInformationStructure& tripInfo);
-        static const IBIS_IP_CustomerInformationService_V2_3CZ1_0::TripInformationStructure* GetTripInformationFromAllData(const AllData& allData);
-        static const IBIS_IP_CustomerInformationService_V2_3CZ1_0::StopInformationStructure* GetCurrentStopFromAllData(const AllData& allData);
-        static const IBIS_IP_CustomerInformationService_V2_3CZ1_0::StopInformationStructure* FindStopByRef(const std::string& stopRef, const AllData& allData);
-        static const IBIS_IP_CustomerInformationService_V2_3CZ1_0::StopInformationStructure* FindLastStopByRef(const std::string& stopRef, const AllData& allData);
-        static const IBIS_IP_CustomerInformationService_V2_3CZ1_0::DisplayContentStructure* FindDisplayContent(
-            const std::string& displayContentRef, const IBIS_IP_CustomerInformationService_V2_3CZ1_0::StopInformationStructure& parent
+        static bool IsTripRefPresent(const CIS::TripInformationStructure& tripInfo);
+        static const CIS::TripInformationStructure* GetTripInformationFromAllData(const AllData& allData);
+        static const CIS::StopInformationStructure* GetCurrentStopFromAllData(const AllData& allData);
+        static const CIS::StopInformationStructure* FindStopByRef(const std::string& stopRef, const AllData& allData);
+        static const CIS::StopInformationStructure* FindLastStopByRef(const std::string& stopRef, const AllData& allData);
+        static const CIS::DisplayContentStructure* FindDisplayContent(
+            const std::string& displayContentRef, const CIS::StopInformationStructure& parent
         );
-        
-        static ssize_t ConvertStopIndex(IBIS_IP_CustomerInformationService_V2_3CZ1_0::IBIS_IP_int stopIndex);
+
+        static ssize_t ConvertStopIndex(CIS::IBIS_IP_int stopIndex);
 
     protected:
         void OnOperationResult(const OperationResult& result) override;

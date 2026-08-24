@@ -4,13 +4,15 @@
 #include "EnumBitflags.h"
 #include "Observable.h"
 
-#include "IBIS_IP_TicketValidationService_V2_2.hpp"
+#include "IBIS_IP_TicketValidationService_V2_3CZ1_0.hpp"
 
 namespace vdv301
 {
+    namespace TVS = IBIS_IP_TicketValidationService_V2_3CZ1_0;
+
     class SubscriberTVS : public SubscriberHttp,
-        Observable<IBIS_IP_TicketValidationService_V2_2::TicketValidationService_RazziaResponseDataStructure>,
-        Observable<IBIS_IP_TicketValidationService_V2_2::TicketValidationService_CurrentTariffStopDataStructure>
+        Observable<TVS::TicketValidationService_RazziaResponseDataStructure>,
+        Observable<TVS::TicketValidationService_CurrentTariffStopDataStructure>
     {
     public:
         enum class Operation : SubscriberHttp::OperationIDType {
@@ -21,8 +23,8 @@ namespace vdv301
             RetrieveTripData = (1 << 4)
         };
 
-        using RazziaState = IBIS_IP_TicketValidationService_V2_2::TicketValidationService_RazziaResponseDataStructure;
-        using CurrentTariffStop = IBIS_IP_TicketValidationService_V2_2::TicketValidationService_CurrentTariffStopDataStructure;
+        using RazziaState = TVS::TicketValidationService_RazziaResponseDataStructure;
+        using CurrentTariffStop = TVS::TicketValidationService_CurrentTariffStopDataStructure;
 
     private:
         RazziaState m_LastRazziaResp;
