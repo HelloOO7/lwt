@@ -294,6 +294,7 @@ public class TicketInspectionHomeActivity extends BaseActivity {
             if (lwtClient != null) {
                 razziaKeeper.getStateLiveData().removeObserver(razziaStateObserver);
                 AsyncUtils.runAsync(lwtClient::close);
+                razziaKeeper.close();
             }
         }
 

@@ -13,7 +13,7 @@ import androidx.lifecycle.MutableLiveData;
 import cz.spojenka.lwt.LwtAPIClient;
 import cz.spojenka.lwt.SetRazziaResponse;
 
-public class RazziaHeartbeatKeeper {
+public class RazziaHeartbeatKeeper implements AutoCloseable {
 
     private final Handler handler;
     private final Supplier<LwtAPIClient> clientSupplier;
@@ -39,6 +39,11 @@ public class RazziaHeartbeatKeeper {
 
     public RazziaHeartbeatKeeper(Handler handler, LwtAPIClient client) {
         this(handler, () -> client, null);
+    }
+
+    @Override
+    public void close() {
+        handler.removeCallbacks(heartbeatRunnable);
     }
 
     public CompletableFuture<SetRazziaResponse> setRazzia(boolean enabled) {
