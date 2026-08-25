@@ -63,18 +63,6 @@ namespace vdv301
         }
     }
 
-    static std::regex FARE_ZONE_FIX(R"(<FareZone>\s*<Value>\s*[^<]+\s*</Value>\s*)");
-    static std::regex ADD_GLOBAL_STOP_REF(R"(<CurrentTariffStop>)");
-
-    psram_string FixupCtsXml(const psram_string& input) {
-        // add missing Language to FareZone, add missing GlobalStopRef
-        return std::regex_replace(
-            std::regex_replace(input, FARE_ZONE_FIX, "$0<Language>cs</Language>"),
-            ADD_GLOBAL_STOP_REF,
-            "$0<GlobalStopRef><Value>-1</Value></GlobalStopRef>"
-        );
-    }
-
     void SubscriberTVS::OnOperationResult(const OperationResult& result)
     {
         using namespace TVS;
@@ -113,7 +101,7 @@ namespace vdv301
                     TicketValidationService_GetCurrentTariffStopResponseStructure stopResp;
                     {
                         UseHeapCaps<MALLOC_CAP_SPIRAM> usePsram;
-                        load_data(FixupCtsXml(result.GetResult()).c_str(), stopResp);
+                        load_data(result.GetResult().c_str(), stopResp);
                     }
                     if (stopResp.CurrentTariffStopData) {
                         m_CurTariffStop = std::move(*stopResp.CurrentTariffStopData);
