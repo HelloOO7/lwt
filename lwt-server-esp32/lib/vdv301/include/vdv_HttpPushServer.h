@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 #include <mutex>
+#include <sys/types.h>
 #include "esp_http_server.h"
 #include "PSRAMContainers.h"
 
@@ -18,14 +19,14 @@ namespace vdv301 {
 
     private:
         std::string m_IfKey;
-        uint16_t m_Port;
+        in_port_t m_Port;
         httpd_handle_t m_Httpd { nullptr };
         std::mutex m_Mutex;
 
         std::unordered_map<std::string, PushConsumer> m_PushEndpoints;
 
     public:
-        HttpPushServer(const std::string& ifkey, uint16_t port);
+        HttpPushServer(const std::string& ifkey, in_port_t port);
 
         void Start();
         void Stop();

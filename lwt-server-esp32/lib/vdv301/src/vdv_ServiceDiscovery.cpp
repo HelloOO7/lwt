@@ -110,7 +110,7 @@ namespace vdv301
         return m_HostName;
     }
 
-    uint16_t ServiceDiscovery::Result::GetPort() const
+    in_port_t ServiceDiscovery::Result::GetPort() const
     {
         return m_Port;
     }
@@ -725,7 +725,7 @@ namespace vdv301
         return *this;
     }
 
-    ServiceDiscovery::ServiceInfoBuilder& ServiceDiscovery::ServiceInfoBuilder::SetPort(uint16_t port)
+    ServiceDiscovery::ServiceInfoBuilder& ServiceDiscovery::ServiceInfoBuilder::SetPort(in_port_t port)
     {
         m_Info.m_Port = port;
         return *this;

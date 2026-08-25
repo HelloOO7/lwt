@@ -7,7 +7,7 @@ namespace vdv301 {
 
     static constexpr const char* TAG = "HttpPushServer";
 
-    HttpPushServer::HttpPushServer(const std::string& ifkey, uint16_t port) :
+    HttpPushServer::HttpPushServer(const std::string& ifkey, in_port_t port) :
         m_IfKey(ifkey),
         m_Port(port)
     {

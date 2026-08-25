@@ -10,6 +10,7 @@
 #include <functional>
 #include "EventQueue.h"
 #include "mdns.h"
+#include <sys/types.h>
 
 namespace vdv301
 {
@@ -57,7 +58,7 @@ namespace vdv301
         private:
             std::string m_InstanceName;
             std::string m_HostName;
-            uint16_t m_Port;
+            in_port_t m_Port;
             TxtRecordSet m_TxtRecords;
             esp_netif_t* m_Interface;
             std::vector<esp_ip_addr_t> m_IPAddresses;
@@ -68,7 +69,7 @@ namespace vdv301
         public:
             const std::string& GetInstanceName() const;
             const std::string& GetHostName() const;
-            uint16_t GetPort() const;
+            in_port_t GetPort() const;
             const std::optional<std::string> GetTxtRecord(const std::string& key) const;
             esp_netif_t* GetInterface() const;
             const esp_ip_addr_t* GetIPAddress(int type) const;
@@ -111,7 +112,7 @@ namespace vdv301
         private:
             std::string m_InstanceName;
             std::string m_HostName;
-            uint16_t m_Port{ 0 };
+            in_port_t m_Port{ 0 };
             TxtRecordSet m_TxtRecords;
         };
 
@@ -123,7 +124,7 @@ namespace vdv301
 
             ServiceInfoBuilder& SetInstanceName(const std::string& instanceName);
             ServiceInfoBuilder& SetHostName(const std::string& hostName);
-            ServiceInfoBuilder& SetPort(uint16_t port);
+            ServiceInfoBuilder& SetPort(in_port_t port);
             ServiceInfoBuilder& AddTxtRecord(const std::string& key, const std::string& value);
             ServiceInfo Build() const;
         };
