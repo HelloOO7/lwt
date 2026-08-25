@@ -17,15 +17,15 @@ namespace vdv301
         using AllData = CIS::CustomerInformationService_AllData;
 
         enum class Operation : SubscriberHttp::OperationIDType {
-            GetAllData = (1 << 0),
-            GetCurrentAnnouncement = (1 << 1),
-            GetCurrentConnectionInformation = (1 << 2),
-            GetCurrentDisplayContent = (1 << 3),
-            GetCurrentStopPoint = (1 << 4),
-            GetCurrentStopIndex = (1 << 5),
-            GetTripData = (1 << 6),
-            GetVehicleData = (1 << 7),
-            RetrievePartialStopSequence = (1 << 8),
+            AllData = DefineOp(0),
+            CurrentAnnouncement = DefineOp(1),
+            CurrentConnectionInformation = DefineOp(2),
+            CurrentDisplayContent = DefineOp(3),
+            CurrentStopPoint = DefineOp(4),
+            CurrentStopIndex = DefineOp(5),
+            TripData = DefineOp(6),
+            VehicleData = DefineOp(7),
+            PartialStopSequence = DefineOp(8),
         };
 
     private:

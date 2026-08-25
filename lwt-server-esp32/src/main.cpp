@@ -3,6 +3,7 @@
 #include "vdv_ServiceDiscovery.h"
 #include "vdv_SubscriberCIS.h"
 #include "vdv_SubscriberTVS.h"
+#include "vdv_PublisherRCS.h"
 #include "nvs_flash.h"
 #include "wifi_client.h"
 #include "ethernet_client.h"
@@ -69,6 +70,7 @@ private:
     vdv301::ServiceDiscovery m_HttpServiceDiscovery;
     vdv301::SubscriberCIS m_CISSubscriber;
     vdv301::SubscriberTVS m_TVSSubscriber;
+    vdv301::PublisherRCS m_RCSPublisher;
     lwt::ServiceRegistry m_ServiceRegistry;
     lwt::ApplicationServer m_AppServer;
     lwt::PingService m_PingService;
@@ -100,12 +102,13 @@ public:
         m_HttpServiceDiscovery{ vdv301::HttpServiceDiscovery(TASK_PRIORITY_BACKGROUND_SYNC) },
         m_CISSubscriber(
             m_HttpServiceDiscovery,
-            vdv301::SubscriberCIS::Operation::GetAllData
+            vdv301::SubscriberCIS::Operation::AllData
         ),
         m_TVSSubscriber(
             m_HttpServiceDiscovery,
-            vdv301::SubscriberTVS::Operation::GetRazzia | vdv301::SubscriberTVS::Operation::GetCurrentTariffStop
+            vdv301::SubscriberTVS::Operation::Razzia | vdv301::SubscriberTVS::Operation::CurrentTariffStop
         ),
+        m_RCSPublisher(m_HttpServiceDiscovery),
         m_ServiceRegistry(lwt::Operation_MIN, lwt::Operation_MAX),
         m_AppServer(m_ServiceRegistry),
         m_ServerAuthService(get_debug_device_crt_start(), m_SigningKey),
@@ -113,7 +116,7 @@ public:
         m_PreauthTokenManager(LoadOrCreateHmacKey("pat_hmac_key", 32)),
         m_TicketVerifier(),
         m_MOSClient("https://ticketing.mos.ropid:8080", { get_debug_device_crt_start(), get_debug_device_crt_end() }, { TLS_LWT_SERVER_KEY_DEBUG_START, TLS_LWT_SERVER_KEY_DEBUG_END }),
-        m_TicketService(TICKETING_CONFIG, m_PreauthTokenManager, m_TicketVerifier, m_MOSClient, m_TripInfoService, &m_TVSSubscriber),
+        m_TicketService(TICKETING_CONFIG, m_PreauthTokenManager, m_TicketVerifier, m_MOSClient, m_TripInfoService, &m_TVSSubscriber, &m_RCSPublisher),
         m_BLETripAdvertiserLegacy(0, BLE_SERVICE_UUID_VEHICLE, lwdn::BleAdvertiser::Flags::INCLUDE_DEVICE_NAME | lwdn::BleAdvertiser::Flags::USE_LEGACY_ADVERTISING),
         m_BLETripAdvertiserExt(1, BLE_SERVICE_UUID_VEHICLE_EXTENDED, lwdn::BleAdvertiser::Flags::INCLUDE_DEVICE_NAME),
         m_BLEServer(BLE_PSM, lwtp::MAX_PACKET_SIZE),

@@ -42,11 +42,7 @@ void* operator new(std::size_t size) {
 }
 
 void* operator new[](std::size_t size) {
-    void* ptr = Allocate(size);
-    if (!ptr) {
-        BadAlloc(size);
-    }
-    return ptr;
+    return operator new(size);
 }
 
 void operator delete(void* ptr) noexcept {
@@ -63,4 +59,16 @@ void operator delete[](void* ptr) noexcept {
 
 void operator delete[](void* ptr, std::size_t size) noexcept {
     free(ptr);
+}
+
+void* operator new(std::size_t size, int caps) {
+    void* ptr = heap_caps_malloc(size, caps);
+    if (!ptr) {
+        BadAlloc(size);
+    }
+    return ptr;
+}
+
+void* operator new[](std::size_t size, int caps) {
+    return operator new(size, caps);
 }

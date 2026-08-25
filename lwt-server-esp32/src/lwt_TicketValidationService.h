@@ -11,6 +11,7 @@
 #include "lwt_PreauthorizationTokenManager.h"
 #include "lwt_TicketSignatureVerifier.h"
 #include "lwt_MosClient.h"
+#include "vdv_PublisherRCS.h"
 #include "PSRAMAllocator.h"
 
 namespace lwt {
@@ -78,6 +79,7 @@ namespace lwt {
         MOSClient& m_MOSClient;
         TripInformationService& m_TripInfoService;
         vdv301::SubscriberTVS* m_TVS;
+        vdv301::PublisherRCS* m_RCS;
 
         std::mutex m_DataMutex;
         bool m_HasData{ false };
@@ -101,7 +103,8 @@ namespace lwt {
             const TicketValidationConfig& config,
             PreauthorizationTokenManager& tokenManager, TicketSignatureVerifier& ticketVerifier,
             MOSClient& mosClient,
-            TripInformationService& tripInfoService, vdv301::SubscriberTVS* tvsOpt = nullptr
+            TripInformationService& tripInfoService, vdv301::SubscriberTVS* tvsOpt = nullptr,
+            vdv301::PublisherRCS* rcsOpt = nullptr
         );
         virtual ~TicketValidationService() override;
 
@@ -130,6 +133,8 @@ namespace lwt {
 
         bool IsRazziaNoLock();
         bool SetRazziaBit(int bit, bool value);
+        bool SetLocalRazziaState(bool isRazzia);
         void ClearLocalRazziaIfExpired();
+        void PropagateRazziaStateToRCS(bool isRazzia);
     };
 }

@@ -16,7 +16,10 @@ namespace vdv301 {
     class SubscriberHttp : public SubscriberBase
     {
     public:
-        using OperationIDType = size_t;
+        using OperationIDType = uint32_t;
+
+        inline static constexpr OperationIDType DefineOp(int index) { return 1 << index; }
+
     protected:
         class OperationResult {
         private:

@@ -3,9 +3,13 @@
 #include <sstream>
 #include "vdv_HttpPushServer.h"
 #include "esp_log.h"
+#include "NewAndDelete.h"
+#include "IBIS_IP_common_V2_3CZ1_0.hpp"
 
 namespace vdv301
 {
+    using namespace IBIS_IP_common_V2_3CZ1_0;
+
     static constexpr const char* TAG = "SubscriberHttp";
 
     static constexpr uint16_t SUBSCRIBER_PUSH_SERVER_PORT = 31415;
@@ -17,7 +21,7 @@ namespace vdv301
     SubscriberHttp::SubscriberHttp(ServiceDiscovery& sd, const std::string& serviceClassName, const ServiceDiscovery::Query& serviceQuery, OperationIDType subscribedOps, size_t taskStackSize) :
         SubscriberBase(),
         m_SD{ sd },
-        m_EventQueue("SubscriberHttp" + serviceClassName, 5, taskStackSize),
+        m_EventQueue(serviceClassName, 5, taskStackSize),
         m_ServiceClassName{ serviceClassName },
         m_SubscribedOperations{ subscribedOps }
     {
@@ -134,10 +138,6 @@ namespace vdv301
 
         std::string endpointPath = GetOperationPushPath(operationName);
 
-        if (!g_SubcriberPushServer.IsRunning()) {
-            g_SubcriberPushServer.Start();
-        }
-
         g_SubcriberPushServer.RegisterPushEndpoint(
             endpointPath,
             [=, this](const HttpPushServer::PushBody& body) {
@@ -166,13 +166,8 @@ namespace vdv301
 
     esp_err_t SubscriberHttp::SendSubscribeRequest(const std::string& operation)
     {
-        if (!operation.starts_with("Get")) {
-            ESP_LOGE(TAG, "Operation name %s does not start with 'Get' - can not subscribe", operation.c_str());
-            return ESP_FAIL;
-        }
-
-        // translate "GetXyz" to "SubscribeXyz"
-        std::string subscribePath = m_HttpPathBase + "Subscribe" + operation.substr(std::string("Get").length());
+        // add "Subscribe" prefix to operation name
+        std::string subscribePath = m_HttpPathBase + "Subscribe" + operation;
         m_BaseHttpConfig.path = subscribePath.c_str();
 
         esp_http_client_handle_t client = esp_http_client_init(&m_BaseHttpConfig);
@@ -181,21 +176,25 @@ namespace vdv301
         ESP_ERROR_CHECK(esp_http_client_set_method(client, HTTP_METHOD_POST));
         ESP_ERROR_CHECK(esp_http_client_set_header(client, "Content-Type", "text/xml"));
 
-        std::ostringstream body;
-        body << R"(<?xml version="1.0" encoding="UTF-8"?>)";
-        body << "<SubscribeRequest>";
-        body << "<Client-IP-Address><Value>" << m_ClientIP << "</Value></Client-IP-Address>";
-        body << "<ReplyPort><Value>" << SUBSCRIBER_PUSH_SERVER_PORT << "</Value></ReplyPort>";
-        body << "<ReplyPath><Value>" << GetOperationPushPath(operation) << "</Value></ReplyPath>";
-        body << "</SubscribeRequest>";
+        std::string body;
+        {
+            UseHeapCaps<MALLOC_CAP_SPIRAM> usePsram;
+
+            SubscribeRequestStructure req;
+            req.Client_IP_Address = IBIS_IP_string{ m_ClientIP };
+            req.ReplyPort = IBIS_IP_int{ SUBSCRIBER_PUSH_SERVER_PORT };
+            req.ReplyPath = IBIS_IP_string{ GetOperationPushPath(operation) };
+
+            body = save_data(req);
+        }
 
         char url[128];
         esp_http_client_get_url(client, url, sizeof(url));
 
-        auto bodyStr = body.str();
-        ESP_LOGI(TAG, "POST Subscribe %s\n%s", url, bodyStr.c_str());
+        auto bodyStr = body.c_str();
+        ESP_LOGI(TAG, "POST Subscribe %s\n%s", url, bodyStr);
 
-        ESP_ERROR_CHECK(esp_http_client_set_post_field(client, bodyStr.c_str(), bodyStr.size()));
+        ESP_ERROR_CHECK(esp_http_client_set_post_field(client, body.c_str(), body.size()));
 
         esp_err_t err = esp_http_client_perform(client);
 

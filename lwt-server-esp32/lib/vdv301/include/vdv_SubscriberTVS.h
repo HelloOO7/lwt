@@ -15,12 +15,12 @@ namespace vdv301
         Observable<TVS::TicketValidationService_CurrentTariffStopDataStructure>
     {
     public:
-        enum class Operation : SubscriberHttp::OperationIDType {
-            GetCurrentTariffStop = (1 << 0),
-            GetRazzia = (1 << 1),
-            GetCurrentLine = (1 << 2),
-            GetVehicleData = (1 << 3),
-            RetrieveTripData = (1 << 4)
+        enum class Operation : OperationIDType {
+            CurrentTariffStop = DefineOp(0),
+            Razzia = DefineOp(1),
+            CurrentLine = DefineOp(2),
+            VehicleData = DefineOp(3),
+            TripData = DefineOp(4)
         };
 
         using RazziaState = TVS::TicketValidationService_RazziaResponseDataStructure;

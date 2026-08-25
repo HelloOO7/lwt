@@ -45,7 +45,7 @@ namespace vdv301
     void SubscriberCIS::OnOperationResult(const OperationResult& result)
     {
         switch (result.GetOperationID<Operation>()) {
-        case Operation::GetAllData:
+        case Operation::AllData:
             std::cout << "Received SubscribeAllData result" << std::endl;
             try {
                 ssize_t freeBefore = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
@@ -85,24 +85,24 @@ namespace vdv301
     std::string SubscriberCIS::GetOperationName(OperationIDType operation) const
     {
         switch (static_cast<Operation>(operation)) {
-        case Operation::GetAllData:
-            return "GetAllData";
-        case Operation::GetCurrentAnnouncement:
-            return "GetCurrentAnnouncement";
-        case Operation::GetCurrentConnectionInformation:
-            return "GetCurrentConnectionInformation";
-        case Operation::GetCurrentDisplayContent:
-            return "GetCurrentDisplayContent";
-        case Operation::GetCurrentStopPoint:
-            return "GetCurrentStopPoint";
-        case Operation::GetCurrentStopIndex:
-            return "GetCurrentStopIndex";
-        case Operation::GetTripData:
-            return "GetTripData";
-        case Operation::GetVehicleData:
-            return "GetVehicleData";
-        case Operation::RetrievePartialStopSequence:
-            return "RetrievePartialStopSequence";
+        case Operation::AllData:
+            return "AllData";
+        case Operation::CurrentAnnouncement:
+            return "CurrentAnnouncement";
+        case Operation::CurrentConnectionInformation:
+            return "CurrentConnectionInformation";
+        case Operation::CurrentDisplayContent:
+            return "CurrentDisplayContent";
+        case Operation::CurrentStopPoint:
+            return "CurrentStopPoint";
+        case Operation::CurrentStopIndex:
+            return "CurrentStopIndex";
+        case Operation::TripData:
+            return "TripData";
+        case Operation::VehicleData:
+            return "VehicleData";
+        case Operation::PartialStopSequence:
+            return "PartialStopSequence";
         default:
             return "";
         }

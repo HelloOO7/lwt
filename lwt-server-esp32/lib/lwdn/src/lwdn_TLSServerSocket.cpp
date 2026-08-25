@@ -17,8 +17,7 @@ namespace lwdn {
             return nullptr;
         }
         // TLS context can be quite large, so use PSRAM
-        UseHeapCaps<MALLOC_CAP_SPIRAM> usePsram;
-        return std::make_unique<TLSSocket>(std::move(baseSocket), m_SSLConfig);
+        return std::unique_ptr<TLSSocket>(new (MALLOC_CAP_SPIRAM) TLSSocket(std::move(baseSocket), m_SSLConfig));
     }
 
     LinkAdapter* TLSServerSocket::GetLinkAdapter() const

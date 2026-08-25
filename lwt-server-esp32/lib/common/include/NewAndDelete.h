@@ -24,6 +24,9 @@ void operator delete(void* ptr, std::size_t size) noexcept;
 void operator delete[](void* ptr) noexcept;
 void operator delete[](void* ptr, std::size_t size) noexcept;
 
+void* operator new(std::size_t size, int caps);
+void* operator new[](std::size_t size, int caps);
+
 template<int CAPS>
 class UseHeapCaps {
 private:

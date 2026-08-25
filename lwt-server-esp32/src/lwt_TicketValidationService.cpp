@@ -23,7 +23,8 @@ namespace lwt {
         const TicketValidationConfig& config,
         PreauthorizationTokenManager& tokenManager, TicketSignatureVerifier& ticketVerifier,
         MOSClient& mosClient,
-        TripInformationService& tripInfoService, SubscriberTVS* tvsOpt
+        TripInformationService& tripInfoService, SubscriberTVS* tvsOpt,
+        PublisherRCS* rcsOpt
     ) :
         m_Config{ config },
         m_TokenManager{ tokenManager },
@@ -31,7 +32,8 @@ namespace lwt {
         m_TicketVerifier{ ticketVerifier },
         m_MOSClient{ mosClient },
         m_TripInfoService{ tripInfoService },
-        m_TVS{ tvsOpt }
+        m_TVS{ tvsOpt },
+        m_RCS{ rcsOpt }
     {
         m_TripInfoService.ObserveTripRouteInfo(*this);
         if (m_TVS) {
@@ -261,7 +263,8 @@ namespace lwt {
 
                     std::lock_guard lock(m_DataMutex);
 
-                    if (SetRazziaBit(RAZZIA_LOCAL_BIT, request.is_razzia())) {
+                    if (SetLocalRazziaState(request.is_razzia())) {
+                        PropagateRazziaStateToRCS(request.is_razzia());
                         UpdateValidationInfo();
                     }
 
@@ -282,8 +285,9 @@ namespace lwt {
         if (m_LastLocalRazziaOnTime > 0 && (m_IsRazzia & RAZZIA_LOCAL_BIT) != 0) {
             auto currentTime = esp_timer_get_time();
             if (currentTime - m_LastLocalRazziaOnTime > RAZZIA_HEARTBEAT_MAX_SECONDS * 1000 * 1000) {
-                SetRazziaBit(RAZZIA_LOCAL_BIT, false);
+                SetLocalRazziaState(false);
                 m_LastLocalRazziaOnTime = 0; //reset to avoid infinite recursion
+                PropagateRazziaStateToRCS(false);
                 UpdateValidationInfo();
             }
         }
@@ -310,6 +314,23 @@ namespace lwt {
         }
         else {
             return m_IsRazzia.fetch_and(~bit) & bit; // changed if was set
+        }
+    }
+
+    bool TicketValidationService::SetLocalRazziaState(bool isRazzia)
+    {
+        return SetRazziaBit(RAZZIA_LOCAL_BIT, isRazzia);
+    }
+
+    void TicketValidationService::PropagateRazziaStateToRCS(bool isRazzia)
+    {
+        if (m_RCS) {
+            if (isRazzia) {
+                m_RCS->StartRazzia();
+            }
+            else {
+                m_RCS->StopRazzia();
+            }
         }
     }
 

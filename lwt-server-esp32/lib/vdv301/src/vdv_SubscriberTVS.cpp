@@ -48,16 +48,16 @@ namespace vdv301
     {
         switch (static_cast<Operation>(operation))
         {
-        case Operation::GetCurrentTariffStop:
-            return "GetCurrentTariffStop";
-        case Operation::GetRazzia:
-            return "GetRazzia";
-        case Operation::GetCurrentLine:
-            return "GetCurrentLine";
-        case Operation::GetVehicleData:
-            return "GetVehicleData";
-        case Operation::RetrieveTripData:
-            return "RetrieveTripData";
+        case Operation::CurrentTariffStop:
+            return "CurrentTariffStop";
+        case Operation::Razzia:
+            return "Razzia";
+        case Operation::CurrentLine:
+            return "CurrentLine";
+        case Operation::VehicleData:
+            return "VehicleData";
+        case Operation::TripData:
+            return "TripData";
         default:
             return "UnknownOperation";
         }
@@ -70,7 +70,7 @@ namespace vdv301
         try {
             switch (result.GetOperationID<Operation>())
             {
-            case Operation::GetRazzia:
+            case Operation::Razzia:
             {
                 auto hash = HashResponseWithoutTimestamp(result.GetResult());
                 if (hash != m_LastRazziaRespHash) {
@@ -94,7 +94,7 @@ namespace vdv301
                 }
                 break;
             }
-            case Operation::GetCurrentTariffStop:
+            case Operation::CurrentTariffStop:
             {
                 auto hash = HashResponseWithoutTimestamp(result.GetResult());
                 if (hash != m_LastCurTariffStopHash) {
