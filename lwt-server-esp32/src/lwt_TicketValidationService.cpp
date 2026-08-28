@@ -9,6 +9,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "BitConverter.h"
+#include "MessageDigest.h"
 #include <cassert>
 
 namespace lwt {
@@ -639,9 +640,7 @@ namespace lwt {
 
     SHA256Hash TicketValidationService::HashActivationToken(const ByteSpan& token)
     {
-        SHA256Hash hash;
-        assert(mbedtls_md(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), token.data(), token.size(), hash.data()) == 0);
-        return hash;
+        return MessageDigest::SHA256(token);
     }
 
     TicketValidationService::ParsedActivationToken TicketValidationService::ParseActivationToken(const ByteSpan& tokenData)
