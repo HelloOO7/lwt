@@ -6,7 +6,8 @@
 #include "esp_http_client.h"
 #include <unordered_map>
 #include <memory>
-#include "esp_timer.h"
+#include <optional>
+#include "TimerProc.h"
 
 namespace vdv301 {
 
@@ -45,7 +46,7 @@ namespace vdv301 {
             bool m_IsDataSet{ false };
             PublishMode m_Mode{ PublishMode::CONTINUOUS };
             size_t m_Heartbeat{ 0 };
-            esp_timer_handle_t m_HeartbeatTimer{ nullptr };
+            std::optional<TimerProc> m_HeartbeatTimer;
             size_t m_RetryCount{ 0 };
 
             PublishState(PublisherHttp* parent, OperationIDType operation);

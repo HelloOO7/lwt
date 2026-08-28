@@ -20,6 +20,7 @@ public class RazziaHeartbeatKeeper implements AutoCloseable {
     private final Executor callExecutor;
 
     private final Runnable heartbeatRunnable = () -> updateRazzia(true);
+    private boolean closed = false;
 
     private final MutableLiveData<State> stateLiveData = new MutableLiveData<>(new State(false, false, null));
 
@@ -43,6 +44,7 @@ public class RazziaHeartbeatKeeper implements AutoCloseable {
 
     @Override
     public void close() {
+        closed = true;
         handler.removeCallbacks(heartbeatRunnable);
     }
 
@@ -58,6 +60,9 @@ public class RazziaHeartbeatKeeper implements AutoCloseable {
 
     private CompletableFuture<SetRazziaResponse> updateRazzia(boolean enabled) {
         return clientSupplier.get().setRazzia(enabled).executeAsync(callExecutor).whenComplete((resp, throwable) -> {
+            if (closed) {
+                return;
+            }
             if (throwable == null) {
                 if (enabled && resp.requestedHeartbeat() != 0) {
                     handler.postDelayed(heartbeatRunnable, Duration.ofSeconds(resp.requestedHeartbeat()).minusSeconds(5).toMillis());

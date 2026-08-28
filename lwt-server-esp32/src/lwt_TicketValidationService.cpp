@@ -33,7 +33,15 @@ namespace lwt {
         m_MOSClient{ mosClient },
         m_TripInfoService{ tripInfoService },
         m_TVS{ tvsOpt },
-        m_RCS{ rcsOpt }
+        m_RCS{ rcsOpt },
+        m_RazziaOffTimer(
+            [this]() {
+                std::lock_guard lock(m_DataMutex);
+                // prevent race conditions - check timestamp again anyway
+                ClearLocalRazziaIfExpired();
+            },
+            RAZZIA_HEARTBEAT_MAX_SECONDS * 1000 * 1000, TimerProc::Type::ONESHOT // 30 seconds
+        )
     {
         m_TripInfoService.ObserveTripRouteInfo(*this);
         if (m_TVS) {
@@ -270,6 +278,9 @@ namespace lwt {
 
                     if (request.is_razzia()) {
                         m_LastLocalRazziaOnTime = esp_timer_get_time();
+                        m_RazziaOffTimer.Restart();
+                    } else {
+                        m_RazziaOffTimer.Stop();
                     }
 
                     fbb.Finish(CreateSetRazziaResponse(fbb, RAZZIA_HEARTBEAT_MAX_SECONDS));
@@ -285,6 +296,7 @@ namespace lwt {
         if (m_LastLocalRazziaOnTime > 0 && (m_IsRazzia & RAZZIA_LOCAL_BIT) != 0) {
             auto currentTime = esp_timer_get_time();
             if (currentTime - m_LastLocalRazziaOnTime > RAZZIA_HEARTBEAT_MAX_SECONDS * 1000 * 1000) {
+                ESP_LOGI(TAG, "Local razzia state expired, clearing it");
                 SetLocalRazziaState(false);
                 m_LastLocalRazziaOnTime = 0; //reset to avoid infinite recursion
                 PropagateRazziaStateToRCS(false);
@@ -302,8 +314,6 @@ namespace lwt {
 
     bool TicketValidationService::IsRazziaNoLock()
     {
-        ClearLocalRazziaIfExpired();
-
         return m_IsRazzia != 0;
     }
 

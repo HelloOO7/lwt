@@ -167,31 +167,25 @@ namespace vdv301 {
 
     void PublisherHttp::PublishState::InitTimer() {
         if (!m_HeartbeatTimer) {
-            esp_timer_create_args_t timerArgs{};
-            timerArgs.callback =
-                [](void* arg)
+            m_HeartbeatTimer.emplace(
+                [this]()
                 {
-                    auto pub = static_cast<PublishState*>(arg);
-                    for (auto&& sub : pub->m_Subscribers) {
+                    for (auto&& sub : m_Subscribers) {
                         sub.m_IsDirty = true; // force send to all subscribers on heartbeat
                     }
-                    pub->m_Parent->SendDataToSubscribersAsync(pub->m_Operation);
-                };
-            timerArgs.arg = this;
-            timerArgs.name = "pub_heartbeat";
-
-            ESP_ERROR_CHECK(esp_timer_create(&timerArgs, &m_HeartbeatTimer));
+                    m_Parent->SendDataToSubscribersAsync(m_Operation);
+                },
+                (uint64_t)m_Heartbeat * 1000 * 1000, // convert seconds to microseconds
+                TimerProc::Type::PERIODIC
+            );
+            m_HeartbeatTimer->Start();
         }
     }
 
     void PublisherHttp::PublishState::DeleteTimer() {
         if (m_HeartbeatTimer) {
-            esp_err_t res = esp_timer_stop(m_HeartbeatTimer);
-            if (res != ESP_OK && res != ESP_ERR_INVALID_STATE) {
-                ESP_ERROR_CHECK(res);
-            }
-            ESP_ERROR_CHECK(esp_timer_delete(m_HeartbeatTimer));
-            m_HeartbeatTimer = nullptr;
+            m_HeartbeatTimer->Stop();
+            m_HeartbeatTimer.reset();
         }
     }
 
@@ -272,14 +266,7 @@ namespace vdv301 {
         }
 
         if (state.m_HeartbeatTimer) {
-            auto heartbeatUs = state.m_Heartbeat * 1000 * 1000; // convert seconds to microseconds
-            esp_err_t err = esp_timer_start_once(state.m_HeartbeatTimer, heartbeatUs);
-            if (err == ESP_ERR_INVALID_STATE) {
-                esp_timer_restart(state.m_HeartbeatTimer, heartbeatUs);
-            }
-            else {
-                ESP_ERROR_CHECK(err);
-            }
+            state.m_HeartbeatTimer->Restart();
         }
     }
 

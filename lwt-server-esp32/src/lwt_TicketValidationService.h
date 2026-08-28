@@ -13,6 +13,8 @@
 #include "lwt_MosClient.h"
 #include "vdv_PublisherRCS.h"
 #include "PSRAMAllocator.h"
+#include "esp_timer.h"
+#include "TimerProc.h"
 
 namespace lwt {
 
@@ -93,6 +95,7 @@ namespace lwt {
 
         std::atomic<int> m_IsRazzia{ 0 };
         int64_t m_LastLocalRazziaOnTime{ 0 };
+        TimerProc m_RazziaOffTimer;
 
         flatbuffers::FlatBufferBuilder m_ValidationInfoFBB{ PSRAMFlatBufferBuilder() };
 

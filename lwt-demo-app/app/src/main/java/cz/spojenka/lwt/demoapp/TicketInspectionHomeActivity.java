@@ -25,6 +25,7 @@ import androidx.core.os.BundleCompat;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.Observer;
+import androidx.lifecycle.ViewModelProvider;
 import cz.dpp.praguepublictransport.LitackaUtils;
 import cz.dpp.praguepublictransport.etd.LitackaETD;
 import cz.spojenka.android.ui.activity.BaseActivity;
@@ -76,7 +77,7 @@ public class TicketInspectionHomeActivity extends BaseActivity {
         setContentView(binding.getRoot());
 
         repository = new TicketInspectionRepository(getApplication());
-        viewModel = new ViewModel(getApplication());
+        viewModel = new ViewModelProvider(this).get(ViewModel.class);
 
         if (savedInstanceState != null) {
             linkedVehicle = BundleCompat.getParcelable(savedInstanceState, STATE_LINKED_VEHICLE, LwtDevice.class);
@@ -295,6 +296,8 @@ public class TicketInspectionHomeActivity extends BaseActivity {
                 razziaKeeper.getStateLiveData().removeObserver(razziaStateObserver);
                 AsyncUtils.runAsync(lwtClient::close);
                 razziaKeeper.close();
+                lwtClient = null;
+                razziaKeeper = null;
             }
         }
 

@@ -42,7 +42,7 @@ namespace vdv301 {
             content = save_data(response);
         }
 
-        ESP_LOGI(TAG, "Sending signal to RCS: %s", content.c_str());
+        ESP_LOGI(TAG, "Sending signal to RCS");
         std::cout << content << std::endl;
 
         PublishData((OperationIDType)Operation::AllData, std::move(content), PublishMode::ONESHOT);
