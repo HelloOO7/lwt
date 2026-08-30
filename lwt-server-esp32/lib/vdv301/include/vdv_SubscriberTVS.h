@@ -33,7 +33,7 @@ namespace vdv301
         uint32_t m_LastCurTariffStopHash{ 0 };
 
     public:
-        SubscriberTVS(ServiceDiscovery& sd, Operation subscribedOps = (Operation) 0);
+        SubscriberTVS(ServiceDiscovery& sd, Operation subscribedOps = (Operation) 0, int taskPriority = EventQueue::DEFAULT_TASK_PRIORITY);
 
         void ObserveRazziaState(Observer<RazziaState>& observer);
         void ObserveCurrentTariffStop(Observer<CurrentTariffStop>& observer);

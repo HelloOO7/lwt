@@ -74,6 +74,7 @@ namespace vdv301
             esp_netif_t* GetInterface() const;
             const esp_ip_addr_t* GetIPAddress(int type) const;
             const esp_ip4_addr_t* GetIPv4Address() const;
+            std::optional<std::string> GetIPv4AddressAsString() const;
 
             bool operator==(const Result& other) const;
             bool operator!=(const Result& other) const;
@@ -239,4 +240,5 @@ namespace vdv301
     };
 
     ServiceDiscovery HttpServiceDiscovery(int taskPriority = EventQueue::DEFAULT_TASK_PRIORITY);
+    ServiceDiscovery UdpServiceDiscovery(int taskPriority = EventQueue::DEFAULT_TASK_PRIORITY);
 }

@@ -5,6 +5,7 @@
 #include "esp_log.h"
 #include <cstring>
 #include "esp_event.h"
+#include "vdv_Utility.h"
 
 namespace vdv301
 {
@@ -146,6 +147,15 @@ namespace vdv301
     {
         const esp_ip_addr_t* addr = GetIPAddress(ESP_IPADDR_TYPE_V4);
         return addr != nullptr ? &addr->u_addr.ip4 : nullptr;
+    }
+
+    std::optional<std::string> ServiceDiscovery::Result::GetIPv4AddressAsString() const
+    {
+        const esp_ip4_addr_t* ipv4Addr = GetIPv4Address();
+        if (ipv4Addr) {
+            return IPToString(ipv4Addr);
+        }
+        return std::nullopt;
     }
 
     bool ServiceDiscovery::Result::operator==(const Result& other) const
@@ -909,5 +919,10 @@ namespace vdv301
     ServiceDiscovery HttpServiceDiscovery(int taskPriority)
     {
         return ServiceDiscovery("ibisip_http", ServiceDiscovery::Protocol::TCP, taskPriority);
+    }
+
+    ServiceDiscovery UdpServiceDiscovery(int taskPriority)
+    {
+        return ServiceDiscovery("ibisip_udp", ServiceDiscovery::Protocol::UDP, taskPriority);
     }
 }

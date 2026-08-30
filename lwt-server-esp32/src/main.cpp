@@ -4,6 +4,8 @@
 #include "vdv_SubscriberCIS.h"
 #include "vdv_SubscriberTVS.h"
 #include "vdv_PublisherRCS.h"
+#include "vdv_SubscriberTimeService.h"
+#include "vdv_SntpAutoConfig.h"
 #include "nvs_flash.h"
 #include "wifi_client.h"
 #include "ethernet_client.h"
@@ -68,9 +70,12 @@ private:
     mbedtls_ssl_config m_MbedTlsConfig;
     lwdn::TLSConfig m_TLSConfig;
     vdv301::ServiceDiscovery m_HttpServiceDiscovery;
+    vdv301::ServiceDiscovery m_UdpServiceDiscovery;
     vdv301::SubscriberCIS m_CISSubscriber;
     vdv301::SubscriberTVS m_TVSSubscriber;
     vdv301::PublisherRCS m_RCSPublisher;
+    vdv301::SubscriberTimeService m_TimeServiceSubscriber;
+    vdv301::SntpAutoConfig m_SntpAutoConfig;
     lwt::ServiceRegistry m_ServiceRegistry;
     lwt::ApplicationServer m_AppServer;
     lwt::PingService m_PingService;
@@ -100,15 +105,20 @@ public:
         m_SigningKey(ByteSpan(TLS_LWT_SERVER_KEY_DEBUG_START, TLS_LWT_SERVER_KEY_DEBUG_END), DigitalSignature::KeyUsage::SIGN),
         m_TLSConfig(m_MbedTlsConfig),
         m_HttpServiceDiscovery{ vdv301::HttpServiceDiscovery(TASK_PRIORITY_BACKGROUND_SYNC) },
+        m_UdpServiceDiscovery{ vdv301::UdpServiceDiscovery(TASK_PRIORITY_BACKGROUND_SYNC) },
         m_CISSubscriber(
             m_HttpServiceDiscovery,
-            vdv301::SubscriberCIS::Operation::AllData
+            vdv301::SubscriberCIS::Operation::AllData,
+            TASK_PRIORITY_BACKGROUND_SYNC
         ),
         m_TVSSubscriber(
             m_HttpServiceDiscovery,
-            vdv301::SubscriberTVS::Operation::Razzia | vdv301::SubscriberTVS::Operation::CurrentTariffStop
+            vdv301::SubscriberTVS::Operation::Razzia | vdv301::SubscriberTVS::Operation::CurrentTariffStop,
+            TASK_PRIORITY_BACKGROUND_SYNC
         ),
-        m_RCSPublisher(m_HttpServiceDiscovery),
+        m_RCSPublisher(m_HttpServiceDiscovery, TASK_PRIORITY_BACKGROUND_SYNC),
+        m_TimeServiceSubscriber(m_UdpServiceDiscovery, TASK_PRIORITY_BACKGROUND_SYNC),
+        m_SntpAutoConfig(m_TimeServiceSubscriber),
         m_ServiceRegistry(lwt::Operation_MIN, lwt::Operation_MAX),
         m_AppServer(m_ServiceRegistry),
         m_ServerAuthService(get_debug_device_crt_start(), m_SigningKey),
@@ -144,9 +154,13 @@ public:
         m_AppServer.AddInterceptor(std::make_unique<lwtp::StartTLSInterceptor>(m_TLSConfig));
         m_AppServer.AddInterceptor(std::make_unique<lwt::CertRoleInterceptor>());
 
+        StartClientServer();
+    }
+
+    void StartClientServer() {
         lwtp::Server::SocketTaskConfig socketTaskConfig{
-            .m_StackSize = 6144,
-            .m_Priority = TASK_PRIORITY_CLIENT_SERVER
+                    .m_StackSize = 6144,
+                    .m_Priority = TASK_PRIORITY_CLIENT_SERVER
         };
 
         m_AppServer.AddSocket(&m_BLEServer, 1, socketTaskConfig);

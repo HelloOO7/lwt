@@ -33,7 +33,7 @@ namespace vdv301
         uint32_t m_LastAllDataHash{ 0 };
 
     public:
-        SubscriberCIS(ServiceDiscovery& sd, Operation subscribedOps = (Operation)0);
+        SubscriberCIS(ServiceDiscovery& sd, Operation subscribedOps = (Operation)0, int taskPriority = EventQueue::DEFAULT_TASK_PRIORITY);
 
         void ObserveAllData(Observer<AllData>& observer);
         void RemoveObserver(Observer<AllData>& observer);

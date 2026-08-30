@@ -11,7 +11,7 @@ namespace vdv301
 {
     using namespace IBIS_IP_CustomerInformationService_V2_3CZ1_0;
 
-    SubscriberCIS::SubscriberCIS(ServiceDiscovery& sd, Operation subscribedOps) :
+    SubscriberCIS::SubscriberCIS(ServiceDiscovery& sd, Operation subscribedOps, int taskPriority) :
         SubscriberHttp(
             sd,
             "CustomerInformationService",
@@ -20,7 +20,8 @@ namespace vdv301
             .FilterTxtRecord("ver", "2.3CZ1.0")
             .Build(),
             std::to_underlying(subscribedOps),
-            8192
+            8192,
+            taskPriority
         )
     {
 

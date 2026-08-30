@@ -16,12 +16,12 @@ namespace vdv301 {
 
     using namespace IBIS_IP_common_V2_3CZ1_0;
 
-    PublisherHttp::PublisherHttp(ServiceDiscovery& sd, const std::string& serviceClassName, const std::string& serviceVersion, size_t taskStackSize) :
+    PublisherHttp::PublisherHttp(ServiceDiscovery& sd, const std::string& serviceClassName, const std::string& serviceVersion, size_t taskStackSize, int taskPriority) :
         PublisherBase(),
         m_SD{ sd },
         m_ServiceName{ serviceClassName },
         m_ServicePath{ serviceVersion },
-        m_EventQueue(serviceClassName, 5, taskStackSize)
+        m_EventQueue(serviceClassName, 5, taskStackSize, taskPriority)
     {
         std::lock_guard lock(m_Mutex);
 

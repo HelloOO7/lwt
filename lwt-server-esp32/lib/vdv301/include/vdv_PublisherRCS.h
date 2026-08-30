@@ -17,7 +17,7 @@ namespace vdv301 {
         };
 
     public:
-        PublisherRCS(ServiceDiscovery& sd);
+        PublisherRCS(ServiceDiscovery& sd, int taskPriority = EventQueue::DEFAULT_TASK_PRIORITY);
         ~PublisherRCS();
 
         void StartRazzia();

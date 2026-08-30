@@ -9,8 +9,8 @@ namespace vdv301 {
 
     using namespace IBIS_IP_RemoteControlService_V2_3CZ1_0;
 
-    PublisherRCS::PublisherRCS(ServiceDiscovery& sd) :
-        PublisherHttp(sd, "RemoteControlService", "2.3CZ1.0", 4096)
+    PublisherRCS::PublisherRCS(ServiceDiscovery& sd, int taskPriority) :
+        PublisherHttp(sd, "RemoteControlService", "2.3CZ1.0", 2048, taskPriority)
     {
         SetOperationEnabled((OperationIDType)Operation::AllData, true);
     }

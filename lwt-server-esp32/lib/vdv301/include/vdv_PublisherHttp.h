@@ -70,7 +70,11 @@ namespace vdv301 {
         std::unordered_map<psram_string, OperationIDType> m_OpNameToID;
 
     public:
-        PublisherHttp(ServiceDiscovery& sd, const std::string& serviceClassName, const std::string& serviceVersion, size_t taskStackSize);
+        PublisherHttp(
+            ServiceDiscovery& sd,
+            const std::string& serviceClassName, const std::string& serviceVersion,
+            size_t taskStackSize, int taskPriority = EventQueue::DEFAULT_TASK_PRIORITY
+        );
         ~PublisherHttp();
 
     protected:

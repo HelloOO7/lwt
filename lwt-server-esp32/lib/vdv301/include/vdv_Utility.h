@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include "PSRAMContainers.h"
+#include "esp_netif_types.h"
 
 namespace vdv301
 {
@@ -15,4 +16,6 @@ namespace vdv301
     inline uint32_t HashResponseWithoutTimestamp(const psram_string& responseXml) {
         return HashResponseWithoutTimestamp(responseXml.c_str());
     }
+
+    std::string IPToString(const esp_ip4_addr_t* ip);
 }

@@ -19,11 +19,17 @@ namespace vdv301 {
 
         const char* timestampEnd = strstr(timestampStart, "</TimeStamp>");
         timestampEnd += strlen("</TimeStamp>");
-        
+
         auto hash = FNV1aHashInit();
         hash = FNV1aHashUpdate(hash, std::span<const char>(responseXml, timestampStart));
         hash = FNV1aHashUpdate(hash, std::span<const char>(timestampEnd, strlen(timestampEnd)));
-        
+
         return hash;
+    }
+
+    std::string IPToString(const esp_ip4_addr_t* ip) {
+        char ipStr[16];
+        snprintf(ipStr, sizeof(ipStr), IPSTR, IP2STR(ip));
+        return std::string(ipStr);
     }
 }

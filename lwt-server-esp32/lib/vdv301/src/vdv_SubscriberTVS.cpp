@@ -9,7 +9,7 @@ namespace vdv301
 {
     static constexpr const char* TAG = "SubscriberTVS";
 
-    SubscriberTVS::SubscriberTVS(ServiceDiscovery& sd, Operation subscribedOps) :
+    SubscriberTVS::SubscriberTVS(ServiceDiscovery& sd, Operation subscribedOps, int taskPriority) :
         SubscriberHttp(
             sd,
             "TicketValidationService",
@@ -19,7 +19,8 @@ namespace vdv301
             .FilterTxtRecord("ver", "2.2")
             .Build(),
             std::to_underlying(subscribedOps),
-            8192
+            8192,
+            taskPriority
         )
     {
     }

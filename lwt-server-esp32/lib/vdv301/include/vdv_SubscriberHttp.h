@@ -33,9 +33,6 @@ namespace vdv301 {
             const HttpPushServer::PushBody& GetResult() const;
         };
     private:
-        ServiceDiscovery& m_SD;
-        std::atomic<ServiceDiscovery::BrowseHandle> m_SDHandle{ 0 };
-        std::mutex m_CommMutex;
         EventQueue m_EventQueue;
 
         std::string m_ServiceClassName;
@@ -53,16 +50,17 @@ namespace vdv301 {
         std::vector<std::string> m_SubscribedOperationEndpoints;
 
     public:
-        SubscriberHttp(ServiceDiscovery& sd, const std::string& serviceClassName, const ServiceDiscovery::Query& serviceQuery, OperationIDType subscribedOps, size_t taskStackSize);
+        SubscriberHttp(
+            ServiceDiscovery& sd,
+            const std::string& serviceClassName, const ServiceDiscovery::Query& serviceQuery,
+            OperationIDType subscribedOps,
+            size_t taskStackSize, int taskPriority = EventQueue::DEFAULT_TASK_PRIORITY
+        );
         ~SubscriberHttp();
 
-        // forbid copy/assignment
-        SubscriberHttp(const SubscriberHttp&) = delete;
-        SubscriberHttp& operator=(const SubscriberHttp&) = delete;
-
-    private:
-        void HandleServiceDiscovered(const ServiceDiscovery::Result& result);
-        void HandleServiceLost();
+    protected:
+        virtual void HandleServiceDiscovered(const ServiceDiscovery::Result& result) override;
+        virtual void HandleServiceLost() override;
 
     protected:
         /**
@@ -90,8 +88,6 @@ namespace vdv301 {
         esp_err_t HandleHttpEvent(esp_http_client_event_t* evt);
 
         static esp_err_t HttpEventHandlerFunc(esp_http_client_event_t* evt);
-
-        static std::string IPToString(const esp_ip4_addr_t* ip);
 
         void UpdateServiceStateAsync();
     };

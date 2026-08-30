@@ -5,6 +5,7 @@
 #include "esp_log.h"
 #include "NewAndDelete.h"
 #include "IBIS_IP_common_V2_3CZ1_0.hpp"
+#include "vdv_Utility.h"
 
 namespace vdv301
 {
@@ -18,40 +19,27 @@ namespace vdv301
 
     static constexpr EventQueue::EventTag SERVICE_UPDATE_EVENT_TAG = 1;
 
-    SubscriberHttp::SubscriberHttp(ServiceDiscovery& sd, const std::string& serviceClassName, const ServiceDiscovery::Query& serviceQuery, OperationIDType subscribedOps, size_t taskStackSize) :
-        SubscriberBase(),
-        m_SD{ sd },
-        m_EventQueue(serviceClassName, 5, taskStackSize),
+    SubscriberHttp::SubscriberHttp(
+        ServiceDiscovery& sd,
+        const std::string& serviceClassName, const ServiceDiscovery::Query& serviceQuery,
+        OperationIDType subscribedOps,
+        size_t taskStackSize, int taskPriority
+    ) :
+        SubscriberBase(sd),
+        m_EventQueue(serviceClassName, 5, taskStackSize, taskPriority),
         m_ServiceClassName{ serviceClassName },
         m_SubscribedOperations{ subscribedOps }
     {
         memset(&m_BaseHttpConfig, 0, sizeof(m_BaseHttpConfig));
-        std::lock_guard lock(m_CommMutex);
 
-        m_SDHandle = m_SD.StartBrowse(
-            serviceQuery,
-            [this](const ServiceDiscovery::ResultSetAccessor& results) {
-                const ServiceDiscovery::Result* result = results.GetAnyResult();
-                if (result) {
-                    ESP_LOGI(TAG, "Service query matched: instance=%s host=%s port=%u", result->GetInstanceName().c_str(), result->GetHostName().c_str(), result->GetPort());
-                    HandleServiceDiscovered(*result);
-                }
-                else {
-                    ESP_LOGI(TAG, "Service query lost");
-                    HandleServiceLost();
-                }
-            }
-        );
+        StartBrowse(serviceQuery);
     }
 
     SubscriberHttp::~SubscriberHttp()
     {
-        // must not lock here, otherwise we would deadlock
-        // (subscriber mutex -> SD mutex vs. SD mutex -> subscriber mutex in HandleServiceDiscovered)
-        // fortunately we do not need to lock, as destructor/constructor can not be called concurrently
-        auto sdh = m_SDHandle.exchange(0);
-        m_SD.StopBrowse(sdh);
-
+        // this needs to be called explicitly, we can not use base class dtor here, as it
+        // runs *after* the derived class dtor
+        StopBrowse();
         {
             // lock again, so that any pending callbacks before StopBrowse was invoked
             // can finish without accessing a destroyed object
@@ -65,16 +53,7 @@ namespace vdv301
 
     void SubscriberHttp::HandleServiceDiscovered(const ServiceDiscovery::Result& result)
     {
-        std::lock_guard lock(m_CommMutex);
-        auto sdh = m_SDHandle.load();
-        if (!sdh) {
-            // called after StopBrowse
-            return;
-        }
-
-        auto* ipv4Addr = result.GetIPv4Address();
-
-        m_HttpHost = ipv4Addr ? IPToString(ipv4Addr) : result.GetHostName();
+        m_HttpHost = result.GetIPv4AddressAsString().value_or(result.GetHostName());
         m_HttpPathBase = "/";
         auto pathStart = result.GetTxtRecord("path");
         if (pathStart) {
@@ -227,12 +206,6 @@ namespace vdv301
             return subscriber->HandleHttpEvent(evt);
         }
         return ESP_OK;
-    }
-
-    std::string SubscriberHttp::IPToString(const esp_ip4_addr_t* ip) {
-        char ipStr[16];
-        snprintf(ipStr, sizeof(ipStr), IPSTR, IP2STR(ip));
-        return std::string(ipStr);
     }
 
     void SubscriberHttp::UpdateServiceStateAsync()
