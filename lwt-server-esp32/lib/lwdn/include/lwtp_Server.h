@@ -12,10 +12,11 @@
 #include "PSRAMContainers.h"
 #include "lwtp_Protocol.h"
 #include "PSRAMTask.h"
+#include "CommonTypes.h"
 
 namespace lwtp {
 
-    using PacketData = psram_vector<uint8_t>;
+    using PacketData = ByteVector;
 
     class Packet {
     private:

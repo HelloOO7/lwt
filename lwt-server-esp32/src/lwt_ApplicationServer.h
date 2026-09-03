@@ -39,7 +39,7 @@ namespace lwt {
                         auto responseFbBuilder = PSRAMFlatBufferBuilder();
 
                         int result = service(*requestFb, responseFbBuilder);
-                        auto innerData = (result >= 200 && result < 300) ? SerializeFlatBuffer(responseFbBuilder) : psram_vector<uint8_t>{};
+                        auto innerData = (result >= 200 && result < 300) ? SerializeFlatBuffer(responseFbBuilder) : ByteVector{};
 
                         return OperationResult(result, std::move(innerData));
                     }

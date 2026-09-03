@@ -41,7 +41,7 @@ namespace lwt {
         bool m_CISCanUseTicketing{ false };
         bool m_TVSCanUseTicketing{ false };
         std::array<uint8_t, AdvDataBasic::PACKED_SIZE> m_LegacyDataBuffer{};
-        psram_vector<uint8_t> m_ExtDataBuffer;
+        ByteVector m_ExtDataBuffer;
 
     public:
         TripInfoAdvertiser(vdv301::SubscriberCIS& cisSubscriber, vdv301::SubscriberTVS& tvsSubscriber, std::initializer_list<lwdn::Advertiser*> advertisers);

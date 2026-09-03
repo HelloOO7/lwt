@@ -4,6 +4,7 @@
 #include <string>
 #include <cstring>
 #include <ctime>
+#include <sys/time.h>
 
 struct LocalTime {
     uint8_t hour{ 0 };
@@ -43,23 +44,24 @@ struct LocalTime {
         return hour * 60 + minute;
     }
 
-    inline std::string to_string() const {
+    template<typename TString = std::string>
+    inline TString to_string() const {
         if (second > 0) {
             if (nanosecond > 0) {
                 char buffer[24]; // HH:MM:SS.nnnnnnnnn + null terminator
                 snprintf(buffer, sizeof(buffer), "%02hhu:%02hhu:%02hhu.%09lu", hour, minute, second, nanosecond);
-                return std::string(buffer);
+                return TString(buffer);
             }
             else {
                 char buffer[12]; // HH:MM:SS + null terminator
                 snprintf(buffer, sizeof(buffer), "%02hhu:%02hhu:%02hhu", hour, minute, second);
-                return std::string(buffer);
+                return TString(buffer);
             }
         }
         else {
             char buffer[6]; // HH:MM + null terminator
             snprintf(buffer, sizeof(buffer), "%02hhu:%02hhu", hour, minute);
-            return std::string(buffer);
+            return TString(buffer);
         }
     }
 };
@@ -83,10 +85,12 @@ struct LocalDate {
         return parse(str.c_str());
     }
 
-    inline std::string to_string() const {
+
+    template<typename TString = std::string>
+    inline TString to_string() const {
         char buffer[11]; // YYYY-MM-DD + null terminator
         snprintf(buffer, sizeof(buffer), "%04hu-%02hhu-%02hhu", year, month, day);
-        return std::string(buffer);
+        return TString(buffer);
     }
 };
 
@@ -111,9 +115,24 @@ struct LocalDateTime {
         return parse(str.c_str());
     }
 
-    inline static LocalDateTime of_epoch_seconds(int64_t epochSeconds) {
+    inline static LocalDateTime now() {
+        std::time_t now = std::time(nullptr);
+        struct tm local;
+        localtime_r(&now, &local);
+        return of(&local);
+    }
+
+    inline static LocalDateTime of_utc_epoch_seconds(int64_t epochSeconds) {
         std::time_t t = static_cast<std::time_t>(epochSeconds);
         std::tm* tmPtr = std::gmtime(&t);
+        return of(tmPtr);
+    }
+
+    inline static LocalDateTime of_epoch_seconds(int64_t epochSeconds, int32_t timezoneOffset) {
+        return of_utc_epoch_seconds(epochSeconds - timezoneOffset);
+    }
+
+    inline static LocalDateTime of(tm* tmPtr) {
         LocalDateTime ldt;
         ldt.date.year = (uint16_t)(tmPtr->tm_year + 1900);
         ldt.date.month = (uint8_t)(tmPtr->tm_mon + 1);
@@ -124,7 +143,7 @@ struct LocalDateTime {
         return ldt;
     }
 
-    inline int64_t to_epoch_seconds() const {
+    std::tm to_tm() const {
         std::tm tm = {};
         tm.tm_year = date.year - 1900;
         tm.tm_mon = date.month - 1;
@@ -132,11 +151,23 @@ struct LocalDateTime {
         tm.tm_hour = time.hour;
         tm.tm_min = time.minute;
         tm.tm_sec = time.second;
-        return static_cast<int64_t>(std::mktime(&tm));
+        return tm;
     }
 
-    inline std::string to_string() const {
-        return date.to_string() + "T" + time.to_string();
+    /**
+     * @brief Return the number of seconds since the Unix epoch, assuming that
+     * the LocalDateTime is in UTC.
+     *
+     * @return int64_t
+     */
+    inline int64_t to_utc_epoch_seconds() const {
+        std::tm tm = to_tm();
+        return static_cast<int64_t>(timegm(&tm));
+    }
+
+    template<typename TString = std::string>
+    inline TString to_string() const {
+        return date.to_string<TString>() + "T" + time.to_string<TString>();
     }
 };
 
@@ -149,6 +180,22 @@ struct OffsetDateTime {
         odt.date_time = ldt;
         odt.offset_seconds = offsetSec;
         return odt;
+    }
+
+    inline static OffsetDateTime now() {
+        return of(LocalDateTime::now(), -_timezone);
+    }
+
+    inline static OffsetDateTime of_epoch_seconds(int64_t epochSeconds, int32_t offsetSec) {
+        return of(LocalDateTime::of_epoch_seconds(epochSeconds, offsetSec), offsetSec);
+    }
+
+    inline static OffsetDateTime of_utc_epoch_seconds(int64_t epochSeconds) {
+        return of_epoch_seconds(epochSeconds, 0);
+    }
+
+    inline static OffsetDateTime of_local_epoch_seconds(int64_t epochSeconds) {
+        return of_epoch_seconds(epochSeconds, -_timezone);
     }
 
     inline static OffsetDateTime parse(const char* str, const char** endPtr = nullptr) {
@@ -182,8 +229,9 @@ struct OffsetDateTime {
         return parse(str.c_str());
     }
 
-    inline std::string to_string() const {
-        std::string result = date_time.to_string();
+    template<typename TString = std::string>
+    inline TString to_string() const {
+        TString result = date_time.to_string<TString>();
         if (offset_seconds == 0) {
             result += "Z";
         }

@@ -9,10 +9,11 @@
 #include "CommonTypes.h"
 #include "psa/crypto.h"
 #include "PSRAMContainers.h"
+#include "HMAC.h"
 
 namespace lwt {
 
-    using PreauthorizationTokenBlob = psram_vector<uint8_t>;
+    using PreauthorizationTokenBlob = ByteVector;
 
     class PreauthorizationTokenManager {
     public:
@@ -26,20 +27,19 @@ namespace lwt {
         };
 
     private:
-        using HMAC = SHA256Hash;
+        using HMACHash = SHA256Hash;
 
     private:
-        std::vector<uint8_t> m_HMACKey;
-        psa_key_id_t m_HMACKeyId{ PSA_KEY_ID_NULL };
+        HMACSHA256& m_HMAC;
 
     public:
-        PreauthorizationTokenManager(const std::vector<uint8_t>& hmacKey);
+        PreauthorizationTokenManager(HMACSHA256& hmac);
         ~PreauthorizationTokenManager();
 
         PreauthorizationTokenBlob CreatePreauthorizationToken(const ByteSpan& activationTokenHash, int64_t expiresAt);
         VerificationResult VerifyPreauthorizationToken(const ByteSpan& tokenBlob, const ByteSpan& activationTokenHash, int64_t currentClock);
 
     private:
-        HMAC HMACMessage(const ByteSpan& message);
+        HMACHash HMACMessage(const ByteSpan& message);
     };
 }

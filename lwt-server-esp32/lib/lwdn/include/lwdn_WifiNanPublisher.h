@@ -25,11 +25,11 @@ namespace lwdn {
         struct Config {
             std::string ServiceName;
             wifi_nan_service_type_t ServiceType{ NAN_PUBLISH_UNSOLICITED };
-            std::vector<psram_vector<uint8_t>> MatchingFilters;
+            std::vector<ByteVector> MatchingFilters;
             Feature Features{ };
             bool SingleRepliedEvent{ true };
             bool AcceptAllNDPs{ true };
-            psram_vector<uint8_t> SSI;
+            ByteVector SSI;
         };
 
         class Message : public ByteSpan {

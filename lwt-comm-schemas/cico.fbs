@@ -13,10 +13,25 @@ table CheckInRequest {
     account_checkin_token: [ubyte] (required);
 }
 
+table CheckInIntermediate {
+    /// Confirmation token issued by the LWT device upon validating with MOS that
+    /// check-in is possible. It is valid for the local device for a generous time period
+    /// (several 10s of minutes). This 2-phase check-in is done so that the client
+    /// is informed about their ability to check-in before they issue the final confirmation,
+    /// which can be done without MOS's knowledge.
+    confirmation_token: [ubyte] (required);
+}
+
+table CheckInConfirmation {
+    /// Token given by the device in CheckInIntermediate, that the client
+    /// can send once it is ready to commit the check-in.
+    confirmation_token: [ubyte] (required);
+}
+
 table CICOTicketFragment {
     /// List of all LWDN addresses of the fragment issuer.
     issuer_addresses: [LwdnAddress] (required);
-    /// PEM data of the certificate of the fragment issuer.
+    /// DER data of the certificate of the fragment issuer.
     /// This is sent to follow-up peers in CICORefresh requests
     /// so that they can verify that the preceding fragment was
     /// signed by a legitimate issuer.
@@ -53,7 +68,10 @@ table CICOTicketFragment {
 table CICOFragmentRefreshRequest {
     /// Raw data of the fragment's refresh token.
     refresh_token: [ubyte] (required);
-    /// Issuer certificate, for use during transfers (changes of vehicles).
+    /// DER issuer certificate, for use during transfers (changes of vehicles).
+    /// As a special case, if the fragment is being sent to the same peer that it
+    /// had originated from, this can be set to a constant 0x5C (single element array)
+    /// to prevent needless retransmissions.
     issuer_certificate: [ubyte] (required);
 }
 
@@ -76,6 +94,13 @@ table CheckOutRequest {
     fragment: CICOFragmentRefreshRequest (required);
 }
 
+table CheckOutResponse {
+    /// ID of the finished CICO session, which the client may use to look up their fare
+    /// in MOS. This is provided for the convenience of not having to extract it out
+    /// of the ETD.
+    session_id: [ubyte] (required);
+}
+
 table CICOSeedDerivationSecret {
     /// The secret contents.
     data: [ubyte] (required);
@@ -86,7 +111,7 @@ table CICOSeedDerivationSecret {
 }
 
 table CICOInspectionData {
-    /// Certificate for the private key used by the device to sign
+    /// DER-format certificate for the private key used by the device to sign
     /// ticket fragments and refresh tokens. This can potentially be its own
     /// cert., albeit at the moment it is the same as the TLS certificate.
     device_certificate: [ubyte] (required);
@@ -95,6 +120,8 @@ table CICOInspectionData {
     /// in which case the issued-at attribute from the ETD selects which
     /// one should be used, similarly to normal ticket, where the "valid from"
     /// attribute fulfills this purpose.
+    /// Currently, only one secret is returned which is valid throughout the
+    /// whole trip of a vehicle, and is changed when the trip or line changes.
     seed_derivation_secrets: [CICOSeedDerivationSecret] (required);
     /// Server timestamp for use with RTT measuring to translate local times to absolute.
     server_time: long;

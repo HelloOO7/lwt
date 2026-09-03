@@ -45,6 +45,8 @@
 #include "lwt_CertRoleInterceptor.h"
 #include "lwt_TaskPriorities.h"
 #include "DigitalSignature.h"
+#include "Certificate.h"
+#include "lwt_CicoService.h"
 #include <atomic>
 
 static constexpr uint16_t BLE_PSM = 0xD7; // 0x80 + 'W'
@@ -54,19 +56,25 @@ static constexpr lwdn::BleAdvertiser::UUID32 BLE_SERVICE_UUID_VEHICLE_EXTENDED =
 static constexpr lwdn::BleAdvertiser::UUID32 BLE_SERVICE_UUID_STOP_EXTENDED = BLE_SERVICE_UUID_STOP + 'E';
 
 static constexpr in_port_t WIFI_NAN_PORT = 26001;
-static const std::vector<psram_vector<uint8_t>> WIFI_NAN_MATCHING_FILTERS_VEHICLE = { {'V'}, {'*'} };
-static const std::vector<psram_vector<uint8_t>> WIFI_NAN_MATCHING_FILTERS_STOP = { {'*'}, {'S'} };
+static const std::vector<ByteVector> WIFI_NAN_MATCHING_FILTERS_VEHICLE = { {'V'}, {'*'} };
+static const std::vector<ByteVector> WIFI_NAN_MATCHING_FILTERS_STOP = { {'*'}, {'S'} };
 
 static const lwt::TicketValidationConfig TICKETING_CONFIG = {
     .TariffSystemID = "PID",
-    .PreauthorizationGracePeriodUs = 2 * 60 * 1000 * 1000, // 2 minutes
-    .ValidationProtectionPeriodUs = 1 * 60 * 1000 * 1000, // 1 minute
+    .TicketIssuerID = "DPP",
+    .PreauthorizationGracePeriodMs = 2 * 60 * 1000, // 2 minutes
+    .ValidationProtectionPeriodMs = 1 * 60 * 1000, // 1 minute
+    .CicoConfirmationTokenExpiryMs = 60 * 60 * 1000, // 1 hour
+    .CicoTicketTtlMs = 5 * 60 * 1000 // 5 minutes
 };
 
 class AppMain {
 private:
     TlsEnvironment m_TlsCredentials;
     DigitalSignature m_SigningKey;
+    Certificate m_TrustRootCert;
+    Certificate m_DeviceCert;
+    HMACSHA256 m_HMAC;
     mbedtls_ssl_config m_MbedTlsConfig;
     lwdn::TLSConfig m_TLSConfig;
     vdv301::ServiceDiscovery m_HttpServiceDiscovery;
@@ -85,6 +93,7 @@ private:
     lwt::TicketSignatureVerifier m_TicketVerifier;
     lwt::MOSClient m_MOSClient;
     lwt::TicketValidationService m_TicketService;
+    lwt::CicoService m_CicoService;
 
     lwdn::BleAdvertiser m_BLETripAdvertiserLegacy;
     lwdn::BleAdvertiser m_BLETripAdvertiserExt;
@@ -103,6 +112,9 @@ public:
             TLS_LWT_SERVER_KEY_DEBUG_START, TLS_LWT_SERVER_KEY_DEBUG_END
         ),
         m_SigningKey(ByteSpan(TLS_LWT_SERVER_KEY_DEBUG_START, TLS_LWT_SERVER_KEY_DEBUG_END), DigitalSignature::KeyUsage::SIGN),
+        m_TrustRootCert(ByteSpan(TLS_ROOT_CRT_START, TLS_ROOT_CRT_END)),
+        m_DeviceCert(ByteSpan(get_debug_device_crt_start(), get_debug_device_crt_end())),
+        m_HMAC(HMACSHA256::ImportKey(LoadOrCreateHmacKey("pat_hmac_key", HMACSHA256::KEY_SIZE))),
         m_TLSConfig(m_MbedTlsConfig),
         m_HttpServiceDiscovery{ vdv301::HttpServiceDiscovery(TASK_PRIORITY_BACKGROUND_SYNC) },
         m_UdpServiceDiscovery{ vdv301::UdpServiceDiscovery(TASK_PRIORITY_BACKGROUND_SYNC) },
@@ -121,12 +133,13 @@ public:
         m_SntpAutoConfig(m_TimeServiceSubscriber),
         m_ServiceRegistry(lwt::Operation_MIN, lwt::Operation_MAX),
         m_AppServer(m_ServiceRegistry),
-        m_ServerAuthService(get_debug_device_crt_start(), m_SigningKey),
+        m_ServerAuthService(m_DeviceCert, m_SigningKey),
         m_TripInfoService(m_CISSubscriber),
-        m_PreauthTokenManager(LoadOrCreateHmacKey("pat_hmac_key", 32)),
+        m_PreauthTokenManager(m_HMAC),
         m_TicketVerifier(),
-        m_MOSClient("https://ticketing.mos.ropid:8080", { get_debug_device_crt_start(), get_debug_device_crt_end() }, { TLS_LWT_SERVER_KEY_DEBUG_START, TLS_LWT_SERVER_KEY_DEBUG_END }),
+        m_MOSClient("https://ticketing.mos.ropid:8080", m_DeviceCert, { TLS_LWT_SERVER_KEY_DEBUG_START, TLS_LWT_SERVER_KEY_DEBUG_END }),
         m_TicketService(TICKETING_CONFIG, m_PreauthTokenManager, m_TicketVerifier, m_MOSClient, m_TripInfoService, &m_TVSSubscriber, &m_RCSPublisher),
+        m_CicoService(TICKETING_CONFIG, m_TrustRootCert, m_DeviceCert, m_SigningKey, m_HMAC, m_TicketService, m_MOSClient, TASK_PRIORITY_BACKGROUND_SYNC),
         m_BLETripAdvertiserLegacy(0, BLE_SERVICE_UUID_VEHICLE, lwdn::BleAdvertiser::Flags::INCLUDE_DEVICE_NAME | lwdn::BleAdvertiser::Flags::USE_LEGACY_ADVERTISING),
         m_BLETripAdvertiserExt(1, BLE_SERVICE_UUID_VEHICLE_EXTENDED, lwdn::BleAdvertiser::Flags::INCLUDE_DEVICE_NAME),
         m_BLEServer(BLE_PSM, lwtp::MAX_PACKET_SIZE),
@@ -149,7 +162,7 @@ public:
 
         m_TicketVerifier.RegisterPublicKey(0, { TICKET_SIGNING_KEY_PUB_START, TICKET_SIGNING_KEY_PUB_END });
 
-        m_ServiceRegistry.RegisterServices(m_PingService, m_ServerAuthService, m_TripInfoService, m_TicketService);
+        m_ServiceRegistry.RegisterServices(m_PingService, m_ServerAuthService, m_TripInfoService, m_TicketService, m_CicoService);
 
         m_AppServer.AddInterceptor(std::make_unique<lwtp::StartTLSInterceptor>(m_TLSConfig));
         m_AppServer.AddInterceptor(std::make_unique<lwt::CertRoleInterceptor>());
@@ -174,10 +187,10 @@ public:
     }
 
 private:
-    static std::vector<uint8_t> LoadOrCreateHmacKey(const char* nvsKey, size_t expectedSize) {
+    static ByteVector LoadOrCreateHmacKey(const char* nvsKey, size_t expectedSize) {
         nvs_handle nvsHandle;
         ESP_ERROR_CHECK(nvs_open("lwt", NVS_READWRITE, &nvsHandle));
-        std::vector<uint8_t> hmacKey(expectedSize);
+        ByteVector hmacKey(expectedSize);
         size_t pBlobSize = expectedSize;
         esp_err_t err = nvs_get_blob(nvsHandle, nvsKey, hmacKey.data(), &pBlobSize);
         if (err == ESP_ERR_NVS_NOT_FOUND) {
@@ -259,7 +272,7 @@ extern "C" void app_main() {
     mdns_hostname_set("lwt-esp32");
     psa_crypto_init();
 
-    std::cout << "Services initialized, free memory before app launch=" << esp_get_free_internal_heap_size() << " bytes" << std::endl;
+    std::cout << "Services initialized, free memory before app launch=" << esp_get_free_internal_heap_size() << " bytes, sizeof(AppMain)=" << sizeof(AppMain) << " bytes" << std::endl;
 
     g_AppMain = new AppMain();
     if (ble_synced) {

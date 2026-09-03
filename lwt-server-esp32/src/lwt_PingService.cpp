@@ -4,6 +4,7 @@
 #include "ping_generated.h"
 #include "esp_timer.h"
 #include "esp_netif.h"
+#include "SystemTime.h"
 
 namespace lwt {
 
@@ -12,7 +13,7 @@ namespace lwt {
             [](flatbuffers::FlatBufferBuilder& fbb) -> ResponseStatus {
                 const char* hostname = "<unknown>";
                 esp_netif_get_hostname(esp_netif_get_default_netif(), &hostname);
-                auto respOff = CreatePingResponseDirect(fbb, hostname, esp_timer_get_time());
+                auto respOff = CreatePingResponseDirect(fbb, hostname, SystemTime::UptimeMicros());
                 fbb.Finish(respOff);
                 return 200;
             }

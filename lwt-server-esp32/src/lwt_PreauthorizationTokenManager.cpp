@@ -2,33 +2,28 @@
 #include <cassert>
 #include "BitConverter.h"
 #include "psa/crypto.h"
+#include "lwt_SecureTokenFormat.h"
 
 namespace lwt {
 
     static constexpr uint16_t TOKEN_BLOB_VERSION = 1;
 
-    PreauthorizationTokenManager::PreauthorizationTokenManager(const std::vector<uint8_t>& hmacKey)
-        : m_HMACKey(hmacKey)
+    PreauthorizationTokenManager::PreauthorizationTokenManager(HMACSHA256& hmac)
+        : m_HMAC(hmac)
     {
-        psa_key_attributes_t keyAttributes = PSA_KEY_ATTRIBUTES_INIT;
-        psa_set_key_usage_flags(&keyAttributes, PSA_KEY_USAGE_SIGN_MESSAGE | PSA_KEY_USAGE_VERIFY_MESSAGE);
-        psa_set_key_algorithm(&keyAttributes, PSA_ALG_HMAC(PSA_ALG_SHA_256));
-        psa_set_key_type(&keyAttributes, PSA_KEY_TYPE_HMAC);
-        assert(psa_import_key(&keyAttributes, hmacKey.data(), hmacKey.size(), &m_HMACKeyId) == PSA_SUCCESS);
+
     }
 
     PreauthorizationTokenManager::~PreauthorizationTokenManager()
     {
-        if (m_HMACKeyId != PSA_KEY_ID_NULL) {
-            psa_destroy_key(m_HMACKeyId);
-        }
+
     }
 
     using BitConverter = ::BitConverter<std::endian::native>;
 
     PreauthorizationTokenBlob PreauthorizationTokenManager::CreatePreauthorizationToken(const ByteSpan& activationTokenHash, int64_t expiresAt)
     {
-        PreauthorizationTokenBlob data(sizeof(uint16_t) + sizeof(uint8_t) + activationTokenHash.size() + sizeof(int64_t) + HMAC{}.size());
+        PreauthorizationTokenBlob data(SecureToken::CalcHmacTokenSize(m_HMAC, sizeof(uint16_t) + sizeof(uint8_t) + activationTokenHash.size() + sizeof(int64_t)));
 
         BitConverter::OutputStream out(data.data());
         out.WriteUInt16(TOKEN_BLOB_VERSION);
@@ -36,27 +31,22 @@ namespace lwt {
         out.WriteBytes(activationTokenHash);
         out.WriteInt64(expiresAt);
 
-        auto hmac = HMACMessage({ data.data(), data.size() - HMAC{}.size() });
-        out.WriteBytes(hmac);
+        SecureToken::AddHmac(m_HMAC, data);
 
         return data;
     }
 
     PreauthorizationTokenManager::VerificationResult PreauthorizationTokenManager::VerifyPreauthorizationToken(const ByteSpan& tokenBlob, const ByteSpan& activationTokenHash, int64_t currentClock)
     {
-        if (tokenBlob.size() < sizeof(uint8_t) + HMAC{}.size()) {
+        if (tokenBlob.size() < SecureToken::CalcHmacTokenSize(m_HMAC, sizeof(uint16_t) + sizeof(uint8_t))) {
             return VerificationResult::TOKEN_CORRUPTED;
         }
 
-        ByteSpan innerData(tokenBlob.data(), tokenBlob.size() - HMAC{}.size());
-        ByteSpan hmac(tokenBlob.data() + innerData.size(), HMAC{}.size());
-
-        HMAC expectedHMAC = HMACMessage(innerData);
-        if (!std::equal(hmac.begin(), hmac.end(), expectedHMAC.begin())) {
+        if (!SecureToken::VerifyHmac(m_HMAC, tokenBlob)) {
             return VerificationResult::INVALID_HMAC;
         }
 
-        BitConverter::InputStream in(innerData.data());
+        BitConverter::InputStream in(tokenBlob.data());
 
         uint16_t version = in.ReadUInt16();
         if (version != TOKEN_BLOB_VERSION) {
@@ -80,11 +70,8 @@ namespace lwt {
         return VerificationResult::OK;
     }
 
-    PreauthorizationTokenManager::HMAC PreauthorizationTokenManager::HMACMessage(const ByteSpan& message)
+    PreauthorizationTokenManager::HMACHash PreauthorizationTokenManager::HMACMessage(const ByteSpan& message)
     {
-        HMAC hmacOutput;
-        size_t macLength = 0;
-        assert(psa_mac_compute(m_HMACKeyId, PSA_ALG_HMAC(PSA_ALG_SHA_256), message.data(), message.size(), hmacOutput.data(), hmacOutput.size(), &macLength) == PSA_SUCCESS);
-        return hmacOutput;
+        return m_HMAC.Compute(message);
     }
 }

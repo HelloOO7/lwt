@@ -38,7 +38,7 @@ namespace lwt {
     LwtLocalDateTime ConvertDateTime(const IBIS_IP_dateTime& dateTime)
     {
         auto dt = LocalDateTime::parse(dateTime.Value);
-        return LwtLocalDateTime(dt.to_epoch_seconds());
+        return LwtLocalDateTime(dt.to_utc_epoch_seconds());
     }
 
     auto BuildTripStopInfo(flatbuffers::FlatBufferBuilder& fbb, const TripInformationStructure& tripInfo, const StopInformationStructure& stopInfo)
@@ -188,21 +188,40 @@ namespace lwt {
 
     flatbuffers::Offset<TripStateInfo> TripInformationService::GetTripStateInfo(flatbuffers::FlatBufferBuilder& fbb)
     {
+        return GetTripStateInfoEx(&fbb, nullptr).OfsTripState;
+    }
+
+    TripInformationService::TripStateInfoResult TripInformationService::GetTripStateInfoEx(flatbuffers::FlatBufferBuilder* fbbTripState, flatbuffers::FlatBufferBuilder* fbbCurrentStop)
+    {
         std::lock_guard lock(m_DataMutex);
 
-        const auto* src = GetTripStateInfo();
-
-        if (!src) {
+        const TripRouteInfo* tripRoute = GetTripRouteInfo();
+        if (!tripRoute) {
             return {};
         }
 
-        return CreateTripStateInfo(
-            fbb,
-            GetTripInfo(fbb, src->trip()),
-            src->delay(),
-            GetStopReference(fbb, src->current_departure_stop()),
-            src->location_state()
-        );
+        const TripStateInfo* tripState = tripRoute->trip();
+        if (!tripState) {
+            return {};
+        }
+
+        TripStateInfoResult result;
+
+        if (fbbTripState) {
+            auto&& fbb = *fbbTripState;
+            result.OfsTripState = CreateTripStateInfo(
+                fbb,
+                GetTripInfo(fbb, tripState->trip()),
+                tripState->delay(),
+                GetStopReference(fbb, tripState->current_departure_stop()),
+                tripState->location_state()
+            );
+        }
+        if (fbbCurrentStop) {
+            auto&& fbb = *fbbCurrentStop;
+            result.OfsCurrentStop = GetTripStopInfo(fbb, tripRoute->stops()->Get(tripState->current_departure_stop()->sequence_id()));
+        }
+        return result;
     }
 
     flatbuffers::Offset<TripInfo> TripInformationService::GetTripInfo(flatbuffers::FlatBufferBuilder& fbb, const TripInfo* src) const
@@ -244,6 +263,22 @@ namespace lwt {
             src->sequence_id(),
             src->global_ref_id(),
             fbb.CreateString(src->name())
+        );
+    }
+
+    flatbuffers::Offset<TripStopInfo> TripInformationService::GetTripStopInfo(flatbuffers::FlatBufferBuilder& fbb, const TripStopInfo* src) const
+    {
+        if (!src) {
+            return {};
+        }
+
+        return CreateTripStopInfo(
+            fbb,
+            GetStopReference(fbb, src->stop_ref()),
+            src->arr_time(),
+            src->dep_time(),
+            fbb.CreateString(src->tariff_zones()),
+            src->tariff_kilometers()
         );
     }
 

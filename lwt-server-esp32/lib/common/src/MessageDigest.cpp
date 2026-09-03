@@ -3,7 +3,7 @@
 #include <cassert>
 #include "psa/crypto_values.h"
 
-int MessageDigest::Digest(const ByteSpan& data, const std::span<uint8_t>& digest, mbedtls_md_type_t hashType) {
+int MessageDigest::Digest(const ByteSpan& data, const WritableByteSpan& digest, mbedtls_md_type_t hashType) {
     auto mdInfo = mbedtls_md_info_from_type(hashType);
     size_t digestSize = mbedtls_md_get_size(mdInfo);
     if (digest.size() < digestSize) {

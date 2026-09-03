@@ -14,8 +14,8 @@ namespace lwt {
 
     static constexpr const char* CHALLENGE_SALT = "LwtServerAuthentication";
 
-    ServerAuthenticationService::ServerAuthenticationService(uint8_t* certString, DigitalSignature& signingKey) :
-        m_CertString{ certString },
+    ServerAuthenticationService::ServerAuthenticationService(Certificate& deviceCert, DigitalSignature& signingKey) :
+        m_DeviceCert{ deviceCert },
         m_SigningKey{ signingKey }
     {
     }
@@ -28,7 +28,7 @@ namespace lwt {
                     return 550;
                 }
                 auto challengeRespOffset = fbb.CreateVector(signedChallenge);
-                auto certBytesOffset = fbb.CreateVector(m_CertString, strlen((char*)m_CertString));
+                auto certBytesOffset = CreateVector(fbb, m_DeviceCert.GetCertificateDer());
 
                 fbb.Finish(CreateServerAuthenticationResponse(fbb, challengeRespOffset, certBytesOffset));
                 return 200;
@@ -36,13 +36,13 @@ namespace lwt {
         ));
     }
 
-    psram_vector<uint8_t> ServerAuthenticationService::SignChallenge(const ByteSpan& challenge) {
-        psram_vector<uint8_t> saltedChallenge;
+    ByteVector ServerAuthenticationService::SignChallenge(const ByteSpan& challenge) {
+        ByteVector saltedChallenge;
         saltedChallenge.reserve(strlen(CHALLENGE_SALT) + challenge.size());
         saltedChallenge.insert(saltedChallenge.end(), CHALLENGE_SALT, CHALLENGE_SALT + strlen(CHALLENGE_SALT));
         saltedChallenge.insert(saltedChallenge.end(), challenge.data(), challenge.data() + challenge.size());
 
-        psram_vector<uint8_t> signature;
+        ByteVector signature;
         int res = m_SigningKey.Sign(saltedChallenge, &signature, MBEDTLS_MD_SHA256);
         if (res != 0) {
             ESP_LOGE(TAG, "Failed to sign challenge, error code: %d", res);

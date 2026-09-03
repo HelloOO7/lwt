@@ -3,13 +3,19 @@
 #include <string>
 #include <cstdint>
 #include "CommonTypes.h"
+#include "UUID.h"
 #include "esp_http_client.h"
 #include "PSRAMContainers.h"
 #include "ISO8601.h"
+#include "Certificate.h"
 #include <optional>
 #include <variant>
+#include "nlohmann/json.hpp"
 
 namespace lwt {
+
+    // the actual object hierarchy is light enough to store in RAM. we want only strings to be in PSRAM.
+    using psram_json = nlohmann::basic_json<std::map, std::vector, psram_string>;
 
     struct MOSTicketActivationParams {
         std::optional<std::variant<OffsetDateTime, LocalDateTime>> Time;
@@ -17,12 +23,12 @@ namespace lwt {
         bool ClientIntegrityAttested{ false };
         std::string Zones;
         std::string ClientAppID;
-        std::string LwtMetadata;
+        psram_string LwtMetadata;
     };
 
     struct MOSTicketPayload {
-        psram_vector<uint8_t> ETD;
-        psram_vector<uint8_t> TOTPSeed;
+        ByteVector ETD;
+        ByteVector TOTPSeed;
     };
 
     struct MOSTicket {
@@ -51,7 +57,8 @@ namespace lwt {
         uint32_t AccountId;
 
         int64_t LocalTimestamp;
-        
+        OffsetDateTime AbsoluteTimestamp;
+
         MOSCICOEventType EventType;
         psram_string LwtMetadata;
     };
@@ -61,16 +68,29 @@ namespace lwt {
         int64_t CurrentLocalTimestamp;
     };
 
+    struct MOSCheckInRequest {
+        ByteVector CheckInToken;
+    };
+
+    struct MOSCheckInResponse {
+        uint32_t AccountId;
+        UUID SessionId;
+    };
+
     class MOSClient {
     private:
         std::string m_BaseUrl;
         esp_http_client_config_t m_HttpClientConfig{};
 
     public:
-        MOSClient(const std::string& baseUrl, const ByteSpan& tlsClientCertChain, const ByteSpan& tlsClientPrivateKey);
+        MOSClient(const std::string& baseUrl, const Certificate& tlsClientCertChain, const ByteSpan& tlsClientPrivateKey);
 
         int ActivateTicket(uint64_t ticketId, const MOSTicketActivationParams& params, MOSTicket* pActivatedTicket);
-        int PushCICOEvents(const MOSCICOEventBatch& eventBatch);
+
+        int CICOPushEvents(const MOSCICOEventBatch& eventBatch);
+        int CICOCheckIn(const MOSCheckInRequest& request, MOSCheckInResponse* pResponse);
+
+        static bool IsStatusOK(int statusCode);
 
     private:
         /**
@@ -85,5 +105,6 @@ namespace lwt {
          *             >=0: HTTP status code.
          */
         int PerformHttpRequest(esp_http_client_method_t method, const std::string& path, const psram_string& requestBody, psram_string* pResponseBody);
+        int PerformJsonHttpRequest(esp_http_client_method_t method, const std::string& path, const psram_json& requestJson, psram_json* pResponseJson);
     };
 }

@@ -20,23 +20,26 @@ namespace lwt {
 
     struct TicketValidationConfig {
         std::string TariffSystemID;
-        int64_t PreauthorizationGracePeriodUs;
-        int64_t ValidationProtectionPeriodUs;
+        std::string TicketIssuerID;
+        int64_t PreauthorizationGracePeriodMs;
+        int64_t ValidationProtectionPeriodMs;
+        int64_t CicoConfirmationTokenExpiryMs;
+        int64_t CicoTicketTtlMs;
     };
 
     class TicketPreauthRateLimiter {
     private:
         struct Entry {
             SHA256Hash TokenHash;
-            int64_t TimestampUs;
+            int64_t TimestampMs;
         };
 
         size_t m_Capacity;
-        int64_t m_MaxAgeUs;
+        int64_t m_MaxAgeMs;
         std::deque<Entry, psram_allocator<Entry>> m_Entries;
 
     public:
-        TicketPreauthRateLimiter(size_t capacity, int64_t maxAgeUs);
+        TicketPreauthRateLimiter(size_t capacity, int64_t maxAgeMs);
 
         void InvalidateAll();
 
@@ -92,6 +95,7 @@ namespace lwt {
         std::string m_TariffZonesForValidation;
         std::vector<std::string> m_NextTariffZonesFromRoute;
         std::string m_NextTariffZonesForValidation;
+        psram_string m_CurrentValidationMetadata;
 
         std::atomic<int> m_IsRazzia{ 0 };
         int64_t m_LastLocalRazziaOnTime{ 0 };
@@ -114,6 +118,8 @@ namespace lwt {
         void Register(ServiceRegistry& registry);
 
         bool IsRazzia();
+        psram_string GetCurrentValidationMetadata();
+        std::string GetCurrentTripKey();
 
         virtual void OnChanged(const TripRouteInfo* result) override;
         virtual void OnChanged(const vdv301::SubscriberTVS::CurrentTariffStop* result) override;
@@ -123,14 +129,14 @@ namespace lwt {
         void UpdateValidationInfo();
         void ResetValidationInfo();
         void FinishValidationInfo(flatbuffers::Offset<TicketValidationInfo> data);
-        std::string GetCurrentTripKey();
+        const TicketValidationInfo* GetValidationInfo() const;
+        std::string GetCurrentTripKeyNoLock() const;
 
         std::string GetTariffZonesOnlyMyTariffSystem(const std::string& tariffZones) const;
 
         static std::string ReduceNextTariffZones(const std::vector<std::string>& nextTariffZones, const std::string& curTariffZones);
 
-        bool OpenActivationToken(const ActivationToken& token, uint16_t* pVersion = nullptr);
-        void ReadActivationTokenSignature(const ActivationToken& activationToken, ByteSpan* pData, ByteSpan* pSignature, uint32_t* pKeyId);
+        int OpenActivationToken(const ActivationToken& token, SHA256Hash* pHash, ParsedActivationToken* pParsedToken);
         SHA256Hash HashActivationToken(const ByteSpan& token);
         ParsedActivationToken ParseActivationToken(const ByteSpan& tokenData);
 

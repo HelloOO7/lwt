@@ -5,6 +5,11 @@
 #include <span>
 #include "CommonTypes.h"
 
+template<typename T>
+concept ConstexprSized = requires {
+    [] <std::size_t N>() {}.template operator() < T{}.size() > ();
+};
+
 template<std::endian TOrder>
 class BitConverter {
 public:
@@ -88,6 +93,20 @@ public:
         ConvertFrom<int64_t>(value, bytes);
     }
 
+    template<typename T>
+        requires std::is_integral_v<T>
+    static void SetBits(T& value, size_t bitOffset, size_t bitCount, T newBits) {
+        T mask = ((T(1) << bitCount) - 1) << bitOffset;
+        value = (value & ~mask) | ((newBits << bitOffset) & mask);
+    }
+
+    template<typename T>
+        requires std::is_integral_v<T>
+    static T GetBits(T value, size_t bitOffset, size_t bitCount) {
+        T mask = (T(1) << bitCount) - 1;
+        return (value >> bitOffset) & mask;
+    }
+
 private:
     template<typename T>
     static T ConvertTo(const uint8_t* bytes, size_t size = sizeof(T)) {
@@ -160,6 +179,22 @@ public:
 
         int64_t ReadInt64() {
             return Read<int64_t>();
+        }
+
+        template<typename TContainer>
+        TContainer ReadBytesAs(size_t size) {
+            TContainer container(size);
+            std::memcpy(container.data(), m_Data, size);
+            m_Data += size;
+            return container;
+        }
+
+        template<ConstexprSized TContainer>
+        TContainer ReadBytesAs() {
+            TContainer container;
+            std::memcpy(container.data(), m_Data, container.size());
+            m_Data += container.size();
+            return container;
         }
 
         ByteSpan ReadBytes(size_t size) {

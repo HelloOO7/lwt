@@ -11,7 +11,5 @@ namespace lwt {
     public:
         virtual void HandleClientCertificate(lwtp::SocketSession& session, lwdn::TLSContext& tlsContext, const mbedtls_x509_crt* clientCert) override;
         virtual void HandleSessionResumption(lwtp::SocketSession& session, lwdn::TLSContext& tlsContext) override;
-
-        static CertRole ParseCertRole(const std::string& role);
     };
 }

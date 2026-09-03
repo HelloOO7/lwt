@@ -17,7 +17,7 @@ namespace lwdn {
     private:
         WifiNanPublisher& m_Publisher;
         
-        psram_vector<uint8_t> m_DynamicSSI;
+        ByteVector m_DynamicSSI;
 
     public:
         WifiNanAdvertiser(WifiNanPublisher& publisher);

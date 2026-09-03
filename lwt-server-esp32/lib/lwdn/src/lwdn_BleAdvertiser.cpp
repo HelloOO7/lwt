@@ -104,7 +104,7 @@ namespace lwdn {
     }
 
     bool BleAdvertiser::SetLwdnAdvData(const ByteSpan& data) {
-        std::vector<uint8_t> advData;
+        ByteVector advData;
         advData.reserve(GetRawFieldsMaxSize());
 
         // we can not use ble_hs_adv_set_fields_mbuf, because for extended advertising,

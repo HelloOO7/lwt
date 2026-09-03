@@ -48,7 +48,7 @@ namespace lwt {
                             if (ShouldReturnChannel(channelInfo, request)) {
                                 flatbuffers::Offset<flatbuffers::Vector<uint8_t>> advDataOffset = {};
                                 if (request.include_data()) {
-                                    advDataOffset = fbb.CreateVector(channelInfo.m_AdvData.data(), channelInfo.m_AdvData.size());
+                                    advDataOffset = CreateVector(fbb, channelInfo.m_AdvData);
                                 }
 
                                 infoOffsets.push_back(
@@ -58,7 +58,7 @@ namespace lwt {
                                         CreateLwdnAddress(
                                             fbb,
                                             channelInfo.m_Type == TripInfoAdvertiser::ChannelType::WIFI_NAN ? LwdnLinkType_WifiAware : LwdnLinkType_BluetoothLe,
-                                            fbb.CreateVector(channelInfo.m_MACAddress.data(), channelInfo.m_MACAddress.size())
+                                            CreateVector(fbb, channelInfo.m_MACAddress)
                                         ),
                                         advDataOffset
                                     )

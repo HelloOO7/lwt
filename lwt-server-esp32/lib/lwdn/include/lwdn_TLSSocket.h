@@ -36,7 +36,7 @@ namespace lwdn {
         mbedtls_ssl_context m_SSLContext;
 
         mbedtls_ssl_ticket_context* m_TicketContext{ nullptr };
-        psram_vector<uint8_t> m_TicketExtraData;
+        ByteVector m_TicketExtraData;
 
         VerifyFunc m_OriginalVerifyFunc{ nullptr };
         void* m_OriginalVerifyCtx{ nullptr };

@@ -6,20 +6,21 @@
 #include "PSRAMContainers.h"
 #include "CommonTypes.h"
 #include "DigitalSignature.h"
+#include "Certificate.h"
 
 namespace lwt {
 
     class ServerAuthenticationService {
     private:
-        uint8_t* m_CertString;
+        Certificate& m_DeviceCert;
         DigitalSignature& m_SigningKey;
 
     public:
-        ServerAuthenticationService(uint8_t* certString, DigitalSignature& signingKey);
+        ServerAuthenticationService(Certificate& deviceCert, DigitalSignature& signingKey);
 
         void Register(ServiceRegistry& registry);
 
     private:
-        psram_vector<uint8_t> SignChallenge(const ByteSpan& challenge);
+        ByteVector SignChallenge(const ByteSpan& challenge);
     };
 }

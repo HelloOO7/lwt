@@ -13,6 +13,7 @@ enum Operation : ushort {
     GetAdvertisingInfo,
     SetRazzia,
     CICOCheckIn,
+    CICOCheckInConfirm,
     CICORefresh,
     CICOCheckOut
 }

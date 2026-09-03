@@ -14,3 +14,4 @@ target_add_binary_data(${COMPONENT_TARGET} ${CMAKE_SOURCE_DIR}/../pki/LWT_Server
 target_add_binary_data(${COMPONENT_TARGET} ${CMAKE_SOURCE_DIR}/../pki/esp32-alice.crt TEXT)
 target_add_binary_data(${COMPONENT_TARGET} ${CMAKE_SOURCE_DIR}/../pki/esp32-bob.crt TEXT)
 target_add_binary_data(${COMPONENT_TARGET} ${CMAKE_SOURCE_DIR}/../pki/Ticket_signing_key_pub.pem TEXT)
+target_add_binary_data(${COMPONENT_TARGET} ${CMAKE_SOURCE_DIR}/../pki/ROPID_Root_CA_Certificate_[DEBUG].crt TEXT)

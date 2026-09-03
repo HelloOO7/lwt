@@ -3,7 +3,6 @@
 #include "esp_log.h"
 #include "esp_crt_bundle.h"
 
-#include "nlohmann/json.hpp"
 #include "mbedtls/base64.h"
 
 #include <iostream>
@@ -12,21 +11,18 @@
 
 namespace lwt {
 
-    // the actual object hierarchy is light enough to store in RAM. we want only strings to be in PSRAM.
-    using psram_json = nlohmann::basic_json<std::map, std::vector, psram_string>;
-
     static constexpr const char* TAG = "MOSClient";
 
     esp_err_t client_event_data_handler(esp_http_client_event_handle_t evt);
 
-    MOSClient::MOSClient(const std::string& baseUrl, const ByteSpan& tlsClientCertChain, const ByteSpan& tlsClientPrivateKey) :
+    MOSClient::MOSClient(const std::string& baseUrl, const Certificate& tlsClientCertChain, const ByteSpan& tlsClientPrivateKey) :
         m_BaseUrl{ baseUrl }
     {
+        auto clientCertDer = tlsClientCertChain.GetCertificateDer();
+
         m_HttpClientConfig.url = m_BaseUrl.c_str();
-        m_HttpClientConfig.cert_pem = (const char*)tlsClientCertChain.data();
-        m_HttpClientConfig.cert_len = tlsClientCertChain.size();
-        m_HttpClientConfig.client_cert_pem = (const char*)tlsClientCertChain.data();
-        m_HttpClientConfig.client_cert_len = tlsClientCertChain.size();
+        m_HttpClientConfig.client_cert_der = (const char*)clientCertDer.data();
+        m_HttpClientConfig.client_cert_len = clientCertDer.size();
         m_HttpClientConfig.client_key_pem = (const char*)tlsClientPrivateKey.data();
         m_HttpClientConfig.client_key_len = tlsClientPrivateKey.size();
         m_HttpClientConfig.use_global_ca_store = true;
@@ -40,14 +36,22 @@ namespace lwt {
         return OffsetDateTime::parse(json.get_ref<const psram_string&>().c_str());
     }
 
-    psram_vector<uint8_t> JsonToByteVector(const psram_json& json) {
+    ByteVector JsonToByteVector(const psram_json& json) {
         auto str = json.get_ref<const psram_string&>();
         // base64 decode
         size_t decodedLen = 0;
         mbedtls_base64_decode(nullptr, 0, &decodedLen, (const unsigned char*)str.data(), str.size());
-        psram_vector<uint8_t> decoded(decodedLen);
+        ByteVector decoded(decodedLen);
         mbedtls_base64_decode(decoded.data(), decoded.size(), &decodedLen, (const unsigned char*)str.data(), str.size());
         return decoded;
+    }
+
+    psram_json ByteVectorToJson(const ByteVector& vec) {
+        size_t encodedLen = 0;
+        mbedtls_base64_encode(nullptr, 0, &encodedLen, vec.data(), vec.size());
+        psram_string encoded(encodedLen, '\0');
+        mbedtls_base64_encode((unsigned char*)encoded.data(), encoded.size(), &encodedLen, vec.data(), vec.size());
+        return psram_json(encoded);
     }
 
     int MOSClient::ActivateTicket(uint64_t ticketId, const MOSTicketActivationParams& params, MOSTicket* pActivatedTicket) {
@@ -68,25 +72,12 @@ namespace lwt {
             );
         }
 
-        std::cout << "--- POST MOS::ActivateTicket --->" << std::endl;
-        std::cout << std::setw(4) << request << std::endl;
+        psram_json& response = request; // reuse
 
-        psram_string body = request.dump();
-
-        int status = PerformHttpRequest(HTTP_METHOD_POST, "/tickets/" + std::to_string(ticketId) + "/activate", body, &body); //reuse request memory for response
-
-        std::cout << "<--- " << status << " MOS::ActivateTicket ---" << std::endl;
-
-        if (status != 200) {
-            if (status > 0) {
-                std::cout << body << std::endl;
-            }
+        int status = PerformJsonHttpRequest(HTTP_METHOD_POST, "/tickets/" + std::to_string(ticketId) + "/activate", request, &response); //reuse request memory for response
+        if (!IsStatusOK(status)) {
             return status;
         }
-
-        psram_json response = psram_json::parse(body);
-
-        std::cout << std::setw(4) << response << std::endl;
 
         response.at("id").get_to(pActivatedTicket->TicketId);
         pActivatedTicket->Payload.ETD = JsonToByteVector(response.at("payload").at("etd"));
@@ -98,6 +89,62 @@ namespace lwt {
         pActivatedTicket->ActivationTime = DateTimeFromJson(response.at("activationRecord").at("activationTime"));
 
         return status;
+    }
+
+    int MOSClient::CICOCheckIn(const MOSCheckInRequest& request, MOSCheckInResponse* pResponse) {
+        psram_json requestJson{
+            {"checkInToken", ByteVectorToJson(request.CheckInToken)}
+        };
+        psram_json& responseJson = requestJson; // reuse
+
+        int status = PerformJsonHttpRequest(HTTP_METHOD_POST, "/cico/check-in", requestJson, &responseJson);
+        if (!IsStatusOK(status)) {
+            return status;
+        }
+
+        responseJson.at("accountId").get_to(pResponse->AccountId);
+        pResponse->SessionId = UUID::Parse(responseJson.at("sessionId").get_ref<const psram_string&>());
+
+        return status;
+    }
+
+    const char* CICOEventTypeToString(MOSCICOEventType type) {
+        switch (type) {
+        case MOSCICOEventType::CHECK_IN: return "CHECK_IN";
+        case MOSCICOEventType::CHECK_OUT: return "CHECK_OUT";
+        case MOSCICOEventType::REFRESH: return "REFRESH";
+        default: return "UNKNOWN";
+        }
+    }
+
+    int MOSClient::CICOPushEvents(const MOSCICOEventBatch& eventBatch) {
+        psram_json requestJson = psram_json::array();
+        for (const auto& event : eventBatch.Events) {
+            psram_json eventJson{
+                {"eventId", event.EventId.ToString()},
+                {"previousEventId", event.PreviousEventId.ToString()},
+                {"sessionId", event.SessionId.ToString()},
+                {"accountId", event.AccountId},
+                {"localTimestamp", event.LocalTimestamp},
+                {"absoluteTimestamp", event.AbsoluteTimestamp.to_string()},
+                {"eventType", CICOEventTypeToString(event.EventType)},
+                {"lwtMetadata", event.LwtMetadata}
+            };
+            requestJson.push_back(std::move(eventJson));
+        }
+
+        psram_json& responseJson = requestJson; // reuse
+
+        int status = PerformJsonHttpRequest(HTTP_METHOD_POST, "/cico/events", requestJson, &responseJson);
+
+        // no response for now
+        (void)responseJson;
+        
+        return status;
+    }
+
+    bool MOSClient::IsStatusOK(int statusCode) {
+        return statusCode >= 200 && statusCode < 300;
     }
 
     struct ClientEventData {
@@ -150,6 +197,42 @@ namespace lwt {
 
         esp_http_client_cleanup(client);
 
+        return status;
+    }
+
+    const char* MethodToString(esp_http_client_method_t method) {
+        switch (method) {
+        case HTTP_METHOD_GET: return "GET";
+        case HTTP_METHOD_POST: return "POST";
+        case HTTP_METHOD_PUT: return "PUT";
+        case HTTP_METHOD_PATCH: return "PATCH";
+        case HTTP_METHOD_DELETE: return "DELETE";
+        default: return "UNKNOWN";
+        }
+    }
+
+    int MOSClient::PerformJsonHttpRequest(esp_http_client_method_t method, const std::string& path, const psram_json& requestJson, psram_json* pResponseJson) {
+        psram_string requestBody = requestJson.dump();
+        std::cout << "--- " << MethodToString(method) << " " << path << " --->" << std::endl;
+        if (requestBody.length() < 512) {
+            std::cout << std::setw(4) << requestJson << std::endl;
+        }
+        else {
+            std::cout << "Request body too large to display (" << requestBody.length() << " bytes)" << std::endl;
+        }
+        psram_string responseBody;
+        int status = PerformHttpRequest(method, path, requestBody, &responseBody);
+        std::cout << "<--- " << status << " " << path << " ---" << std::endl;
+        if (IsStatusOK(status)) {
+            if (pResponseJson) {
+                *pResponseJson = psram_json::parse(responseBody);
+            }
+        }
+        else {
+            if (status > 0) {
+                std::cout << responseBody << std::endl;
+            }
+        }
         return status;
     }
 }

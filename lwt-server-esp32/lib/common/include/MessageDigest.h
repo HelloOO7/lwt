@@ -16,7 +16,7 @@ public:
         return Digest(data, *digest, hashType);
     }
 
-    static int Digest(const ByteSpan& data, const std::span<uint8_t>& digest, mbedtls_md_type_t hashType = MBEDTLS_MD_SHA256);
+    static int Digest(const ByteSpan& data, const WritableByteSpan& digest, mbedtls_md_type_t hashType = MBEDTLS_MD_SHA256);
 
     static SHA256Hash SHA256(const ByteSpan& data);
 };

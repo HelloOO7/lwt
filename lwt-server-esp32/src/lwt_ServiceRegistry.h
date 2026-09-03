@@ -6,6 +6,7 @@
 #include <utility>
 #include "PSRAMContainers.h"
 #include "lwt_CertRole.h"
+#include "CommonTypes.h"
 
 namespace lwt {
 
@@ -14,14 +15,14 @@ namespace lwt {
     class OperationResult {
     private:
         ResponseStatus m_Status;
-        psram_vector<uint8_t> m_ResponseData;
+        ByteVector m_ResponseData;
     public:
         inline OperationResult(ResponseStatus status) : m_Status(status) {}
-        inline OperationResult(ResponseStatus status, psram_vector<uint8_t>&& responseData) : m_Status(status), m_ResponseData(std::move(responseData)) {}
-        inline OperationResult(psram_vector<uint8_t>&& responseData) : OperationResult(200, std::move(responseData)) {}
+        inline OperationResult(ResponseStatus status, ByteVector&& responseData) : m_Status(status), m_ResponseData(std::move(responseData)) {}
+        inline OperationResult(ByteVector&& responseData) : OperationResult(200, std::move(responseData)) {}
 
         inline ResponseStatus GetStatus() const { return m_Status; }
-        inline const psram_vector<uint8_t>& GetResponseData() const { return m_ResponseData; };
+        inline const ByteVector& GetResponseData() const { return m_ResponseData; };
     };
 
     using OperationFunction = std::function<OperationResult(const RequestPacket&)>;

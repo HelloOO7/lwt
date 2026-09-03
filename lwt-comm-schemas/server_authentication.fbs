@@ -35,6 +35,6 @@ table ServerAuthenticationResponse {
     /// Signature of the client's challenge by the server private key.
     /// Use the certificate to detect whether it is RSA or ECDSA.
     response: [ubyte] (required);
-    /// X.509 data of the server's certificate chain in PEM format.
+    /// X.509 data of the server's certificate chain in DER format.
     certificate: [ubyte] (required);
 }
