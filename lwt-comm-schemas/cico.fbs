@@ -76,11 +76,8 @@ table CICOFragmentRefreshRequest {
 }
 
 table CICORefreshRequest {
-    /// One or more fragments that should be refreshed. The response will
-    /// always be one fragment, but it can potentially follow up on multiple preceding fragments.
-    /// This is so that ambiguous scenarios (lots of vehicles in close proximity) can be reconciled
-    /// into one ticket after the situation changes.
-    fragments: [CICOFragmentRefreshRequest] (required);
+    /// The fragment that should be refreshed.
+    fragment: CICOFragmentRefreshRequest (required);
 }
 
 table CheckOutRequest {

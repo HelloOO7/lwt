@@ -31,6 +31,7 @@ import javax.net.ssl.SSLContext;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import cz.spojenka.android.ui.activity.BaseActivity;
 import cz.spojenka.android.util.AsyncUtils;
 import cz.spojenka.android.util.ViewUtils;
@@ -121,12 +122,21 @@ public class MainActivity extends BaseActivity {
 
         binding.btnRunTicketInspection.setOnClickListener(v -> startActivity(new Intent(this, TicketInspectionHomeActivity.class)));
 
+        binding.btnToggleBleService.setOnClickListener(v -> toggleBleService());
+        updateBleServiceButton();
+
         binding.btnSetClientCert.setOnClickListener(v -> startActivity(
                 new Intent(this, ClientCertImportActivity.class)
                         .putExtra(ClientCertImportActivity.EXTRA_TARGET_ALIAS, GlobalTrustManager.APP_CLIENT_KEY_ALIAS)
         ));
 
         Log.d(TAG, "Client key present: " + GlobalTrustManager.isClientKeyPresent());
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        updateBleServiceButton();
     }
 
     private void testNanDatapath() {
@@ -229,6 +239,40 @@ public class MainActivity extends BaseActivity {
                 }
             }
         }, null);
+    }
+
+    private void toggleBleService() {
+        if (BleScanService.isRunning()) {
+            stopService(new Intent(this, BleScanService.class));
+            updateBleServiceButton();
+        } else {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, 101);
+                    return;
+                }
+            }
+            ContextCompat.startForegroundService(this, new Intent(this, BleScanService.class));
+            updateBleServiceButton();
+        }
+    }
+
+    private void updateBleServiceButton() {
+        if (BleScanService.isRunning()) {
+            binding.btnToggleBleService.setText("Stop Background BLE Scan");
+        } else {
+            binding.btnToggleBleService.setText("Start Background BLE Scan");
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 101) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                toggleBleService();
+            }
+        }
     }
 
     private boolean hasBluetoothScanPermission() {

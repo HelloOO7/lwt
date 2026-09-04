@@ -18,26 +18,38 @@ import cz.spojenka.lwdn.LwdnScan;
 import cz.spojenka.lwdn.LwdnScanConfig;
 import cz.spojenka.lwdn.LwdnScanException;
 import cz.spojenka.lwdn.LwdnScanResult;
+import cz.spojenka.lwdn.LwdnScanner;
 import cz.spojenka.lwdn.LwdnServiceID;
 
 public class LwtDeviceScanner {
 
     private static final String TAG = "LwtDeviceScanner";
 
-    private final HybridLwdnScanner lwdnScanner = new HybridLwdnScanner();
+    private final LwdnScanner lwdnScanner;
+
+    public LwtDeviceScanner(LwdnScanner lwdnScanner) {
+        this.lwdnScanner = lwdnScanner;
+    }
 
     public LwtDeviceScanner(Context context, LwtLinkSession session) {
-        BluetoothManager btm = context.getSystemService(BluetoothManager.class);
-        if (btm != null) {
-            BluetoothAdapter adapter = btm.getAdapter();
-            if (adapter != null && BluetoothLwdnScanner.isSupported(context)) {
-                lwdnScanner.addBluetoothScanner(context, btm.getAdapter(), LwtServiceConstants.BLE_API_PSM);
-            }
+        this(createHybridScanner(context, session));
+    }
+
+    public static @Nullable BluetoothLwdnScanner createBluetoothScanner(Context context) {
+        return BluetoothLwdnScanner.create(context, LwtServiceConstants.BLE_API_PSM);
+    }
+
+    public static HybridLwdnScanner createHybridScanner(Context context, LwtLinkSession session) {
+        HybridLwdnScanner hybridScanner = new HybridLwdnScanner();
+        BluetoothLwdnScanner btScanner = createBluetoothScanner(context);
+        if (btScanner != null) {
+            hybridScanner.addBluetoothScanner(btScanner);
         }
         WifiAwareManager wam = context.getSystemService(WifiAwareManager.class);
         if (wam != null) {
-            lwdnScanner.addWifiAwareScanner(wam, session.getAwareSessionManager(wam), LwtServiceConstants.WIFI_API_PORT);
+            hybridScanner.addWifiAwareScanner(wam, session.getAwareSessionManager(wam), LwtServiceConstants.WIFI_API_PORT);
         }
+        return hybridScanner;
     }
 
     public boolean isAvailable() {

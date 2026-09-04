@@ -13,15 +13,16 @@ import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import cz.spojenka.lwdn.BluetoothLwdnAddress;
 import cz.spojenka.lwdn.LwdnAddress;
+import cz.spojenka.lwdn.WifiAwareLwdnAddress;
 import cz.spojenka.lwt.util.ByteBufferUtils;
 import cz.spojenka.lwt.util.LwtTime;
 import cz.spojenka.lwt.util.RTTExecutionObserver;
@@ -181,5 +182,72 @@ public class LwtAPIClient extends LwtClient {
         FlatBufferBuilder builder = new FlatBufferBuilder();
         builder.finish(SetRazziaRequest.createSetRazziaRequest(builder, razziaState));
         return newCall(LwtAPI::setRazzia, builder.dataBuffer());
+    }
+
+    public LwtCall<CheckInIntermediate> startCheckIn(byte[] accountCheckInToken) {
+        FlatBufferBuilder builder = new FlatBufferBuilder();
+        builder.finish(CheckInRequest.createCheckInRequest(
+                builder,
+                CheckInRequest.createAccountCheckinTokenVector(builder, accountCheckInToken)
+        ));
+        return newCall(LwtAPI::cicoCheckIn, builder.dataBuffer());
+    }
+
+    public LwtCall<CICOTicketFragment> confirmCheckIn(CheckInIntermediate intermediate) {
+        FlatBufferBuilder builder = new FlatBufferBuilder();
+        builder.finish(CheckInConfirmation.createCheckInConfirmation(
+                builder,
+                CheckInConfirmation.createConfirmationTokenVector(builder, intermediate.confirmationTokenAsByteBuffer()))
+        );
+        return newCall(LwtAPI::cicoCheckInConfirm, builder.dataBuffer());
+    }
+
+    private boolean isAddressTypeMatch(LwdnAddress libAddress, cz.spojenka.lwt.LwdnAddress protocolAddress) {
+        return switch (protocolAddress.linkType()) {
+            case LwdnLinkType.BluetoothLe -> libAddress instanceof BluetoothLwdnAddress;
+            case LwdnLinkType.WifiAware -> libAddress instanceof WifiAwareLwdnAddress;
+            default -> false;
+        };
+    }
+
+    private static final byte[] SELF_CERTIFICATE_MAGIC = new byte[]{0x5C};
+
+    private ByteBuffer getCertificateForFragmentRefresh(CICOTicketFragment fragment) {
+        LwdnAddress myAddress = getPeerAddress();
+        for (int i = 0; i < fragment.issuerAddressesLength(); i++) {
+            cz.spojenka.lwt.LwdnAddress issuerAddress = fragment.issuerAddresses(i);
+            if (isAddressTypeMatch(myAddress, issuerAddress)) {
+                if (Arrays.equals(ByteBufferUtils.toByteArray(issuerAddress.macAsByteBuffer()), myAddress.getRawLinkAddress())) {
+                    return ByteBuffer.wrap(SELF_CERTIFICATE_MAGIC);
+                }
+            }
+        }
+        return fragment.issuerCertificateAsByteBuffer();
+    }
+
+    private int createFragmentRefreshRequest(FlatBufferBuilder builder, CICOTicketFragment fragment) {
+        return CICOFragmentRefreshRequest.createCICOFragmentRefreshRequest(
+                builder,
+                CICOFragmentRefreshRequest.createRefreshTokenVector(builder, fragment.refreshTokenAsByteBuffer()),
+                CICOFragmentRefreshRequest.createIssuerCertificateVector(builder, getCertificateForFragmentRefresh(fragment))
+        );
+    }
+
+    public LwtCall<CICOTicketFragment> refreshCICO(CICOTicketFragment previousFragment) {
+        FlatBufferBuilder builder = new FlatBufferBuilder();
+        builder.finish(CICORefreshRequest.createCICORefreshRequest(
+                builder,
+                createFragmentRefreshRequest(builder, previousFragment)
+        ));
+        return newCall(LwtAPI::cicoRefresh, builder.dataBuffer());
+    }
+
+    public LwtCall<CheckOutResponse> checkOut(CICOTicketFragment ticketFragment) {
+        FlatBufferBuilder builder = new FlatBufferBuilder();
+        builder.finish(CheckOutRequest.createCheckOutRequest(
+                builder,
+                createFragmentRefreshRequest(builder, ticketFragment)
+        ));
+        return newCall(LwtAPI::cicoCheckOut, builder.dataBuffer());
     }
 }

@@ -1,8 +1,6 @@
 package cz.spojenka.lwdn;
 
 import java.time.Duration;
-import java.util.List;
-import java.util.UUID;
 
 public class LwdnScanConfig {
 
@@ -11,13 +9,15 @@ public class LwdnScanConfig {
     private final int minRssi;
     private final int maxDistanceMm;
     private final Duration deviceLostTimeout;
+    private final ScanMode scanMode;
 
-    private LwdnScanConfig(Duration timeout, int maxDevices, int minRssi, int maxDistanceMm, Duration deviceLostTimeout) {
+    private LwdnScanConfig(Duration timeout, int maxDevices, int minRssi, int maxDistanceMm, Duration deviceLostTimeout, ScanMode scanMode) {
         this.timeout = timeout;
         this.maxDevices = maxDevices;
         this.minRssi = minRssi;
         this.maxDistanceMm = maxDistanceMm;
         this.deviceLostTimeout = deviceLostTimeout;
+        this.scanMode = scanMode;
     }
 
     public Duration getTimeout() {
@@ -44,6 +44,10 @@ public class LwdnScanConfig {
         return deviceLostTimeout;
     }
 
+    public ScanMode getScanMode() {
+        return scanMode;
+    }
+
     public static class Builder {
 
         private Duration timeout = Duration.ofSeconds(10);
@@ -51,6 +55,7 @@ public class LwdnScanConfig {
         private int minRssi = -127;
         private int maxDistanceMm = Integer.MAX_VALUE;
         private Duration deviceLostTimeout = Duration.ofSeconds(5);
+        private ScanMode scanMode = ScanMode.LOW_LATENCY;
 
         /**
          * Set a timeout after which the scan will be stopped.
@@ -111,8 +116,27 @@ public class LwdnScanConfig {
             return this;
         }
 
-        public LwdnScanConfig build() {
-            return new LwdnScanConfig(timeout, maxDevices, minRssi, maxDistanceMm, deviceLostTimeout);
+        /**
+         * Set whether to prefer low latency when delivering results, or low power consumption.
+         * On Bluetooth LE, this chooses between {@link android.bluetooth.le.ScanSettings#SCAN_MODE_LOW_LATENCY}
+         * and {@link android.bluetooth.le.ScanSettings#SCAN_MODE_LOW_POWER}. On Wi-Fi Aware and
+         * Android 13+, this enables {@link android.net.wifi.aware.SubscribeConfig.Builder#setInstantCommunicationModeEnabled(boolean, int)}
+         * if the device supports it.
+         *
+         * @param scanMode the scan mode
+         */
+        public Builder setScanMode(ScanMode scanMode) {
+            this.scanMode = scanMode;
+            return this;
         }
+
+        public LwdnScanConfig build() {
+            return new LwdnScanConfig(timeout, maxDevices, minRssi, maxDistanceMm, deviceLostTimeout, scanMode);
+        }
+    }
+
+    public static enum ScanMode {
+        LOW_LATENCY,
+        LOW_POWER
     }
 }

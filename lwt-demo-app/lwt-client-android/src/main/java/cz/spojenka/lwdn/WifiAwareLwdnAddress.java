@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 public final class WifiAwareLwdnAddress implements LwdnAddress {
 
@@ -64,7 +65,9 @@ public final class WifiAwareLwdnAddress implements LwdnAddress {
         return data.peerHandle();
     }
 
-    public byte[] getMacAddress() {
+    @Nullable
+    @Override
+    public byte[] getRawLinkAddress() {
         return macAddress;
     }
 

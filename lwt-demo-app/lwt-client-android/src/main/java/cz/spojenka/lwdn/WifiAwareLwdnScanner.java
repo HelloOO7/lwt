@@ -1,7 +1,9 @@
 package cz.spojenka.lwdn;
 
+import android.net.wifi.ScanResult;
 import android.net.wifi.aware.AttachCallback;
 import android.net.wifi.aware.AwareResources;
+import android.net.wifi.aware.Characteristics;
 import android.net.wifi.aware.DiscoverySessionCallback;
 import android.net.wifi.aware.PeerHandle;
 import android.net.wifi.aware.ServiceDiscoveryInfo;
@@ -39,6 +41,11 @@ public class WifiAwareLwdnScanner implements LwdnScanner {
     @Override
     public boolean isAvailable() {
         return awareManager.isAvailable();
+    }
+
+    @Override
+    public boolean isUsingExtendedAdvertising() {
+        return true;
     }
 
     @Override
@@ -281,6 +288,13 @@ public class WifiAwareLwdnScanner implements LwdnScanner {
                     .setMatchFilter(serviceName.compileMatchingFilters())
                     .setSubscribeType(SubscribeConfig.SUBSCRIBE_TYPE_PASSIVE)
                     .setTerminateNotificationEnabled(true);
+
+            if (config.getScanMode() == LwdnScanConfig.ScanMode.LOW_LATENCY && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                Characteristics chars = sessionManager.getAwareManager().getCharacteristics();
+                if (chars != null && chars.isInstantCommunicationModeSupported()) {
+                    builder.setInstantCommunicationModeEnabled(true, ScanResult.WIFI_BAND_5_GHZ);
+                }
+            }
 
             if (config.hasMaxDistance()) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.CINNAMON_BUN) {

@@ -27,4 +27,16 @@ public interface LwtAPI {
 
     @LwtOperation(Operation.SetRazzia)
     public LwtCall<SetRazziaResponse> setRazzia(ByteBuffer request);
+
+    @LwtOperation(Operation.CICOCheckIn)
+    public LwtCall<CheckInIntermediate> cicoCheckIn(ByteBuffer request);
+
+    @LwtOperation(Operation.CICOCheckInConfirm)
+    public LwtCall<CICOTicketFragment> cicoCheckInConfirm(ByteBuffer request);
+
+    @LwtOperation(Operation.CICORefresh)
+    public LwtCall<CICOTicketFragment> cicoRefresh(ByteBuffer request);
+
+    @LwtOperation(Operation.CICOCheckOut)
+    public LwtCall<CheckOutResponse> cicoCheckOut(ByteBuffer request);
 }

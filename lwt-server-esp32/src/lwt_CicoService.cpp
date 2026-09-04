@@ -172,23 +172,11 @@ namespace lwt {
 
                     auto time = SystemTime::EpochMillis();
 
-                    psram_vector<ParsedRefreshToken> parsedTokens;
-                    std::vector<bool> tokenSameIssuer;
-
-                    for (auto&& fragment : *request.fragments()) {
-                        ParsedRefreshToken parsedToken;
-                        bool sameIssuer;
-                        int status = VerifyAndParseRefreshToken(*fragment, &parsedToken, &sameIssuer);
-                        if (status) {
-                            return status;
-                        }
-                        parsedTokens.push_back(std::move(parsedToken));
-                        tokenSameIssuer.push_back(sameIssuer);
-                    }
-
-                    if (parsedTokens.empty()) {
-                        ESP_LOGW(TAG, "No refresh tokens provided");
-                        return 400;
+                    ParsedRefreshToken parsedToken;
+                    bool sameIssuer;
+                    int status = VerifyAndParseRefreshToken(*request.fragment(), &parsedToken, &sameIssuer);
+                    if (status) {
+                        return status;
                     }
 
                     bool isRazzia = m_TicketValidationService.IsRazzia();
@@ -198,14 +186,7 @@ namespace lwt {
                     }
                     else {
                         // refresh is possible if any of the tokens was issued recently enough
-                        canRefresh = std::any_of(
-                            parsedTokens.begin(),
-                            parsedTokens.end(),
-                            [&](const ParsedRefreshToken& token)
-                            {
-                                return time < token.IssuedAt + m_Config.CicoTicketTtlMs;
-                            }
-                        );
+                        canRefresh = time < parsedToken.IssuedAt + m_Config.CicoConfirmationTokenExpiryMs;
                     }
 
                     if (!canRefresh) {
@@ -213,38 +194,9 @@ namespace lwt {
                         return 409; // conflict
                     }
 
-                    UUID sessionId = parsedTokens.front().SessionId;
-                    for (auto&& token : parsedTokens) {
-                        if (token.SessionId != sessionId) {
-                            ESP_LOGW(TAG, "Refresh tokens have different session IDs");
-                            return 403;
-                        }
-                    }
-
-                    // choose preceding token - preferred is one from this vehicle, even if expired, otherwise the most recent one
-                    ParsedRefreshToken* precedingToken = nullptr;
-                    for (size_t i = 0; i < parsedTokens.size(); ++i) {
-                        if (tokenSameIssuer[i]) {
-                            precedingToken = &parsedTokens[i];
-                            break;
-                        }
-                    }
-                    if (!precedingToken) {
-                        // chose newest
-                        precedingToken = &*std::max_element(
-                            parsedTokens.begin(),
-                            parsedTokens.end(),
-                            [](const ParsedRefreshToken& a, const ParsedRefreshToken& b) {
-                                return a.IssuedAt < b.IssuedAt;
-                            }
-                        );
-                    }
-
-                    assert(precedingToken != nullptr);
-
                     psram_string metadata = m_TicketValidationService.GetCurrentValidationMetadata();
 
-                    ProcessCicoRequest(EventRefreshCico(*precedingToken, metadata, MOSCICOEventType::REFRESH), fbb);
+                    ProcessCicoRequest(EventRefreshCico(parsedToken, metadata, MOSCICOEventType::REFRESH), fbb);
 
                     return 200;
                 }

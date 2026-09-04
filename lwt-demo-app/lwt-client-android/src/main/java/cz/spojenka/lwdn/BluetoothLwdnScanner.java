@@ -2,6 +2,7 @@ package cz.spojenka.lwdn;
 
 import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothManager;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanFilter;
@@ -21,6 +22,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import androidx.annotation.Nullable;
+import cz.spojenka.lwt.LwtServiceConstants;
+
 public class BluetoothLwdnScanner implements LwdnScanner {
 
     private final Context context;
@@ -38,10 +42,22 @@ public class BluetoothLwdnScanner implements LwdnScanner {
         handler = new Handler(Looper.getMainLooper());
     }
 
+    public static @Nullable BluetoothLwdnScanner create(Context context, int addressPsm) {
+        BluetoothManager btm = context.getSystemService(BluetoothManager.class);
+        if (btm != null) {
+            BluetoothAdapter adapter = btm.getAdapter();
+            if (adapter != null && isSupported(context)) {
+                return new BluetoothLwdnScanner(context, adapter, addressPsm);
+            }
+        }
+        return null;
+    }
+
     public static boolean isSupported(Context context) {
         return context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE);
     }
 
+    @Override
     public boolean isUsingExtendedAdvertising() {
         return isUsingExtendedAdvertising;
     }
@@ -197,7 +213,11 @@ public class BluetoothLwdnScanner implements LwdnScanner {
         private ScanSettings.Builder buildScanSettings(LwdnScanConfig config) {
             ScanSettings.Builder settings = new ScanSettings.Builder()
                     .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
-                    .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                    .setScanMode(
+                            config.getScanMode() == LwdnScanConfig.ScanMode.LOW_LATENCY
+                                    ? ScanSettings.SCAN_MODE_LOW_LATENCY
+                                    : ScanSettings.SCAN_MODE_LOW_POWER
+                    )
                     .setLegacy(!isUsingExtendedAdvertising);
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA && Build.VERSION.SDK_INT_FULL >= Build.VERSION_CODES_FULL.BAKLAVA_1) {

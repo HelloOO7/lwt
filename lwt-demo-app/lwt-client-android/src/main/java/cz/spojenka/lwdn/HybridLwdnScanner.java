@@ -15,6 +15,10 @@ public class HybridLwdnScanner implements LwdnScanner {
         this.bluetoothScanner = new BluetoothLwdnScanner(context, bluetoothAdapter, addressPsm);
     }
 
+    public void addBluetoothScanner(BluetoothLwdnScanner bluetoothScanner) {
+        this.bluetoothScanner = bluetoothScanner;
+    }
+
     public void addWifiAwareScanner(WifiAwareManager awareManager, WifiAwareSessionManager sessionManager, int addressPort) {
         this.wifiAwareScanner = new WifiAwareLwdnScanner(awareManager, sessionManager, addressPort);
     }
@@ -23,6 +27,7 @@ public class HybridLwdnScanner implements LwdnScanner {
         return bluetoothScanner != null && bluetoothScanner.isAvailable();
     }
 
+    @Override
     public boolean isUsingExtendedAdvertising() {
         return isWifiAwareScannerAvailable() || (isBluetoothScannerAvailable() && bluetoothScanner.isUsingExtendedAdvertising());
     }

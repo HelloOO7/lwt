@@ -6,5 +6,6 @@ import java.util.UUID;
 public interface LwdnScanner {
 
     public boolean isAvailable();
+    public boolean isUsingExtendedAdvertising();
     public LwdnScan startScan(List<LwdnServiceID> services, LwdnScanConfig config);
 }
