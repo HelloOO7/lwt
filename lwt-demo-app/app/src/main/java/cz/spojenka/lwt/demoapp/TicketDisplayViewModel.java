@@ -14,6 +14,7 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import cz.dpp.praguepublictransport.etd.ETDUtils;
 import cz.dpp.praguepublictransport.etd.LitackaETD;
+import cz.spojenka.android.system.livedata.LiveErrorSignal;
 import cz.spojenka.android.ui.drawable.QrCodeDrawable;
 import cz.spojenka.lwt.util.PIDTicketTOTP;
 import cz.spojenka.lwt.util.TicketTOTP;
@@ -24,7 +25,7 @@ public class TicketDisplayViewModel extends AndroidViewModel {
 
     private final MutableLiveData<TicketData> ticketLiveData = new MutableLiveData<>();
     private final MutableLiveData<Drawable> qrDrawable = new MutableLiveData<>();
-    private final MutableLiveData<Throwable> qrDrawableError = new MutableLiveData<>();
+    private final LiveErrorSignal qrDrawableError = new LiveErrorSignal();
 
     private Drawable lastQRDrawable;
     private String lastQRData;
@@ -72,6 +73,10 @@ public class TicketDisplayViewModel extends AndroidViewModel {
         onTicketLoaded();
     }
 
+    public boolean hasTicket() {
+        return ticket != null;
+    }
+
     private void onTicketLoaded() {
         ticketLiveData.setValue(ticket);
         totp = new PIDTicketTOTP(ticket.getTotpSeed());
@@ -83,15 +88,6 @@ public class TicketDisplayViewModel extends AndroidViewModel {
     }
 
     public void updateQR() {
-        CompletableFuture
-                .supplyAsync(this::createQRDrawable)
-                .whenCompleteAsync((drawable, throwable) -> {
-                    if (drawable != null) {
-                        qrDrawable.setValue(drawable);
-                    } else {
-                        Log.d(TAG, "Error generating QR drawable", throwable);
-                        qrDrawableError.setValue(throwable);
-                    }
-                }, getApplication().getMainExecutor());
+        qrDrawableError.catchError(CompletableFuture.supplyAsync(this::createQRDrawable), qrDrawable::setValue, getApplication().getMainExecutor());
     }
 }

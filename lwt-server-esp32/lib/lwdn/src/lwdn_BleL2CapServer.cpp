@@ -166,6 +166,7 @@ namespace lwdn {
                 err = ECONNRESET;
                 break;
             }
+            ESP_LOGI(TAG, "Sending data: chan=%p, len=%d", channel->m_Chan, len);
             err = ble_l2cap_send(channel->m_Chan, mbuf);
             if (err == BLE_HS_ESTALLED) {
                 channel->m_TxUnstalled.wait(lock);

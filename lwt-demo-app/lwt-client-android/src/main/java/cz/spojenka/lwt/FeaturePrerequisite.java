@@ -7,28 +7,45 @@ import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.wifi.aware.WifiAwareManager;
 import android.os.Build;
 import android.os.PowerManager;
 import android.provider.Settings;
 
 import java.util.Set;
 
-import androidx.annotation.ChecksSdkIntAtLeast;
+import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
+import cz.spojenka.lwdn.BluetoothLwdnScanner;
+import cz.spojenka.lwdn.HybridLwdnScanner;
 import cz.spojenka.lwt.util.PermissionRequestFlow;
 
 public interface FeaturePrerequisite {
+
+    public static final FeaturePrerequisite[] NO_DEPENDENCIES = new FeaturePrerequisite[0];
 
     public default boolean isApplicable(Context context) {
         return true;
     }
 
+    public default FeaturePrerequisite[] getDependencies() {
+        return NO_DEPENDENCIES;
+    }
+
+    public default boolean checkDependenciesMet(Context context) {
+        for (FeaturePrerequisite dependency : getDependencies()) {
+            if (dependency.isApplicable(context) && (!dependency.check(context) || !dependency.checkDependenciesMet(context))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public boolean check(Context context);
 
-    public default PermissionRequestFlow createRemedyFlow(AppCompatActivity activity) {
-        return new PermissionRequestFlow(activity, activity1 -> {
-        });
+    public default @Nullable PermissionRequestFlow createRemedyFlow(AppCompatActivity activity) {
+        return null;
     }
 
     public static class AlwaysSatisfiedPrerequisite implements FeaturePrerequisite {
@@ -78,6 +95,13 @@ public interface FeaturePrerequisite {
         public abstract void startRemedyActivity(Context context);
     }
 
+    public static final FeaturePrerequisite LWT_HARDWARE = new FeaturePrerequisite() {
+        @Override
+        public boolean check(Context context) {
+            return HybridLwdnScanner.isSupported(context);
+        }
+    };
+
     public static final FeaturePrerequisite CICO_HARDWARE = new FeaturePrerequisite() {
         @Override
         public boolean check(Context context) {
@@ -91,8 +115,8 @@ public interface FeaturePrerequisite {
                 @RequiresApi(api = Build.VERSION_CODES.S)
                 @Override
                 public boolean check(Context context) {
-                    return context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
-                            && context.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED;
+                    return context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+                            && context.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED;
                 }
             }
             : new AlwaysSatisfiedPrerequisite();
@@ -105,8 +129,36 @@ public interface FeaturePrerequisite {
 
         @Override
         public void startRemedyActivity(Context context) {
-            if (context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
-                context.startActivity(new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE));
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    return;
+                }
+            }
+            context.startActivity(new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE));
+        }
+
+        @Override
+        public FeaturePrerequisite[] getDependencies() {
+            return new FeaturePrerequisite[]{BLUETOOTH_PERMISSIONS};
+        }
+    };
+
+    public static final FeaturePrerequisite AWARE_AVAILABLE = new AbstractSimpleFlowPrerequisite() {
+        @Override
+        public boolean check(Context context) {
+            WifiAwareManager awareManager = context.getSystemService(WifiAwareManager.class);
+            if (awareManager == null) {
+                return false;
+            }
+            return awareManager.isAvailable();
+        }
+
+        @Override
+        public void startRemedyActivity(Context context) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                context.startActivity(new Intent(Settings.Panel.ACTION_WIFI));
+            } else {
+                context.startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS));
             }
         }
     };
@@ -116,6 +168,32 @@ public interface FeaturePrerequisite {
                     ? Manifest.permission.ACCESS_FINE_LOCATION
                     : Manifest.permission.ACCESS_COARSE_LOCATION
     );
+
+    public static final FeaturePrerequisite NEARBY_WIFI_DEVICES = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+            ? new AbstractPermissionPrerequisite(Manifest.permission.NEARBY_WIFI_DEVICES)
+            : new AlwaysSatisfiedPrerequisite();
+
+    public static final FeaturePrerequisite LOCATION_FOR_AWARE_SCAN = new AbstractPermissionPrerequisite(Manifest.permission.ACCESS_FINE_LOCATION);
+
+    // permissions needed for BLE scan in LOW_POWER mode
+    public static final FeaturePrerequisite BACKGROUND_LOCATION_FOR_LE_SCAN_LP = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ?
+            new AbstractPermissionPrerequisite(Manifest.permission.ACCESS_BACKGROUND_LOCATION) {
+
+                @Override
+                public boolean isApplicable(Context context) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                        // on Android 14 and up, scans are downgraded to low power mode, which is fine by us
+                        return false;
+                    }
+                    return BluetoothLwdnScanner.isBackgroundLocationPermissionNeeded(context);
+                }
+
+                @Override
+                public FeaturePrerequisite[] getDependencies() {
+                    return new FeaturePrerequisite[]{LOCATION_FOR_LE_SCAN};
+                }
+            }
+            : new AlwaysSatisfiedPrerequisite();
 
     public static final FeaturePrerequisite NOTIFICATION_PERMISSION = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
             ? new AbstractPermissionPrerequisite(Manifest.permission.POST_NOTIFICATIONS)
@@ -159,24 +237,47 @@ public interface FeaturePrerequisite {
         }
     };
 
+    public static FeaturePrerequisite[] LWT_OVER_BLE = {
+            LWT_HARDWARE,
+            BLUETOOTH_ON,
+            LOCATION_FOR_LE_SCAN
+    };
+
+    public static FeaturePrerequisite[] LWT_OVER_AWARE = {
+            LWT_HARDWARE,
+            AWARE_AVAILABLE,
+            NEARBY_WIFI_DEVICES,
+            LOCATION_FOR_AWARE_SCAN
+    };
+
     public static FeaturePrerequisite[] CICO = {
             CICO_HARDWARE,
             BLUETOOTH_ON,
             LOCATION_FOR_LE_SCAN,
+            BACKGROUND_LOCATION_FOR_LE_SCAN_LP,
             NOTIFICATION_PERMISSION,
             BATTERY_EXEMPTION
     };
 
-    public static boolean checkAllSatisfied(Context context, FeaturePrerequisite[] prerequisites) {
+    public static int getNumUnsatisfied(Context context, FeaturePrerequisite[] prerequisites) {
+        int count = 0;
         for (FeaturePrerequisite prerequisite : prerequisites) {
             if (prerequisite.isApplicable(context) && !prerequisite.check(context)) {
-                return false;
+                count++;
             }
         }
-        return true;
+        return count;
+    }
+
+    public static boolean checkAllSatisfied(Context context, FeaturePrerequisite[] prerequisites) {
+        return getNumUnsatisfied(context, prerequisites) == 0;
     }
 
     public static boolean checkCICOSatisfied(Context context) {
         return checkAllSatisfied(context, CICO);
+    }
+
+    public static boolean checkCICOSatisfiedExceptBTOn(Context context) {
+        return getNumUnsatisfied(context, CICO) == 1 && !BLUETOOTH_ON.check(context);
     }
 }

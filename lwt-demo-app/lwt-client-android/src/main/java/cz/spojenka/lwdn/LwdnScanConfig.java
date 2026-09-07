@@ -50,11 +50,13 @@ public class LwdnScanConfig {
 
     public static class Builder {
 
+        private static final Duration DEVICE_LOST_TIMEOUT_DEFAULT = Duration.ofSeconds(-1); // must be compared by reference equality
+
         private Duration timeout = Duration.ofSeconds(10);
         private int maxDevices = Integer.MAX_VALUE;
         private int minRssi = -127;
         private int maxDistanceMm = Integer.MAX_VALUE;
-        private Duration deviceLostTimeout = Duration.ofSeconds(5);
+        private Duration deviceLostTimeout = DEVICE_LOST_TIMEOUT_DEFAULT;
         private ScanMode scanMode = ScanMode.LOW_LATENCY;
 
         /**
@@ -107,7 +109,7 @@ public class LwdnScanConfig {
          * are received from it during that period.
          * This is currently only supported on Bluetooth LE. It is not needed on Wi-Fi Aware,
          * as lost peers are detected automatically without the need for a timeout.
-         * The default is 5 seconds.
+         * The default is 5 seconds for low latency scans and 20 seconds for low power scans.
          *
          * @param deviceLostTimeout the timeout duration
          */
@@ -130,8 +132,19 @@ public class LwdnScanConfig {
             return this;
         }
 
+        private Duration resolveDeviceLostTimeout() {
+            if (deviceLostTimeout == DEVICE_LOST_TIMEOUT_DEFAULT) {
+                if (scanMode == ScanMode.LOW_LATENCY) {
+                    return Duration.ofSeconds(5);
+                } else {
+                    return Duration.ofSeconds(20);
+                }
+            }
+            return deviceLostTimeout;
+        }
+
         public LwdnScanConfig build() {
-            return new LwdnScanConfig(timeout, maxDevices, minRssi, maxDistanceMm, deviceLostTimeout, scanMode);
+            return new LwdnScanConfig(timeout, maxDevices, minRssi, maxDistanceMm, resolveDeviceLostTimeout(), scanMode);
         }
     }
 

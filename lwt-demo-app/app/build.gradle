@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "cz.spojenka.lwt.demoapp"
-        minSdk = 29
+        minSdk = 28
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -43,6 +43,8 @@ dependencies {
     implementation libs.camerax.lifecycle
     implementation libs.camerax.view
     implementation libs.zxing
+    implementation libs.slidetoact
+    implementation libs.restrictionbypass
 
     implementation libs.okhttp
     implementation libs.retrofit

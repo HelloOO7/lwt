@@ -61,7 +61,15 @@ namespace lwt {
         void InvalidateOldEntries(int64_t currentTime);
     };
 
-    class TicketValidationService : Observer<TripRouteInfo>, Observer<vdv301::SubscriberTVS::CurrentTariffStop>, Observer<vdv301::SubscriberTVS::RazziaState>
+    struct TicketValidationState {
+        bool IsAvailable{ false };
+        bool IsOutsideOfTariff{ false };
+        bool IsInLastStop{ false };
+    };
+
+    class TicketValidationService :
+        Observer<TripRouteInfo>, Observer<vdv301::SubscriberTVS::CurrentTariffStop>, Observer<vdv301::SubscriberTVS::RazziaState>,
+        public Observable<TicketValidationState>
     {
     private:
         static constexpr int64_t RAZZIA_HEARTBEAT_MAX_SECONDS = 30;
@@ -97,6 +105,11 @@ namespace lwt {
         std::string m_NextTariffZonesForValidation;
         psram_string m_CurrentValidationMetadata;
 
+        bool m_CISCanUseTicketing{ false };
+        bool m_TVSCanUseTicketing{ false };
+        bool m_IsOutsideOfTariff{ false };
+        bool m_IsInLastStop{ false };
+
         std::atomic<int> m_IsRazzia{ 0 };
         int64_t m_LastLocalRazziaOnTime{ 0 };
         TimerProc m_RazziaOffTimer;
@@ -125,8 +138,12 @@ namespace lwt {
         virtual void OnChanged(const vdv301::SubscriberTVS::CurrentTariffStop* result) override;
         virtual void OnChanged(const vdv301::SubscriberTVS::RazziaState* result) override;
 
+        void ObserveServiceState(Observer<TicketValidationState>& observer);
+        void RemoveObserver(Observer<TicketValidationState>& observer);
+
     private:
         void UpdateValidationInfo();
+        void PublishServiceState();
         void ResetValidationInfo();
         void FinishValidationInfo(flatbuffers::Offset<TicketValidationInfo> data);
         const TicketValidationInfo* GetValidationInfo() const;

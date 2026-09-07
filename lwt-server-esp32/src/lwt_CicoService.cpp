@@ -15,6 +15,10 @@
 #include "lwdn_WifiNanLink.h"
 #include "lwdn_BleLink.h"
 #include "lwt_CertRole.h"
+#include "esp_netif_sntp.h"
+#include <iostream>
+
+#define CICO_WITHOUT_MOS
 
 namespace lwt {
 
@@ -42,9 +46,16 @@ namespace lwt {
     {
         xTaskCreateStaticPSRAM(SyncEventsTaskFunc, "CicoSync", 4096, this, syncTaskPriority, &m_SyncTask);
         m_SeedDerivationSecret.resize(SEED_DERIVATION_SECRET_SIZE);
+        ESP_ERROR_CHECK(esp_event_handler_instance_register(NETIF_SNTP_EVENT, NETIF_SNTP_TIME_SYNC, [](void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
+            CicoService* service = static_cast<CicoService*>(arg);
+            service->OnTimeSyncDone();
+            }, this, &m_TimeSyncEventInstance));
+        m_TicketValidationService.ObserveServiceState(*this);
     }
 
     CicoService::~CicoService() {
+        m_TicketValidationService.RemoveObserver(*this);
+        esp_event_handler_instance_unregister(NETIF_SNTP_EVENT, NETIF_SNTP_TIME_SYNC, m_TimeSyncEventInstance);
         std::unique_lock lock(m_EventsMutex);
         m_RequestClose = true;
         m_HasEventsCV.notify_all();
@@ -52,13 +63,39 @@ namespace lwt {
     }
 
     bool CicoService::IsCicoReady() {
-        sntp_sync_status_t status = esp_sntp_get_sync_status();
-        if (status == SNTP_SYNC_STATUS_COMPLETED) {
-            // esp_sntp_get_sync_status resets the status to SNTP_SYNC_STATUS_RESET after returning SNTP_SYNC_STATUS_COMPLETED,
-            // we want it to stay
-            esp_sntp_set_sync_status(SNTP_SYNC_STATUS_COMPLETED);
-        }
-        return status != SNTP_SYNC_STATUS_RESET;
+        std::lock_guard lock(m_StateMutex);
+        return IsCicoReadyNoLock();
+    }
+
+    bool CicoService::IsCicoReadyNoLock() {
+        return m_CicoTimeReady && m_CicoDataReady;
+    }
+
+    void CicoService::OnTimeSyncDone() {
+        std::lock_guard lock(m_StateMutex);
+        ESP_LOGI(TAG, "Time synchronization completed");
+        m_CicoTimeReady = true;
+        PublishServiceState();
+    }
+
+    void CicoService::OnChanged(const TicketValidationState* result) {
+        std::lock_guard lock(m_StateMutex);
+        m_CicoDataReady = (result && result->IsAvailable && !result->IsOutsideOfTariff);
+        PublishServiceState();
+    }
+
+    void CicoService::PublishServiceState() {
+        CicoState state;
+        state.IsReady = IsCicoReadyNoLock();
+        NotifyObservers(&state);
+    }
+
+    void CicoService::ObserveServiceState(Observer<CicoState>& observer) {
+        AddObserver(observer);
+    }
+
+    void CicoService::RemoveObserver(Observer<CicoState>& observer) {
+        Observable<CicoState>::RemoveObserver(observer);
     }
 
     void CicoService::SyncEventsLoop() {
@@ -76,6 +113,7 @@ namespace lwt {
     }
 
     bool CicoService::SendEventsToServer() {
+#ifndef CICO_WITHOUT_MOS
         if (!m_EventBuffer.empty()) {
             MOSCICOEventBatch eventBatch{
                 .Events = std::move(m_EventBuffer),
@@ -87,7 +125,12 @@ namespace lwt {
                 m_EventBuffer = std::move(eventBatch.Events);
                 return false;
             }
+            m_EventBuffer.clear();
         }
+#else
+        ESP_LOGI(TAG, "CICO_WITHOUT_MOS: %zu events would be sent to MOS", m_EventBuffer.size());
+        m_EventBuffer.clear();
+#endif
         return true;
     }
 
@@ -105,6 +148,7 @@ namespace lwt {
                         return 503; // service unavailable
                     }
 
+#ifndef CICO_WITHOUT_MOS
                     auto* checkinToken = request.account_checkin_token();
                     MOSCheckInRequest req;
                     req.CheckInToken.assign(checkinToken->begin(), checkinToken->end());
@@ -114,6 +158,12 @@ namespace lwt {
                     if (!MOSClient::IsStatusOK(statusCode)) {
                         return statusCode;
                     }
+#else
+                    MOSCheckInResponse resp{
+                        .AccountId = 12345678,
+                        .SessionId = UUID::V7()
+                    };
+#endif
 
                     auto confirmationToken = CreateConfirmationToken(resp);
 

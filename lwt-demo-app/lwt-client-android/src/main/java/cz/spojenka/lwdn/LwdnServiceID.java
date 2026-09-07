@@ -10,14 +10,15 @@ import java.util.List;
 
 import androidx.annotation.NonNull;
 import androidx.core.os.ParcelCompat;
+import cz.spojenka.lwt.util.BLEScanRecordUtil;
 
-public sealed interface LwdnServiceID extends Parcelable permits LwdnServiceID.UUID, LwdnServiceID.ServiceName {
+public sealed interface LwdnServiceID extends Parcelable permits LwdnServiceID.UUID, LwdnServiceID.ServiceName, LwdnServiceID.DeviceName {
 
     public static record UUID(java.util.UUID uuid) implements LwdnServiceID {
 
         public UUID(int uuid32) {
             // https://stackoverflow.com/questions/13964342/android-how-do-bluetooth-uuids-work
-            this(new java.util.UUID((Integer.toUnsignedLong(uuid32) << 32) | 0x1000, 0x800000805f9b34fbL));
+            this(BLEScanRecordUtil.uuid32To128(uuid32));
         }
 
         public static final Creator<UUID> CREATOR = new Creator<>() {
@@ -125,6 +126,45 @@ public sealed interface LwdnServiceID extends Parcelable permits LwdnServiceID.U
             return "ServiceName{" +
                     "name='" + name + '\'' +
                     ", matchingFilters=" + Arrays.deepToString(compileMatchingFilters().toArray()) +
+                    '}';
+        }
+    }
+
+    /**
+     * Special service ID that is used by BLE scanner on devices where service UUID filtering
+     * is broken. On those devices, filtering will be done by name, and the UUID will be processed
+     * in software by the scanner after discovery.
+     *
+     * @param name the name of the device
+     */
+    public static record DeviceName(String name) implements LwdnServiceID {
+
+        public static final Creator<DeviceName> CREATOR = new Creator<>() {
+            @Override
+            public DeviceName createFromParcel(Parcel in) {
+                return new DeviceName(in.readString());
+            }
+
+            @Override
+            public DeviceName[] newArray(int size) {
+                return new DeviceName[size];
+            }
+        };
+
+        @Override
+        public int describeContents() {
+            return 0;
+        }
+
+        @Override
+        public void writeToParcel(@NonNull Parcel dest, int flags) {
+            dest.writeString(name);
+        }
+
+        @Override
+        public String toString() {
+            return "DeviceName{" +
+                    "name='" + name + '\'' +
                     '}';
         }
     }

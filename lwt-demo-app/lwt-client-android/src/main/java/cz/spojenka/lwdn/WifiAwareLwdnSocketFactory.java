@@ -1,16 +1,21 @@
 package cz.spojenka.lwdn;
 
 import android.net.ConnectivityManager;
+import android.net.LinkProperties;
+import android.net.MacAddress;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
+import android.net.NetworkSpecifier;
 import android.net.wifi.aware.WifiAwareNetworkInfo;
 import android.net.wifi.aware.WifiAwareNetworkSpecifier;
+import android.os.Build;
 import android.util.Log;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.Inet6Address;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
@@ -56,7 +61,7 @@ public class WifiAwareLwdnSocketFactory implements LwdnSocketFactory {
                 .requestNetwork(
                         new NetworkRequest.Builder()
                                 .addTransportType(NetworkCapabilities.TRANSPORT_WIFI_AWARE)
-                                .setNetworkSpecifier(new WifiAwareNetworkSpecifier.Builder(address.getDiscoverySession(), address.getPeerHandle()).build())
+                                .setNetworkSpecifier(createAwareNetworkSpecifier(address))
                                 .build(),
                         networkCallback = new ConnectivityManager.NetworkCallback() {
 
@@ -77,17 +82,34 @@ public class WifiAwareLwdnSocketFactory implements LwdnSocketFactory {
                                     Log.w(TAG, "Datapath capabilities changed but socket factory is closed");
                                     return;
                                 }
-                                if (networkCapabilities.getTransportInfo() instanceof WifiAwareNetworkInfo awareNetworkInfo) {
-                                    if (awareNetworkInfo.equals(lastAwareNetworkInfo)) {
-                                        return;
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                    if (networkCapabilities.getTransportInfo() instanceof WifiAwareNetworkInfo awareNetworkInfo) {
+                                        if (awareNetworkInfo.equals(lastAwareNetworkInfo)) {
+                                            return;
+                                        } else {
+                                            lastAwareNetworkInfo = awareNetworkInfo;
+                                        }
+                                        Log.d(TAG, "Datapath established - " + awareNetworkInfo);
+                                        // we do not use the port number from awareNetworkInfo.getPortNumber
+                                        onDatapathEstablished(new InetLwdnSocketFactory(network.getSocketFactory(), awareNetworkInfo.getPeerIpv6Addr(), address.getPortNumber()));
                                     } else {
-                                        lastAwareNetworkInfo = awareNetworkInfo;
+                                        onDatapathLost();
                                     }
-                                    Log.d(TAG, "Datapath established - " + awareNetworkInfo);
-                                    // we do not use the port number from awareNetworkInfo.getPortNumber
-                                    onDatapathEstablished(new InetLwdnSocketFactory(network.getSocketFactory(), awareNetworkInfo.getPeerIpv6Addr(), address.getPortNumber()));
-                                } else {
-                                    onDatapathLost();
+                                }
+                            }
+
+                            @Override
+                            public void onLinkPropertiesChanged(@NonNull Network network, @NonNull LinkProperties linkProperties) {
+                                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                                    byte[] mac = address.getRawLinkAddress();
+                                    if (mac == null) {
+                                        Log.w(TAG, "Datapath link established but address has no MAC");
+                                        onDatapathLost();
+                                    } else {
+                                        MacAddress macAddress = MacAddress.fromBytes(mac);
+                                        Inet6Address peerIP = MacAddressCompat.getLinkLocalIpv6FromEui48Mac(macAddress);
+                                        onDatapathEstablished(new InetLwdnSocketFactory(network.getSocketFactory(), peerIP, address.getPortNumber()));
+                                    }
                                 }
                             }
 
@@ -104,6 +126,15 @@ public class WifiAwareLwdnSocketFactory implements LwdnSocketFactory {
                             }
                         }
                 );
+    }
+
+    @SuppressWarnings("deprecation")
+    private static NetworkSpecifier createAwareNetworkSpecifier(WifiAwareLwdnAddress address) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            return new WifiAwareNetworkSpecifier.Builder(address.getDiscoverySession(), address.getPeerHandle()).build();
+        } else {
+            return address.getDiscoverySession().createNetworkSpecifierOpen(address.getPeerHandle());
+        }
     }
 
     private synchronized void onDatapathEstablished(InetLwdnSocketFactory socketFactory) {

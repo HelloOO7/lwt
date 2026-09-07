@@ -60,6 +60,8 @@ namespace lwt {
         const TripRouteInfo* GetTripRouteInfo() const;
         const TripStateInfo* GetTripStateInfo() const;
 
+        void OnReceivedNoData();
+
         flatbuffers::Offset<TripInfo> GetTripInfo(flatbuffers::FlatBufferBuilder& fbb, const TripInfo* src) const;
         flatbuffers::Offset<LineInfo> GetLineInfo(flatbuffers::FlatBufferBuilder& fbb, const LineInfo* src) const;
         flatbuffers::Offset<StopReference> GetStopReference(flatbuffers::FlatBufferBuilder& fbb, const StopReference* src) const;

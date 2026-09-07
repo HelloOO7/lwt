@@ -12,6 +12,7 @@ namespace lwt {
 
         static constexpr uint8_t FLAG_IS_AT_STOP = (1 << 0);
         static constexpr uint8_t FLAG_CAN_USE_TICKETING = (1 << 1);
+        static constexpr uint8_t FLAG_CAN_USE_CICO = (1 << 2);
 
         LineType line_type;
         uint32_t line_license_number;
@@ -27,6 +28,7 @@ namespace lwt {
         uint8_t flags;
 
         void set_train_line_number(const std::string& prefix, uint16_t number);
+        bool set_flag(uint8_t flag, bool value);
 
         void pack(uint8_t* pDst) const;
     };

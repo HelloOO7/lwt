@@ -62,7 +62,12 @@ public class DeviceListActivity extends BaseActivity {
             }
         });
 
-        binding.getRoot().setOnRefreshListener(viewModel::reloadIfNotLoading);
+        binding.getRoot().setOnRefreshListener(() -> {
+            if (!viewModel.reloadIfNotLoading()) {
+                binding.getRoot().setRefreshing(false);
+            }
+        });
+
         int srlEnd = binding.getRoot().getProgressViewEndOffset();
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.getRoot(), (v, insets) -> {

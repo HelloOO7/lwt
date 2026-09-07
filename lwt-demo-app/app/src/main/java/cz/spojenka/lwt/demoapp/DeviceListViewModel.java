@@ -1,19 +1,22 @@
 package cz.spojenka.lwt.demoapp;
 
 import android.app.Application;
+import android.os.Handler;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Predicate;
 
 import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
+import androidx.lifecycle.Observer;
 import cz.spojenka.android.system.livedata.LiveList;
-import cz.spojenka.lwdn.AbstractScan;
 import cz.spojenka.lwdn.LwdnAddress;
 import cz.spojenka.lwdn.LwdnScanException;
 import cz.spojenka.lwt.LwtDevice;
@@ -25,6 +28,9 @@ public class DeviceListViewModel extends AndroidViewModel implements LwtScan.OnR
     private List<LwtDeviceType> deviceTypes;
     private boolean useContinuousScan = false;
     private LwtScan currentScan;
+
+    private LiveData<List<LwtDevice>> externalScanResults;
+    private Observer<List<LwtDevice>> externalScanObserver = this::onReceivedExternalScanResults;
 
     private final LiveList<LwtDevice> deviceResults = new LiveList<>();
     private final MutableLiveData<Boolean> isLoading = new MutableLiveData<>(true);
@@ -46,6 +52,10 @@ public class DeviceListViewModel extends AndroidViewModel implements LwtScan.OnR
         } else {
             // leave results for other activities
             unbindGlobalObservers();
+        }
+        if (externalScanResults != null) {
+            externalScanResults.removeObserver(externalScanObserver);
+            externalScanResults = null;
         }
     }
 
@@ -161,6 +171,12 @@ public class DeviceListViewModel extends AndroidViewModel implements LwtScan.OnR
             insertIndex = -insertIndex - 1;
         }
         deviceResults.add(insertIndex, device);
+        /*var h = new Handler(getApplication().getMainLooper());
+        h.postDelayed(() -> {
+            // debug
+            removeResult(device);
+            h.postDelayed(() -> insertResult(device), 100);
+        }, 1000);*/
     }
 
     private void removeResult(LwtDevice device) {
@@ -174,10 +190,39 @@ public class DeviceListViewModel extends AndroidViewModel implements LwtScan.OnR
         load();
     }
 
-    public void reloadIfNotLoading() {
+    public void bindExternalScan(LiveData<List<LwtDevice>> externalScanResults) {
+        close();
+
+        startLoading();
+
+        this.externalScanResults = externalScanResults;
+        this.externalScanResults.observeForever(externalScanObserver);
+    }
+
+    public void unbindExternalScan() {
+        close();
+        isLoading.setValue(false);
+    }
+
+    private void onReceivedExternalScanResults(List<LwtDevice> results) {
+        Set<LwdnAddress> presentAddresses = new HashSet<>();
+        for (LwtDevice device : results) {
+            presentAddresses.add(device.getAddress());
+            insertResult(device);
+        }
+        for (LwtDevice removalCandidate : List.copyOf(deviceResults.asList())) {
+            if (!presentAddresses.contains(removalCandidate.getAddress())) {
+                removeResult(removalCandidate);
+            }
+        }
+    }
+
+    public boolean reloadIfNotLoading() {
         if (!isLoading()) {
             reload();
+            return true;
         }
+        return false;
     }
 
     public void reload() {
@@ -189,14 +234,18 @@ public class DeviceListViewModel extends AndroidViewModel implements LwtScan.OnR
     }
 
     private void load() {
-        unbindGlobalObservers();
-        deviceResults.clear();
+        close();
 
-        isLoading.setValue(true);
+        startLoading();
 
         currentScan = GlobalLwtScanner.getInstance(getApplication()).scan(deviceTypes, useContinuousScan);
         currentScan.addOnResultListener(this);
         currentScan.addOnFinishedListener(this);
+    }
+
+    private void startLoading() {
+        deviceResults.clear();
+        isLoading.setValue(true);
     }
 
     public LiveData<LwdnScanException> getScanError() {

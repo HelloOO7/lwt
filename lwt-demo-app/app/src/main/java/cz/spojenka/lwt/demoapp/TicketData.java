@@ -9,6 +9,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.os.ParcelCompat;
 
 public class TicketData implements Parcelable {
@@ -89,8 +90,12 @@ public class TicketData implements Parcelable {
         return zoneOptions;
     }
 
-    public Duration getValidityPeriod() {
+    public @Nullable Duration getValidityPeriod() {
         return validityPeriod;
+    }
+
+    public @NonNull Duration getValidityPeriodOrDefault() {
+        return validityPeriod == null ? Duration.between(validSince, validUntil) : validityPeriod;
     }
 
     public OffsetDateTime getActivatedAt() {

@@ -2,6 +2,9 @@ package cz.spojenka.lwt.util;
 
 import android.bluetooth.le.ScanRecord;
 
+import java.nio.ByteBuffer;
+import java.util.UUID;
+
 /**
  * Some Android devices tend to do weird things to BLE scan records which render them unparseable.
  * For example, on a Sony XPERIA 10 III, when using {@link android.bluetooth.le.ScanSettings#CALLBACK_TYPE_FIRST_MATCH},
@@ -41,6 +44,26 @@ public class BLEScanRecordUtil {
             throw new IllegalArgumentException("Service data too short to contain a 32-bit UUID");
         }
         return ((serviceData[3] & 0xFF) << 24) | ((serviceData[2] & 0xFF) << 16) | ((serviceData[1] & 0xFF) << 8) | (serviceData[0] & 0xFF);
+    }
+
+    public static UUID uuid16To128(int uuid16) {
+        return uuid32To128(uuid16 & 0xFFFF);
+    }
+
+    public static UUID uuid32To128(int uuid32) {
+        // https://stackoverflow.com/questions/13964342/android-how-do-bluetooth-uuids-work
+        return new UUID((Integer.toUnsignedLong(uuid32) << 32) | 0x1000, 0x800000805f9b34fbL);
+    }
+
+    public static UUID getServiceUUID128(byte[] serviceData) {
+        if (serviceData.length < 16) {
+            throw new IllegalArgumentException("Service data too short to contain a 128-bit UUID");
+        }
+        // https://cs.android.com/android/platform/superproject/+/android-latest-release:packages/modules/Bluetooth/framework/java/android/bluetooth/BluetoothUuid.java
+        ByteBuffer buf = ByteBuffer.wrap(serviceData, 0, 16);
+        long mostSigBits = buf.getLong();
+        long leastSigBits = buf.getLong();
+        return new UUID(mostSigBits, leastSigBits);
     }
 
     public static byte[] getServiceDataPayload(byte[] serviceData, int uuidLength) {

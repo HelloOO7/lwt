@@ -6,35 +6,15 @@
     android:layout_height="match_parent">
 
     <Button
-        android:id="@+id/btnTest"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Run test"
-        app:layout_constraintBottom_toTopOf="@id/btnTestTls"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_chainStyle="packed" />
-
-    <Button
-        android:id="@+id/btnTestTls"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Run TLS test"
-        app:layout_constraintBottom_toTopOf="@id/btnSetClientCert"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/btnTest" />
-
-    <Button
         android:id="@+id/btnSetClientCert"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Set client certificate"
+        app:layout_constraintVertical_chainStyle="packed"
         app:layout_constraintBottom_toTopOf="@id/btnShowDeviceList"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/btnTestTls" />
+        app:layout_constraintTop_toTopOf="parent" />
 
     <Button
         android:id="@+id/btnShowDeviceList"
@@ -61,16 +41,16 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Demo ticket inspection"
-        app:layout_constraintBottom_toTopOf="@id/btnToggleBleService"
+        app:layout_constraintBottom_toTopOf="@id/btnOpenCico"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/btnRunTicketActivation" />
 
     <Button
-        android:id="@+id/btnToggleBleService"
+        android:id="@+id/btnOpenCico"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Start Background BLE Scan"
+        android:text="Open CI/CO"
         app:layout_constraintBottom_toTopOf="@id/etNumZones"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -87,7 +67,7 @@
         android:textAlignment="textEnd"
         app:layout_constraintBottom_toTopOf="@id/etValidMinutes"
         app:layout_constraintEnd_toEndOf="@+id/btnRunTicketInspection"
-        app:layout_constraintTop_toBottomOf="@+id/btnToggleBleService" />
+        app:layout_constraintTop_toBottomOf="@+id/btnOpenCico" />
 
     <TextView
         android:id="@+id/tvNumZonesLabel"

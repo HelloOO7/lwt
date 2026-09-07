@@ -15,6 +15,7 @@ import com.google.android.material.divider.MaterialDivider;
 import androidx.annotation.DrawableRes;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
+import androidx.core.content.res.ResourcesCompat;
 import cz.spojenka.android.util.ViewUtils;
 
 public class TitleBar extends LinearLayout {
@@ -71,14 +72,14 @@ public class TitleBar extends LinearLayout {
             try (var a = getContext().obtainStyledAttributes(attrs, R.styleable.TitleBar)) {
                 setText(a.getText(R.styleable.TitleBar_android_text));
                 setTextSize(a.getDimension(R.styleable.TitleBar_android_textSize, getResources().getDimension(R.dimen.text_title_l)));
-                setIcon(a.getResourceId(R.styleable.TitleBar_android_icon, Resources.ID_NULL));
+                setIcon(a.getResourceId(R.styleable.TitleBar_android_icon, ResourcesCompat.ID_NULL));
                 setDividerVisible(a.getBoolean(R.styleable.TitleBar_dividerVisible, true));
                 if (a.hasValue(R.styleable.TitleBar_dividerThickness)) {
                     setDividerThickness(a.getDimensionPixelSize(R.styleable.TitleBar_dividerThickness, 0));
                 }
             }
         } else {
-            setIcon(Resources.ID_NULL);
+            setIcon(ResourcesCompat.ID_NULL);
             setTextSize(getResources().getDimension(R.dimen.text_title_l));
         }
     }

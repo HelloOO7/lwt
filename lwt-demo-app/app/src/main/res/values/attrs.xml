@@ -73,4 +73,9 @@
         <attr name="android:textSize" format="dimension" />
         <attr name="android:icon" format="reference" />
     </declare-styleable>
+
+    <declare-styleable name="PermissionCheckmark">
+        <attr name="title" format="string"/>
+        <attr name="description" format="string"/>
+    </declare-styleable>
 </resources>

@@ -29,4 +29,6 @@
     <dimen name="ticket_progress_bar_corner_radius">8dp</dimen>
     <dimen name="ticket_qr_frame_corner_dim">12dp</dimen>
     <dimen name="ticket_qr_min_width">250dp</dimen>
+    <dimen name="check_in_huge_margin">60dp</dimen>
+    <dimen name="device_list_vertical_padding">6dp</dimen>
 </resources>

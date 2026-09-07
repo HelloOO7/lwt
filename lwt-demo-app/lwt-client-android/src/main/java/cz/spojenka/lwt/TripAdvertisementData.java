@@ -17,6 +17,7 @@ public class TripAdvertisementData {
 
     private static final int FLAG_IS_AT_STOP = 1;
     private static final int FLAG_CAN_USE_TICKETING = 2;
+    private static final int FLAG_CAN_USE_CICO = 4;
 
     private final int lineType;
     private final int lineLicenseNumber;
@@ -132,6 +133,10 @@ public class TripAdvertisementData {
 
     public boolean isCanUseTicketing() {
         return (flags & FLAG_CAN_USE_TICKETING) != 0;
+    }
+
+    public boolean isCanUseCICO() {
+        return (flags & FLAG_CAN_USE_CICO) != 0;
     }
 
     public static TripAdvertisementData unwrap(byte[] serviceData) throws IOException {

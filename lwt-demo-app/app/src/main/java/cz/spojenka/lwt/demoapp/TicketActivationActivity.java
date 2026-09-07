@@ -42,8 +42,6 @@ import cz.spojenka.lwt.LwtDevice;
 import cz.spojenka.lwt.TripRouteInfo;
 import cz.spojenka.lwt.TripStopInfo;
 import cz.spojenka.lwt.demoapp.databinding.ActivityTicketActivationBinding;
-import cz.spojenka.lwt.demoapp.databinding.DeviceListItemCheckmarkBinding;
-import cz.spojenka.lwt.demoapp.databinding.DeviceListItemLoadingBarBinding;
 import cz.spojenka.lwt.util.TextMarkupConverter;
 
 public class TicketActivationActivity extends BaseActivity {
@@ -58,8 +56,7 @@ public class TicketActivationActivity extends BaseActivity {
 
     private ActivityTicketActivationBinding binding;
 
-    private DeviceListViewController devListUIController;
-    private TripInfoViewController selectedDevUIController;
+    private InlineDevicePickerViewController devPickerUIController;
     private ActivityResultLauncher<LitackaZonePickerActivity.Input> zonePickerLauncher;
     private ActivityResultLauncher<TripStopPickerActivity.Input> stopPickerLauncher;
 
@@ -79,20 +76,14 @@ public class TicketActivationActivity extends BaseActivity {
         viewModel = new ViewModelProvider(this).get(TicketActivationViewModel.class);
         devicesViewModel = viewModel.getDevicesViewModel();
 
-        devListUIController = new DeviceListViewController(binding.rvDeviceList, devicesViewModel) {
+        devPickerUIController = new InlineDevicePickerViewController(binding.tripChoiceSubscreens, devicesViewModel) {
 
             @Override
-            protected void onDeviceSelected(LwtDevice device) {
+            protected boolean onDeviceSelected(LwtDevice device) {
                 viewModel.selectAutoActivationDevice(device);
+                return true; //consume
             }
         };
-        devListUIController.setLoadingDisplayRule(DeviceListViewController.LoadingSpinnerDisplayRule.WHEN_EMPTY);
-        // when we click the item, it is hidden and switched to another view. if the ripple were enabled,
-        // it would be visible only partially when toggling between the two views, which looks weird, so we disable it.
-        devListUIController.setOnClickEffectEnabled(false);
-
-        selectedDevUIController = new TripInfoViewController(binding.selectedDeviceView, devListUIController.getMarkupConverter());
-        binding.selectedDeviceView.getRoot().setOnClickListener(v -> viewModel.selectAutoActivationDevice(null));
 
         zonePickerLauncher = registerForActivityResult(LitackaZonePickerActivity.PICK_ZONES, result -> {
             if (result != null) {
@@ -120,7 +111,7 @@ public class TicketActivationActivity extends BaseActivity {
             }
         }
 
-        devListUIController.bind(this);
+        devPickerUIController.bind(this);
 
         binding.llZoneChoiceType.setOnClickListener(v -> showZoneChoiceTypeDialog());
 
@@ -144,6 +135,7 @@ public class TicketActivationActivity extends BaseActivity {
 
         binding.llContent.getLayoutTransition().enableTransitionType(LayoutTransition.CHANGING);
         binding.llHeader.getLayoutTransition().enableTransitionType(LayoutTransition.CHANGING);
+        binding.llActivationFormWrapper.getLayoutTransition().enableTransitionType(LayoutTransition.CHANGING);
         binding.getRoot().getLayoutTransition().enableTransitionType(LayoutTransition.CHANGING);
 
         binding.llActivationTime.setOnClickListener(v -> showActivationTimeTypeDialog());
@@ -165,26 +157,16 @@ public class TicketActivationActivity extends BaseActivity {
             }
         });
 
-        binding.selectedDeviceView.getRoot().setCardElevation(getResources().getDimensionPixelSize(R.dimen.ticket_activation_selected_card_elevation));
-        ViewUtils.disableRipple(binding.selectedDeviceView.getRoot());
-        View checkmark = DeviceListItemCheckmarkBinding.inflate(getLayoutInflater(), binding.selectedDeviceView.getRoot(), true).getRoot();
-        View deviceDataLoadingBar = DeviceListItemLoadingBarBinding.inflate(getLayoutInflater(), binding.selectedDeviceView.getRoot(), true).getRoot();
-
         viewModel.getSelectedAutoActivationDevice().observe(this, device -> {
-            if (device != null) {
-                binding.selectedDeviceView.getRoot().setVisibility(View.VISIBLE);
-                if (device instanceof LwtDevice.Vehicle v) {
-                    selectedDevUIController.bind(v.getAdvData());
-                }
-            } else {
-                binding.selectedDeviceView.getRoot().setVisibility(View.GONE);
-            }
+            devPickerUIController.overrideSelectedDevice(device);
             updateDeviceChoiceVisibility();
         });
 
         viewModel.getDeviceDataIsLoading().observe(this, loading -> {
-            deviceDataLoadingBar.setVisibility(loading ? View.VISIBLE : View.GONE);
-            updateDeviceCheckmark(checkmark);
+            devPickerUIController.setShowLoadingBar(loading);
+            if (!loading) {
+                updateDeviceCheckmark();
+            }
         });
 
         viewModel.getActivationStop().observe(this, activationStop -> {
@@ -194,7 +176,7 @@ public class TicketActivationActivity extends BaseActivity {
                 if (time != null) {
                     binding.activationStop.tvDepartureTime.setText(DateTimeUtils.formatTime(time.toLocalTime()));
                 }
-                CharSequence stopName = devListUIController.getMarkupConverter().toSpannableString(activationStop.name());
+                CharSequence stopName = devPickerUIController.getDevListUIController().getMarkupConverter().toSpannableString(activationStop.name());
                 stopName = TextUtils.concat(getText(R.string.ticket_activation_depart_from_title), "\n", stopName);
                 binding.activationStop.tvStationName.setText(stopName);
                 setupTariffZoneViews(viewModel.getActivationStopExt());
@@ -219,11 +201,11 @@ public class TicketActivationActivity extends BaseActivity {
         binding.activationStop.getRoot().setOnClickListener(v -> launchStopPicker());
 
         viewModel.getRawServerAuthenticationResult().observe(this, trusted -> {
-            updateDeviceCheckmark(checkmark);
             if (trusted == null) {
                 // no device
                 return;
             }
+            updateDeviceCheckmark();
 
             LwtDevice device = viewModel.getCurrentAutoActivationDevice();
             if (!trusted && device != null) {
@@ -297,12 +279,9 @@ public class TicketActivationActivity extends BaseActivity {
             }
         });
 
-        viewModel.getActivationError().observe(this, error -> {
-            if (error != null) {
-                viewModel.ackActivationError();
-                CommonDialogs.newInfoDialog(this, getString(R.string.ticket_activation_error_title), error.getMessage())
-                        .show();
-            }
+        viewModel.getActivationError().handle(this, error -> {
+            CommonDialogs.newInfoDialog(this, getString(R.string.ticket_activation_error_title), error.getMessage())
+                    .show();
         });
 
         viewModel.getActivationResult().observe(this, result -> {
@@ -356,8 +335,13 @@ public class TicketActivationActivity extends BaseActivity {
         }
     };
 
-    private void updateDeviceCheckmark(View checkmark) {
-        checkmark.setVisibility((viewModel.isDeviceDataLoading() || (viewModel.isDeviceTrustDecided() && !viewModel.isCurrentDeviceTrusted())) ? View.GONE : View.VISIBLE);
+    private void updateDeviceCheckmark() {
+        if (!viewModel.isDeviceDataLoading()) {
+            // only set checkmark or not after loading has finished
+            // device trust checks are asynchronous, so the checkmark may appear and then disappear.
+            // this is intended - users are very unlikely to actually encounter untrusted devices.
+            devPickerUIController.markDeviceAsConfirmed(!viewModel.isDeviceTrustDecided() || viewModel.isCurrentDeviceTrusted());
+        }
     }
 
     private String formatValidityStartText() {
@@ -429,7 +413,11 @@ public class TicketActivationActivity extends BaseActivity {
     }
 
     private void updateDeviceChoiceVisibility() {
-        binding.rvDeviceList.setVisibility((viewModel.getCurrentAutoActivationDevice() == null && !viewModel.isZonesManuallyChosen()) ? View.VISIBLE : View.GONE);
+        if (viewModel.isZonesManuallyChosen()) {
+            devPickerUIController.setOverridePickerVisible(false);
+        } else {
+            devPickerUIController.clearOverridePickerVisible();
+        }
         binding.cvActivationStopCard.setVisibility(viewModel.getCurrentActivationStop() != null ? View.VISIBLE : View.GONE);
     }
 

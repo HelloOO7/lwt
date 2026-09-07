@@ -1,5 +1,7 @@
 package cz.spojenka.lwdn;
 
+import android.content.Context;
+import android.content.pm.PackageManager;
 import android.net.wifi.ScanResult;
 import android.net.wifi.aware.AttachCallback;
 import android.net.wifi.aware.AwareResources;
@@ -36,6 +38,16 @@ public class WifiAwareLwdnScanner implements LwdnScanner {
         this.awareManager = awareManager;
         this.sessionManager = sessionManager;
         this.servicePort = servicePort;
+    }
+
+    public static boolean isSupported(Context context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return false;
+        }
+        if (!context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WIFI_AWARE)) {
+            return false;
+        }
+        return context.getSystemService(WifiAwareManager.class) != null;
     }
 
     @Override

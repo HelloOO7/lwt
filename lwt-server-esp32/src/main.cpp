@@ -153,7 +153,7 @@ public:
         ),
         m_WifiNanAdvertiser(m_WifiNanPublisher),
         m_WifiNanServer(m_WifiNanPublisher, WIFI_NAN_PORT),
-        m_TripInfoAdvertiser(m_CISSubscriber, m_TVSSubscriber, { &m_BLETripAdvertiserLegacy, &m_BLETripAdvertiserExt, &m_WifiNanAdvertiser })
+        m_TripInfoAdvertiser(m_CISSubscriber, m_TicketService, m_CicoService, { &m_BLETripAdvertiserLegacy, &m_BLETripAdvertiserExt, &m_WifiNanAdvertiser })
     {
         lwt::ensure_generated_types_linked();
 
@@ -239,6 +239,8 @@ static void bleprph_on_sync(void)
         g_AppMain->StartAdvertising();
     }
 }
+
+#include "esp_mac.h"
 
 void init_nimble() {
     ESP_ERROR_CHECK(nimble_port_init());

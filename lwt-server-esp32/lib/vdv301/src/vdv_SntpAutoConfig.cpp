@@ -28,7 +28,7 @@ namespace vdv301 {
                 // sntp_setservername() does not duplicate the string, so we need to keep a copy of it
                 const char* sntpServer = m_LastSntpServer.c_str();
                 esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG(sntpServer);
-                config.smooth_sync = true;
+                config.smooth_sync = false;
                 config.sync_cb = OnTimeSyncCallback;
                 esp_err_t err = esp_netif_sntp_init(&config);
                 if (err == ESP_OK) {

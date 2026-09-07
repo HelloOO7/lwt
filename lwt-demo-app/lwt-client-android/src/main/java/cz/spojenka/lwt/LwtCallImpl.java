@@ -21,6 +21,7 @@ class LwtCallImpl<T> implements LwtCall<T> {
     private final ByteBuffer requestBuffer;
     private final Class<T> responseType;
 
+    private CompletableFuture<LwtpPacket> lwtpFuture;
     private CompletableFuture<T> enqueuedFuture;
     private boolean isCancelled = false;
 
@@ -37,6 +38,7 @@ class LwtCallImpl<T> implements LwtCall<T> {
     public void cancel() {
         if (enqueuedFuture != null) {
             enqueuedFuture.cancel(true);
+            lwtpFuture.cancel(true);
             isCancelled = true;
         }
     }
@@ -59,7 +61,7 @@ class LwtCallImpl<T> implements LwtCall<T> {
             return cancelledFuture;
         }
         LwtpPacket requestPacket = new LwtpPacket(createRequestFlatbuffer(operationId, requestBuffer));
-        enqueuedFuture = createResponseFuture(session.add(requestPacket), responseType);
+        enqueuedFuture = createResponseFuture(lwtpFuture = session.add(requestPacket), responseType);
         enqueuedFuture.whenComplete((result, ex) -> {
             for (Runnable callback : onFinishedCallbacks) {
                 callback.run();

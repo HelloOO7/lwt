@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:paddingVertical="@dimen/activity_vertical_margin"
+    app:paddingWindowInsets="vertical"
+    android:animateLayoutChanges="true">
+
+    <cz.spojenka.lwt.demoapp.TitleBar
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="@dimen/activity_horizontal_margin"
+        android:layout_marginBottom="@dimen/item_margin_normal"
+        android:text="@string/cico_prerequisites_title"
+        app:marginWindowInsets="horizontal" />
+
+    <cz.spojenka.android.ui.view.PermissionCheckmark
+        android:id="@+id/permHardware"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:description="@string/cico_prerequisites_hardware_desc"
+        app:title="@string/cico_prerequisites_hardware_title" />
+
+    <cz.spojenka.android.ui.view.PermissionCheckmark
+        android:id="@+id/permBluetooth"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:title="@string/cico_prerequisites_bt_title"
+        app:description="@string/cico_prerequisites_bt_desc_none" />
+
+    <cz.spojenka.android.ui.view.PermissionCheckmark
+        android:id="@+id/permBluetoothState"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:description="@string/cico_prerequisites_bt_state_desc_off"
+        app:title="@string/cico_prerequisites_bt_title" />
+
+    <cz.spojenka.android.ui.view.PermissionCheckmark
+        android:id="@+id/permLocation"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:description="@string/cico_prerequisites_location_desc_none"
+        app:title="@string/cico_prerequisites_location_title" />
+
+    <cz.spojenka.android.ui.view.PermissionCheckmark
+        android:id="@+id/permBackgroundLocation"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:description="@string/cico_prerequisites_bg_location_desc_none"
+        app:title="@string/cico_prerequisites_bg_location_title" />
+
+    <cz.spojenka.android.ui.view.PermissionCheckmark
+        android:id="@+id/permNotifications"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:description="@string/cico_prerequisites_notifications_desc_none"
+        app:title="@string/cico_prerequisites_notifications_title" />
+
+    <cz.spojenka.android.ui.view.PermissionCheckmark
+        android:id="@+id/permBattery"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:description="@string/cico_prerequisites_battery_desc_none"
+        app:title="@string/cico_prerequisites_battery_title" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <Button
+        android:id="@+id/btnDone"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="@dimen/activity_horizontal_margin"
+        android:layout_marginTop="@dimen/section_margin_normal"
+        android:text="@string/cico_prerequisites_done" />
+
+</LinearLayout>

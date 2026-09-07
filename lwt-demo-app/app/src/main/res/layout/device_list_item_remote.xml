@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- translated from device_list_item.xml by ChatGPT -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    xmlns:tools="http://schemas.android.com/tools"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="horizontal"
+    android:padding="@dimen/item_margin_normal"
+    android:clipToPadding="false"
+    android:clipChildren="false"
+    android:gravity="center_vertical"
+    android:background="@drawable/notification_card_background">
+
+    <!-- Line number -->
+    <RelativeLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content">
+
+        <ImageView
+            android:id="@+id/ivLineNumberBackground"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_alignTop="@id/tvLineNumber"
+            android:layout_alignBottom="@id/tvLineNumber"
+            android:layout_alignStart="@id/tvLineNumber"
+            android:layout_alignEnd="@id/tvLineNumber"
+            android:scaleType="fitXY"
+            android:src="@drawable/line_number_background_no_padding"
+            android:elevation="3dp"
+            android:background="@drawable/line_number_background_no_padding" />
+
+        <TextView
+            android:id="@+id/tvLineNumber"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="@dimen/item_margin_normal"
+            android:gravity="center"
+            android:textSize="30sp"
+            android:textStyle="bold"
+            android:elevation="4dp"
+            tools:text="394" />
+    </RelativeLayout>
+
+    <!-- Right-hand content -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="@dimen/section_margin_normal"
+        android:orientation="vertical"
+        android:gravity="center_vertical">
+
+        <!-- Headsign -->
+        <TextView
+            android:id="@+id/tvHeadsign"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="20sp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="NOVÉ BUTOVICE" />
+
+        <!-- Next stop + delay -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvNextStop"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:maxLines="2"
+                android:ellipsize="end"
+                tools:text="v zast. Beroun, U Černého koně" />
+
+            <TextView
+                android:id="@+id/tvDelayDisplay"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/section_margin_normal"
+                android:drawablePadding="4dp"
+                android:paddingHorizontal="@dimen/item_margin_normal"
+                android:gravity="center_vertical"
+                tools:text="včas"
+                android:drawableStart="@drawable/delay_indicator" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</LinearLayout>

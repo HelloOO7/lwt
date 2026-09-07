@@ -6,6 +6,8 @@ import cz.spojenka.lwdn.LwdnServiceID;
 
 public class LwtServiceConstants {
 
+    public static final String BLE_DEVICE_NAME = "LWT";
+
     public static final int BLE_SERVICE_UUID_VEHICLE = 0x4C575456; // "LWTV"
     public static final int BLE_SERVICE_UUID_STOP = 0x4C575453; // "LWTS"
 

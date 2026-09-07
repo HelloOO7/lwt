@@ -1,8 +1,6 @@
 package cz.spojenka.lwt.demoapp;
 
-import android.Manifest;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -19,74 +17,31 @@ import android.net.wifi.aware.WifiAwareSession;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
-import android.widget.Toast;
 
 import java.io.DataInputStream;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-import javax.net.ssl.SSLContext;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 import cz.spojenka.android.ui.activity.BaseActivity;
 import cz.spojenka.android.util.AsyncUtils;
 import cz.spojenka.android.util.ViewUtils;
-import cz.spojenka.lwdn.LwdnScanConfig;
-import cz.spojenka.lwdn.LwdnScanException;
 import cz.spojenka.lwt.*;
 import cz.spojenka.lwt.demoapp.databinding.ActivityMainBinding;
-import cz.spojenka.lwt.util.LwtTime;
-import cz.spojenka.lwtp.LwtpTLSConfig;
-import cz.spojenka.lwtp.LwtpTLSPolicy;
 
 public class MainActivity extends BaseActivity {
 
     private static final String TAG = "LWTDemoApp";
 
-    private LwtDeviceScanner lwtScanner;
-
-    private SSLContext sslContext;
-
     private ActivityMainBinding binding;
-
-    private LwtDevice foundDevice;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(ViewUtils.wrapInScrollView(binding.getRoot()));
-        setButtonsEnabled(false);
-        sslContext = createSSLContext();
-        lwtScanner = new LwtDeviceScanner(this, GlobalLwtScanner.getInstance(getApplication()).getLinkSession());
-        if (hasBluetoothScanPermission()) {
-            lwtScanner.startScan(
-                    new LwdnScanConfig.Builder()
-                            .setMaxDevices(1)
-                            .setTimeout(Duration.ofSeconds(5))
-                            .build()
-            ).addOnResultListener(new LwtScan.OnResultListener() {
-                @Override
-                public void onResult(LwtScan scan, LwtDevice result) {
-                    Log.i(TAG, "Found device: " + result);
-                    foundDevice = result;
-                    setButtonsEnabled(true);
-                }
-
-                @Override
-                public void onFailure(LwtScan scan, LwdnScanException e) {
-                    Log.e(TAG, "Scan failed", e);
-                }
-            });
-        } else {
-            Toast.makeText(this, "Bluetooth scan permission not granted.", Toast.LENGTH_LONG).show();
-        }
-        binding.btnTest.setOnClickListener(v -> checkTrustAndRunTest());
-        binding.btnTestTls.setOnClickListener(v -> runTestOverTLS());
 
         binding.btnShowDeviceList.setOnClickListener(v -> startActivity(new Intent(this, DeviceListActivity.class)));
         binding.btnRunTicketActivation.setOnClickListener(v -> {
@@ -122,8 +77,10 @@ public class MainActivity extends BaseActivity {
 
         binding.btnRunTicketInspection.setOnClickListener(v -> startActivity(new Intent(this, TicketInspectionHomeActivity.class)));
 
-        binding.btnToggleBleService.setOnClickListener(v -> toggleBleService());
-        updateBleServiceButton();
+        binding.btnOpenCico.setOnClickListener(v -> startActivity(
+                new Intent(this, CheckInActivity.class)
+                        .putExtra(CheckInActivity.EXTRA_CICO_TOKEN, new byte[16])
+        ));
 
         binding.btnSetClientCert.setOnClickListener(v -> startActivity(
                 new Intent(this, ClientCertImportActivity.class)
@@ -133,13 +90,10 @@ public class MainActivity extends BaseActivity {
         Log.d(TAG, "Client key present: " + GlobalTrustManager.isClientKeyPresent());
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        updateBleServiceButton();
-    }
-
     private void testNanDatapath() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return;
+        }
         getSystemService(WifiAwareManager.class).attach(new AttachCallback() {
 
             @Override
@@ -239,130 +193,5 @@ public class MainActivity extends BaseActivity {
                 }
             }
         }, null);
-    }
-
-    private void toggleBleService() {
-        if (BleScanService.isRunning()) {
-            stopService(new Intent(this, BleScanService.class));
-            updateBleServiceButton();
-        } else {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                    ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, 101);
-                    return;
-                }
-            }
-            ContextCompat.startForegroundService(this, new Intent(this, BleScanService.class));
-            updateBleServiceButton();
-        }
-    }
-
-    private void updateBleServiceButton() {
-        if (BleScanService.isRunning()) {
-            binding.btnToggleBleService.setText("Stop Background BLE Scan");
-        } else {
-            binding.btnToggleBleService.setText("Start Background BLE Scan");
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == 101) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                toggleBleService();
-            }
-        }
-    }
-
-    private boolean hasBluetoothScanPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            return ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED;
-        } else {
-            return ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_ADMIN) == PackageManager.PERMISSION_GRANTED;
-        }
-    }
-
-    private void checkTrustAndRunTest() {
-        initTest();
-        try (LwtAPIClient client = new LwtAPIClient(this, foundDevice.getAddress())) {
-            client.setSocketWatchdogTimeout(Duration.ofSeconds(5));
-            client.disableTLS();
-            client.authenticateServer(GlobalTrustManager.getInstance(getApplication())).executeAsync().whenCompleteAsync((trusted, error) -> {
-                if (error != null) {
-                    Log.e(TAG, "Server auth operation error", error);
-                    setButtonsEnabled(true);
-                } else {
-                    Log.i(TAG, "Server authentication result: " + trusted);
-                }
-            }, getMainExecutor());
-            LwtSession session = client.newSession();
-            enqueueTestOperations(client, session);
-            executeOps(session);
-        }
-    }
-
-    private void runTestOverTLS() {
-        initTest();
-        try (LwtAPIClient client = new LwtAPIClient(this, foundDevice.getAddress())) {
-            client.setSocketWatchdogTimeout(Duration.ofSeconds(5));
-            client.useTLS(
-                    new LwtpTLSConfig.Builder(foundDevice.getAddress())
-                            .setTLSPolicy(LwtpTLSPolicy.EXPLICIT_OPPORTUNISTIC)
-                            .setSSLContext(sslContext)
-                            .build()
-            );
-            LwtSession session = client.newSession();
-            enqueueTestOperations(client, session);
-            executeOps(session);
-        }
-    }
-
-    private void initTest() {
-        setButtonsEnabled(false);
-        Log.i(TAG, "Testing bluetooth communication with device: " + foundDevice.getAddress());
-    }
-
-    private void enqueueTestOperations(LwtAPIClient client, LwtSession session) {
-        for (int i = 0; i < 1; i++) {
-            client.ping().enqueue(session).thenAccept(pingResponse -> {
-                Log.i(TAG, "Ping response received: dev=" + pingResponse.deviceId() + ", time=" + pingResponse.deviceTime());
-            }).exceptionally(ex -> {
-                Log.e(TAG, "LWT operation failed", ex);
-                return null;
-            });
-        }
-        client.getTripRouteInfo().enqueue(session).thenAccept(tripRouteInfo -> {
-            Log.i(TAG, "Trip route info received: " + routeInfoToString(tripRouteInfo));
-        }).exceptionally(ex -> {
-            Log.e(TAG, "LWT operation failed", ex);
-            return null;
-        });
-        client.getTicketValidationInfo().enqueue(session).thenAccept(tvi -> {
-            Log.i(TAG, "Ticket validation info received: zone " + tvi.tariffZones() + ", act. time=" + LwtTime.convertLocalDateTime(tvi.scheduledActivationTime()));
-        }).exceptionally(ex -> {
-            Log.e(TAG, "LWT operation failed", ex);
-            return null;
-        });
-    }
-
-    private String routeInfoToString(TripRouteInfo t) {
-        return t.trip().trip().line().name() + " (" + t.trip().trip().globalRefId() + ") "
-                + t.stopsLength() + " stops";
-    }
-
-    private void executeOps(LwtSession session) {
-        session.executeAsync().whenCompleteAsync((unused, throwable) -> {
-            setButtonsEnabled(true);
-        }, getMainExecutor());
-    }
-
-    private void setButtonsEnabled(boolean enabled) {
-        binding.btnTest.setEnabled(enabled);
-        binding.btnTestTls.setEnabled(enabled);
-    }
-
-    private SSLContext createSSLContext() {
-        return GlobalTrustManager.createSSLContext(getApplication());
     }
 }

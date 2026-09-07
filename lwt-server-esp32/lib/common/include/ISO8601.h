@@ -129,7 +129,7 @@ struct LocalDateTime {
     }
 
     inline static LocalDateTime of_epoch_seconds(int64_t epochSeconds, int32_t timezoneOffset) {
-        return of_utc_epoch_seconds(epochSeconds - timezoneOffset);
+        return of_utc_epoch_seconds(epochSeconds + timezoneOffset);
     }
 
     inline static LocalDateTime of(tm* tmPtr) {

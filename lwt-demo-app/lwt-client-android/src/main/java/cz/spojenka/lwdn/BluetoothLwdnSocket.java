@@ -21,7 +21,7 @@ public class BluetoothLwdnSocket implements LwdnSocket {
     }
 
     public BluetoothLwdnSocket(BluetoothDevice device, int psm) throws IOException {
-        this(device.createInsecureL2capChannel(psm));
+        this(BluetoothDeviceCompat.createInsecureL2capChannel(device, psm));
     }
 
     private void ensureConnected() throws IOException {

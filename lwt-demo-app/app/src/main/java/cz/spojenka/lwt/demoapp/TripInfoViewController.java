@@ -38,8 +38,8 @@ public class TripInfoViewController {
         String stopName;
         if (d instanceof TripAdvertisementDataExt ext) {
             showLineNumber(ext.getLineName());
-            showHeadsign(ext.getHeadsign());
-            stopName = ext.getCurrentStopName();
+            showNormalizedHeadsign(ext.getHeadsign());
+            stopName = normalizeStopName(ext.getCurrentStopName());
         } else {
             if (d.isTrain()) {
                 binding.tvLineNumber.setText(d.getParsedTrainLineNumber());
@@ -56,9 +56,22 @@ public class TripInfoViewController {
 
     public void bind(TripStateInfo tripInfo) {
         showLineNumber(tripInfo.trip().line().name());
-        showHeadsign(tripInfo.trip().line().headsign().name());
-        showNextStop(tripInfo.currentDepartureStop().name(), tripInfo.locationState() == LocationState.AtStop);
+        showNormalizedHeadsign(tripInfo.trip().line().headsign().name());
+        showNextStop(normalizeStopName(tripInfo.currentDepartureStop().name()), tripInfo.locationState() == LocationState.AtStop);
         setDelayDisplay(tripInfo.delay());
+    }
+
+    private String normalizeStopName(String stopName) {
+        if (stopName == null) {
+            return "";
+        }
+        // add proper gaps after commas so that word-wrapping works as intended
+        return stopName
+                .replace(",,", ",")
+                .replace(",", ", ")
+                .replaceAll("\\.(?=\\w)", ". ")
+                .replace("  ", " ")
+                .trim();
     }
 
     private void showLineNumber(String lineNumberHtml) {
@@ -66,10 +79,15 @@ public class TripInfoViewController {
         binding.tvLineNumber.setText(lineNum);
         BackgroundColorSpan lineBgColor = markupConverter.extractBackgroundColor(lineNum);
         if (lineBgColor != null) {
+            binding.tvLineNumber.setBackgroundResource(R.drawable.line_number_background);
             binding.tvLineNumber.setBackgroundTintList(ColorStateList.valueOf(lineBgColor.getBackgroundColor()));
         } else {
             binding.tvLineNumber.setBackground(null);
         }
+    }
+
+    private void showNormalizedHeadsign(String headsignHtml) {
+        showHeadsign(normalizeStopName(headsignHtml));
     }
 
     private void showHeadsign(String headsignHtml) {

@@ -343,6 +343,9 @@ namespace lwt {
         if (result) {
             m_CurTripDelay = result->trip()->delay();
 
+            m_IsInLastStop = result->trip()->current_departure_stop()->sequence_id() == result->stops()->size() - 1;
+            m_CISCanUseTicketing = true;
+
             if (!m_HasTVSData) {
                 ESP_LOGI(TAG, "No TVS data available (yet), generating ticket validation info from TripRouteInfo");
 
@@ -379,6 +382,8 @@ namespace lwt {
             m_NextTariffZonesForValidation = ReduceNextTariffZones(m_NextTariffZonesFromRoute, m_TariffZonesForValidation);
         }
         else {
+            m_CISCanUseTicketing = false;
+            m_IsInLastStop = false;
             if (!m_TVS) {
                 m_TimeForTicketValidityStart = 0;
             }
@@ -393,6 +398,8 @@ namespace lwt {
         if (result) {
             ESP_LOGI(TAG, "Updating ticket validation info from TVS CurrentTariffStop data");
             m_HasTVSData = true;
+            m_IsOutsideOfTariff = result->CurrentTariffStop.FareZone.empty();
+            m_TVSCanUseTicketing = true;
             auto&& scheduledDep = result->CurrentTariffStop.DepartureScheduled;
             if (scheduledDep && !scheduledDep->Value.empty()) {
                 m_TimeForTicketValidityStart = LocalDateTime::parse(scheduledDep->Value).to_utc_epoch_seconds() + m_CurTripDelay * 60;
@@ -406,6 +413,8 @@ namespace lwt {
         else {
             // use m_TimeForTicketValidityStart and m_TariffZonesForValidation from TripRouteInfo, if available
             m_HasTVSData = false;
+            m_TVSCanUseTicketing = false;
+            m_IsOutsideOfTariff = false; // no data - assume in tariff
         }
 
         UpdateValidationInfo();
@@ -418,6 +427,14 @@ namespace lwt {
 
         SetRazziaBit(RAZZIA_TVS_BIT, isRazzia);
         UpdateValidationInfo();
+    }
+
+    void TicketValidationService::ObserveServiceState(Observer<TicketValidationState>& observer) {
+        AddObserver(observer);
+    }
+
+    void TicketValidationService::RemoveObserver(Observer<TicketValidationState>& observer) {
+        Observable<TicketValidationState>::RemoveObserver(observer);
     }
 
     std::string TicketValidationService::GetTariffZonesOnlyMyTariffSystem(const std::string& tariffZones) const {
@@ -461,6 +478,8 @@ namespace lwt {
 
     void TicketValidationService::UpdateValidationInfo()
     {
+        PublishServiceState(); // do this unconditionally
+
         auto oldTripKey = GetCurrentTripKeyNoLock();
 
         ResetValidationInfo();
@@ -533,6 +552,22 @@ namespace lwt {
             ESP_LOGI(TAG, "Trip changed, invalidating preauth rate limit");
             m_PreauthRateLimiter.InvalidateAll();
         }
+    }
+
+    void TicketValidationService::PublishServiceState()
+    {
+        // TVS does not send messages when vehicle is not in service, so last data remains.
+        // therefore, we need to & with CIS data, which is false when there is no TripInformation
+        bool canUse = m_HasTVSData ? (m_TVSCanUseTicketing && m_CISCanUseTicketing) : m_CISCanUseTicketing;
+
+        ESP_LOGI(TAG, "Updating ticketing availability flag: CIS=%d, TVS=%d, TVS available=%d, can use=%d", m_CISCanUseTicketing, m_TVSCanUseTicketing, m_HasTVSData, canUse);
+
+        TicketValidationState state;
+        state.IsAvailable = canUse;
+        state.IsInLastStop = m_IsInLastStop;
+        state.IsOutsideOfTariff = m_IsOutsideOfTariff;
+
+        NotifyObservers(&state);
     }
 
     void TicketValidationService::ResetValidationInfo()

@@ -7,7 +7,7 @@
     "board/esp32c5-builtin.cfg"
   ],
   "idf.currentSetup": "C:\\dev\\esp\\master\\esp-idf",
-  "idf.portWin": "COM9",
+  "idf.portWin": "COM20",
   "idf.flashType": "UART",
   "idf.flashBaudRate": "921600"
 }

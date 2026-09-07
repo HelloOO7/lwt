@@ -35,7 +35,7 @@ public class TicketDisplayActivity extends BaseActivity {
     public static final String EXTRA_TICKET = TicketDisplayActivity.class.getName() + ".EXTRA_TICKET";
 
     private ActivityTicketDisplayBinding binding;
-    private TicketDisplayViewModel viewModel;
+    protected TicketDisplayViewModel viewModel;
 
     private ClockView clockView;
     private TickNotifier qrTicker;
@@ -46,7 +46,7 @@ public class TicketDisplayActivity extends BaseActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         binding = ActivityTicketDisplayBinding.inflate(getLayoutInflater());
-        setContentView(ViewUtils.wrapInScrollView(binding.getRoot()));
+        setContentView(decorateContentView(ViewUtils.wrapInScrollView(binding.getRoot())));
 
         clockView = new ClockView(binding.tvClock);
         clockView.addClockCallback(this::updateProgressBar);
@@ -61,8 +61,6 @@ public class TicketDisplayActivity extends BaseActivity {
         binding.ivQR.setForeground(qrLoading);
 
         viewModel = new ViewModelProvider(this).get(TicketDisplayViewModel.class);
-        TicketData ticket = Objects.requireNonNull(IntentCompat.getParcelableExtra(getIntent(), EXTRA_TICKET, TicketData.class));
-        viewModel.loadTicket(ticket);
 
         qrTicker = new TickNotifier(this, viewModel::updateQR, 30000);
 
@@ -81,13 +79,24 @@ public class TicketDisplayActivity extends BaseActivity {
             if (zones != null && !zones.isEmpty()) {
                 addInfoView(R.string.ticket_display_valid_zones, String.join(", ", zones));
             }
-            addInfoView(R.string.ticket_display_valid_duration, DateTimeUtils.formatTimeDifferenceMinutes(this, ticketData.getValidityPeriod()));
+            if (ticketData.getValidityPeriod() != null) {
+                addInfoView(R.string.ticket_display_valid_duration, DateTimeUtils.formatTimeDifferenceMinutes(this, ticketData.getValidityPeriod()));
+            }
             addInfoView(R.string.ticket_display_valid_since, DateTimeUtils.formatDateTimeLocalized(ticketData.getValidSince().toLocalDateTime()));
             addInfoView(R.string.ticket_display_valid_until, DateTimeUtils.formatDateTimeLocalized(ticketData.getValidUntil().toLocalDateTime()));
 
             ticketForClock = ticketData;
             updateProgressBar();
         });
+
+        TicketData ticket = IntentCompat.getParcelableExtra(getIntent(), EXTRA_TICKET, TicketData.class);
+        if (ticket != null) {
+            viewModel.loadTicket(ticket);
+        }
+    }
+
+    protected View decorateContentView(View baseContentView) {
+        return baseContentView;
     }
 
     private final DateTimeUtils.RelativeFormatParams relativeFormatParams = new DateTimeUtils.RelativeFormatParams()
@@ -96,12 +105,16 @@ public class TicketDisplayActivity extends BaseActivity {
             .withWeekdayStyle(DateTimeUtils.WeekdayStyle.NONE);
 
     private void updateProgressBar() {
-        if (ticketForClock != null && ticketForClock.getActivatedAt() != null) {
+        if (ticketForClock == null) {
+            return;
+        }
+        if (ticketForClock.getActivatedAt() != null) {
             Context context = this;
             OffsetDateTime now = OffsetDateTime.now();
             OffsetDateTime act = ticketForClock.getActivatedAt();
             OffsetDateTime from = ticketForClock.getValidSince();
             OffsetDateTime to = ticketForClock.getValidUntil();
+            boolean pastValidity = false;
 
             @ColorInt int progressTint;
             @ColorInt int progressTextTint = MaterialColors.getColor(binding.tvRemainingTime, android.R.attr.textColor);
@@ -112,7 +125,7 @@ public class TicketDisplayActivity extends BaseActivity {
                         R.string.ticket_display_remaining_format,
                         DateTimeUtils.formatTimeDifference(context, toEndOfValidity, ChronoUnit.SECONDS)
                 ));
-                boolean warn = toEndOfValidity.compareTo(ticketForClock.getValidityPeriod().dividedBy(10)) <= 0;
+                boolean warn = toEndOfValidity.compareTo(ticketForClock.getValidityPeriodOrDefault().dividedBy(10)) <= 0;
                 progressTint = getProgressBarTint(true, warn);
 
                 setupProgress(from, now, to);
@@ -135,6 +148,7 @@ public class TicketDisplayActivity extends BaseActivity {
 
                 setupProgress(act, now, from);
             } else {
+                pastValidity = true;
                 binding.pbValidity.setVisibility(View.GONE);
                 binding.tvRemainingTime.setText(R.string.ticket_display_validity_ended);
                 progressTint = context.getColor(R.color.ticket_display_progress_bg);
@@ -142,6 +156,10 @@ public class TicketDisplayActivity extends BaseActivity {
             }
             binding.tvRemainingTime.setTextColor(progressTextTint);
             binding.pbValidity.setProgressTintList(ColorStateList.valueOf(progressTint));
+
+            if (ticketForClock.getValidityPeriod() == null && !pastValidity) {
+                binding.tvRemainingTime.setText(R.string.ticket_display_validity_flexible);
+            }
         }
     }
 

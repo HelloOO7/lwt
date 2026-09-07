@@ -9,44 +9,61 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.ServiceInfo;
 import android.os.Binder;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.SystemClock;
 import android.util.Log;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.Stack;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
+import javax.net.ssl.SSLContext;
+
 import androidx.annotation.Nullable;
+import androidx.core.app.ServiceCompat;
 import androidx.core.content.IntentCompat;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
+import cz.spojenka.lwdn.BluetoothLeThrottling;
 import cz.spojenka.lwdn.BluetoothLwdnScanner;
+import cz.spojenka.lwdn.LwdnAddress;
 import cz.spojenka.lwdn.LwdnScanConfig;
 import cz.spojenka.lwdn.LwdnScanException;
+import cz.spojenka.lwdn.ScanErrorCode;
+import cz.spojenka.lwt.util.LwtTime;
+import cz.spojenka.lwtp.LwtpTLSConfig;
+import cz.spojenka.lwtp.LwtpTLSPolicy;
 
 public class CICOService extends Service {
 
-    private static final String EXTRA_NOTIFICATION_ID = CICOService.class.getName() + ".EXTRA_NOTIFICATION_ID";
-    private static final String EXTRA_NOTIFICATION = CICOService.class.getName() + ".EXTRA_NOTIFICATION";
-    private static final String EXTRA_CICO_TOKEN = CICOService.class.getName() + ".EXTRA_CICO_TOKEN";
+    /*
+    todo:
+    - service state persistence/restoration (in case of crashes)
+    - spinner while CI/COing (instead of checkmark)
+    - dark mode notifications
+     */
 
-    private static final String TAG = "BleScanService";
+    private static final String EXTRA_FOREGROUND_CONTROLLER_CLASS = CICOService.class.getName() + ".EXTRA_FOREGROUND_CONTROLLER_CLASS";
+
+    private static final String TAG = "CICOService";
 
     private Handler handler;
 
-    private int foregroundNotificationId;
-    private Notification foregroundNotification;
+    private ForegroundController foregroundController;
 
     private LwtDeviceScanner scanner;
     private MutableLiveData<List<LwtDevice>> devicesInProximityLiveData = new MutableLiveData<>();
     private MutableLiveData<List<LwtDevice>> deviceResultTarget = devicesInProximityLiveData;
 
-    private byte[] cicoToken;
     private CheckInIntermediate checkInIntermediate;
     private boolean isSessionActive = false;
     private LwtScan currentScan;
@@ -56,16 +73,20 @@ public class CICOService extends Service {
     private boolean restoreConnectionPending;
     private MutableLiveData<LwtDevice> currentDeviceLiveData = new MutableLiveData<>();
     private LwtAPIClient currentLwtClient;
+    private SSLContext clientSSLContext;
 
     private MutableLiveData<CICOTicketFragment> currentTicketLiveData = new MutableLiveData<>();
+    private long ttlForTryRestore;
 
     private Stack<DeviceStackEntry> deviceStack = new Stack<>();
 
     private final Runnable refreshTicketRunnable = this::refreshTicket;
+    private final Runnable restartThrottledScanRunnable = this::restartLastDeviceScan;
 
     @Override
     public void onCreate() {
         super.onCreate();
+        Log.d(TAG, "Starting CICO service");
         handler = new Handler(getMainLooper());
         BluetoothLwdnScanner btScanner = LwtDeviceScanner.createBluetoothScanner(getApplicationContext());
         if (btScanner == null) {
@@ -73,26 +94,48 @@ public class CICOService extends Service {
         }
         scanner = new LwtDeviceScanner(btScanner);
         registerReceiver(bluetoothStateReceiver, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
+        Log.d(TAG, "Service started");
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        stopDeviceScanIfExists();
+        Log.d(TAG, "Terminating CICO service");
+        stopAndClearDeviceScan();
         disconnectCurrentDevice();
+        unregisterReceiver(bluetoothStateReceiver);
+        Log.d(TAG, "Service terminated");
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        foregroundNotificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, 0);
-        foregroundNotification = Objects.requireNonNull(IntentCompat.getParcelableExtra(intent, EXTRA_NOTIFICATION, Notification.class));
-        cicoToken = Objects.requireNonNull(intent.getByteArrayExtra(EXTRA_CICO_TOKEN));
+        Log.d(TAG, "Received onStartCommand intent=" + intent);
+        if (intent == null) {
+            // todo handle restore of sticky state
+            return START_NOT_STICKY;
+        }
+        Class<?> foregroundControllerClass = Objects.requireNonNull(IntentCompat.getSerializableExtra(intent, EXTRA_FOREGROUND_CONTROLLER_CLASS, Class.class));
+        foregroundController = instantiateForegroundController(foregroundControllerClass);
+        foregroundController.onServiceStateChanged(lastServiceState);
 
         return START_STICKY;
     }
 
+    private ForegroundController instantiateForegroundController(Class<?> controllerClass) {
+        try {
+            return (ForegroundController) controllerClass.getConstructor(Context.class).newInstance(getApplicationContext());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to instantiate foreground controller " + controllerClass.getName(), e);
+        }
+    }
+
     private LiveData<List<LwtDevice>> prepareSession() {
+        Log.d(TAG, "prepareSession()");
         assertSessionNotActive();
+        if (currentScan != null) {
+            return deviceResultTarget;
+        }
+        Log.d(TAG, "Scan is not yet running, starting it");
         MutableLiveData<List<LwtDevice>> resultList = new MutableLiveData<>();
         deviceResultTarget = resultList;
         startDeviceScan(LwdnScanConfig.ScanMode.LOW_LATENCY);
@@ -100,12 +143,19 @@ public class CICOService extends Service {
     }
 
     private void cancelPrepareSession() {
+        Log.d(TAG, "cancelPrepareSession");
         devicesInProximityLiveData = new MutableLiveData<>();
         assertSessionNotActive();
-        stopDeviceScanIfExists();
+        stopAndClearDeviceScan();
+    }
+
+
+    private boolean isPrepareSessionRunning() {
+        return !isSessionActive && currentScan != null;
     }
 
     private void onBluetoothRestarted() {
+        Log.d(TAG, "Bluetooth was turned on after being off");
         if (isSessionActive) {
             if (currentDevice != null) {
                 refreshTicket();
@@ -113,47 +163,118 @@ public class CICOService extends Service {
                 restoreConnection();
             }
         } else {
-            startDeviceScanIfNotRunning();
+            restartLastDeviceScan();
         }
     }
 
     private void onBluetoothTurnedOff() {
+        Log.d(TAG, "User turned off bluetooth");
         stopDeviceScanIfExists();
-    }
-
-    private void startDeviceScanIfNotRunning() {
-        if (currentScan == null) {
-            startDeviceScan(lastScanMode);
+        cancelPendingTicketRefresh();
+        if (isSessionActive) {
+            foregroundController.onServiceError(ErrorCode.BLUETOOTH_TURNED_OFF);
         }
     }
 
+    private void stopAndClearDeviceScan() {
+        Log.d(TAG, "stopAndClearDeviceScan()");
+        stopDeviceScanIfExists();
+        lastScanMode = null;
+        handler.removeCallbacks(restartThrottledScanRunnable);
+    }
+
+    private void restartLastDeviceScan() {
+        Log.d(TAG, "restartLastDeviceScan() requested");
+        if (currentScan == null && lastScanMode != null) {
+            startDeviceScan(lastScanMode);
+        } else {
+            Log.d(TAG, "no active scan");
+        }
+    }
+
+    private Set<LwdnAddress> devicesToAddresses(Collection<LwtDevice> devices) {
+        return devices.stream()
+                .map(LwtDevice::getAddress)
+                .collect(Collectors.toSet());
+    }
+
+    private boolean sameDevices(List<LwtDevice> list1, List<LwtDevice> list2) {
+        if (list1 == null || list2 == null) {
+            return false;
+        }
+        if (list1.size() != list2.size()) {
+            return false;
+        }
+        return devicesToAddresses(list1).equals(devicesToAddresses(list2));
+    }
+
     private final LwtScan.OnResultListener scanResultListener = new LwtScan.OnResultListener() {
+
+        private long restoreThrottleTime;
+
         @Override
         public void onResult(LwtScan scan, LwtDevice result) {
-            devicesInProximityLiveData.setValue(getCicoDevicesByProximity(scan.getResults()));
+            List<LwtDevice> lastDevices = deviceResultTarget.getValue();
+            List<LwtDevice> newDevices = getCicoDevicesByProximity(scan.getResults());
+            deviceResultTarget.setValue(newDevices);
             if (restoreConnectionPending) {
-                restoreConnection();
+                if (!sameDevices(lastDevices, newDevices) || (SystemClock.elapsedRealtime() - restoreThrottleTime > ttlForTryRestore)) {
+                    restoreThrottleTime = 0;
+                    Log.d(TAG, "restoreConnection on result");
+                    restoreConnection();
+                } else {
+                    if (restoreThrottleTime == 0) {
+                        restoreThrottleTime = SystemClock.elapsedRealtime();
+                    }
+                }
+            } else {
+                restoreThrottleTime = 0;
+            }
+            if (currentDevice != null && result.addressEquals(currentDevice)) {
+                if (!isDeviceCicoReady(result, false)) {
+                    Log.d(TAG, "Got result from device, but it is not CICO ready (probably off-route?); considering it lost");
+                    onResultLost(scan, result);
+                } else {
+                    updateCurrentDevice(result); // update rssi and advdata
+                }
             }
         }
 
         @Override
         public void onResultLost(LwtScan scan, LwtDevice result) {
+            deviceResultTarget.setValue(getCicoDevicesByProximity(scan.getResults()));
             if (currentDevice != null && result.addressEquals(currentDevice)) {
+                Log.d(TAG, "Current device " + result.getAddress() + " was lost.");
                 disconnectCurrentDevice();
-                refreshTicket();
+                restoreConnection();
             }
         }
 
         @Override
         public void onFailure(LwtScan scan, LwdnScanException e) {
-
+            if (e.getCode() == ScanErrorCode.THROTTLED) {
+                Log.e(TAG, "Scan throttled, will restart after throttle period", e);
+                long currentTime = SystemClock.elapsedRealtime();
+                long nextScanTime = BluetoothLeThrottling.getNextUnthrottledScanTime(getApplicationContext());
+                Log.i(TAG, "Current time: " + currentTime + ", next scan time: " + nextScanTime);
+                stopDeviceScan(); // do not clear
+                handler.postAtTime(restartThrottledScanRunnable, realtimeToUptime(nextScanTime));
+            } else {
+                Log.e(TAG, "Scan failed", e);
+                stopAndClearDeviceScan();
+            }
         }
     };
+
+    private static long realtimeToUptime(long realtime) {
+        return SystemClock.uptimeMillis() + (realtime - SystemClock.elapsedRealtime());
+    }
 
     private void startDeviceScan(LwdnScanConfig.ScanMode scanMode) {
         if (currentScan != null) {
             throw new IllegalStateException("Scan is already in progress");
         }
+        Log.d(TAG, "startDeviceScan(" + scanMode + ")");
         currentScan = scanner.startScan(
                 new LwdnScanConfig.Builder()
                         .setTimeout(null) //continuous scan
@@ -168,8 +289,10 @@ public class CICOService extends Service {
         if (currentScan == null) {
             throw new IllegalStateException("No scan is in progress");
         }
+        Log.d(TAG, "stopDeviceScan()");
         currentScan.removeOnResultListener(scanResultListener);
         currentScan.cancel();
+        currentScan = null;
     }
 
     private void stopDeviceScanIfExists() {
@@ -179,7 +302,19 @@ public class CICOService extends Service {
     }
 
     private void startForegroundService() {
-        startForeground(foregroundNotificationId, foregroundNotification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE);
+        Log.d(TAG, "Starting foreground service");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ServiceCompat.startForeground(this, foregroundController.getNotificationId(), foregroundController.createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE);
+        } else {
+            startForeground(foregroundController.getNotificationId(), foregroundController.createNotification());
+        }
+        updateStateFlag(ServiceState.FLAG_FOREGROUND_SERVICE_ACTIVE, true);
+    }
+
+    private void stopForegroundService() {
+        Log.d(TAG, "Stopping foreground service");
+        stopForeground(STOP_FOREGROUND_REMOVE);
+        updateStateFlag(ServiceState.FLAG_FOREGROUND_SERVICE_ACTIVE, false);
     }
 
     private void assertSessionActive() {
@@ -194,25 +329,43 @@ public class CICOService extends Service {
         }
     }
 
-    private CompletableFuture<CheckInIntermediate> requestSession(LwtDevice device) {
+    private LwtCall<CheckInIntermediate> requestSessionCall = null;
+
+    private CompletableFuture<CheckInIntermediate> requestSession(LwtDevice device, byte[] cicoToken) {
+        Log.d(TAG, "requestSession(" + device.getAddress() + ", XXXXXXX)");
         assertSessionNotActive();
         disconnectCurrentDevice();
         connectDevice(device);
-        return currentLwtClient
-                .startCheckIn(cicoToken)
+        requestSessionCall = currentLwtClient.startCheckIn(cicoToken);
+        return requestSessionCall
                 .executeAsync()
                 .whenCompleteAsync((intermediate, throwable) -> {
+                    if (throwable instanceof CancellationException) {
+                        return; // cancelled
+                    }
+                    Log.d(TAG, "requestSession has arrived");
+                    requestSessionCall = null;
                     checkInIntermediate = intermediate;
                     if (throwable != null) {
                         Log.e(TAG, "Failed to request session with device " + device.getAddress(), throwable);
                         disconnectCurrentDevice();
                     }
-                });
+                }, getMainExecutor());
     }
 
-    private boolean isDeviceCicoReady(LwtDevice device) {
+    private void cancelRequestSession() {
+        Log.d(TAG, "cancelRequestSession()");
+        assertSessionNotActive();
+        if (requestSessionCall != null) {
+            requestSessionCall.cancel();
+            requestSessionCall = null;
+        }
+        disconnectCurrentDevice();
+    }
+
+    private boolean isDeviceCicoReady(LwtDevice device, boolean mustAllowCheckIn) {
         if (device instanceof LwtDevice.Vehicle v) {
-            return v.getAdvData().isCanUseTicketing();
+            return v.getAdvData().isCanUseCICO() && (!mustAllowCheckIn || v.getAdvData().isCanUseTicketing());
         }
         return false;
     }
@@ -222,6 +375,7 @@ public class CICOService extends Service {
         if (currentDevice == null || checkInIntermediate == null) {
             throw new IllegalStateException("Must successfully call requestSession() before starting a session");
         }
+        Log.d(TAG, "startSession()");
         return currentLwtClient
                 .confirmCheckIn(checkInIntermediate)
                 .executeAsync()
@@ -230,32 +384,44 @@ public class CICOService extends Service {
                         Log.e(TAG, "Failed to start session with device " + currentDevice.getAddress(), throwable);
                         disconnectCurrentDevice();
                     } else {
-                        cancelPrepareSession();
+                        Log.d(TAG, "startSession OK");
+                        onSessionStarted();
                         onGotTicket(ticket);
-                        startForegroundService();
-                        startIdleDeviceScan();
                     }
                 }, getMainExecutor());
     }
 
+    private void onSessionStarted() {
+        Log.d(TAG, "onSessionStarted()");
+        cancelPrepareSession();
+        startForegroundService();
+        startIdleDeviceScan();
+        updateStateFlag(ServiceState.FLAG_SESSION_ACTIVE, true);
+    }
+
     private void startIdleDeviceScan() {
+        Log.d(TAG, "Start idle device scan");
         // switch to low power scan to check for device loss etc.
         deviceResultTarget = devicesInProximityLiveData;
         startDeviceScan(LwdnScanConfig.ScanMode.LOW_POWER);
     }
 
     private CompletableFuture<?> endSession() {
+        Log.d(TAG, "endSession()");
         assertSessionActive();
-        stopDeviceScanIfExists();
+        stopAndClearDeviceScan();
         if (currentDevice != null) {
             CICOTicketFragment currentTicket = currentTicketLiveData.getValue();
             if (currentTicket != null) {
+                Log.d(TAG, "endSession has ticket, run check-out");
                 return currentLwtClient
                         .checkOut(currentTicket)
                         .executeAsync()
                         .whenCompleteAsync((resp, throwable) -> {
                             if (throwable != null) {
                                 Log.e(TAG, "Failed to check out with device " + currentDevice.getAddress(), throwable);
+                            } else {
+                                Log.d(TAG, "Checked out.");
                             }
                             // session always ends regardless of whether the check-out request succeeded or failed
                             onSessionEnded();
@@ -274,22 +440,33 @@ public class CICOService extends Service {
     }
 
     private void onGotTicket(CICOTicketFragment ticket) {
+        Log.d(TAG, "onGotTicket; issuedAt=" + LwtTime.convertOffsetDateTime(ticket.issuedAtAbsolute()) + ", ttl=" + ticket.ttl() + " ms");
         isSessionActive = true;
-        currentTicketLiveData.setValue(ticket);
+        updateTicketLiveData(ticket);
 
         long ttl = ticket.ttl();
         long ttlToRefresh = ttlRatio(ttl, 0.75f);
+        ttlForTryRestore = ttlRatio(ttl, 0.1f);
 
         handler.postDelayed(refreshTicketRunnable, ttlToRefresh);
     }
 
+    private void updateTicketLiveData(CICOTicketFragment ticket) {
+        currentTicketLiveData.setValue(ticket);
+        updateServiceState();
+    }
+
     private void onSessionEnded() {
+        Log.d(TAG, "onSessionEnded()");
         isSessionActive = false;
-        currentTicketLiveData.setValue(null);
+        updateStateFlag(ServiceState.FLAG_SESSION_ACTIVE, false);
+        updateTicketLiveData(null);
+        stopForegroundService();
         stopSelf();
     }
 
     private CompletableFuture<?> forceDeviceChange(LwtDevice newDevice) {
+        Log.d(TAG, "forceDeviceChange(" + newDevice.getAddress() + ")");
         assertSessionActive();
         saveCurrentDevice();
         connectDevice(newDevice); // without disconnecting the current device
@@ -327,30 +504,87 @@ public class CICOService extends Service {
 
     private List<LwtDevice> getCicoDevicesByProximity(List<LwtDevice> source) {
         return source.stream()
-                .filter(this::isDeviceCicoReady)
+                .filter(dev -> isDeviceCicoReady(dev, true))
                 .sorted(Comparator.comparingInt((LwtDevice d) -> d.getScanResult().rssi()).reversed())
                 .collect(Collectors.toList());
     }
 
+    private LwtAPIClient createDeviceClient(LwtDevice device) {
+        LwtAPIClient client = new LwtAPIClient(getApplicationContext(), device.getAddress());
+
+        if (clientSSLContext != null) {
+            client.useTLS(
+                    new LwtpTLSConfig.Builder(device.getAddress())
+                            .setTLSPolicy(LwtpTLSPolicy.EXPLICIT_REQUIRED)
+                            .setSSLContext(clientSSLContext)
+                            .build()
+            );
+        } else {
+            Log.w(TAG, "TLS is not configured, communication will be insecure");
+        }
+
+        return client;
+    }
+
     private void connectDevice(LwtDevice device) {
-        currentDevice = device;
-        currentLwtClient = new LwtAPIClient(getApplicationContext(), device.getAddress());
-        currentDeviceLiveData.setValue(currentDevice);
+        connectDevice(device, createDeviceClient(device));
     }
 
     private void connectDevice(LwtDevice device, LwtAPIClient client) {
-        currentDevice = device;
+        Log.d(TAG, "connectDevice(" + device.getAddress() + ")");
         currentLwtClient = client;
-        currentDeviceLiveData.setValue(currentDevice);
+        updateCurrentDevice(device);
     }
 
     private void disconnectCurrentDevice() {
+        Log.d(TAG, "disconnectCurrentDevice()");
         if (currentLwtClient != null) {
             currentLwtClient.close();
             currentLwtClient = null;
         }
-        currentDevice = null;
-        currentDeviceLiveData.setValue(null);
+        if (currentDevice != null) {
+            Log.d(TAG, "Device was disconnected: " + currentDevice.getAddress());
+        }
+        updateCurrentDevice(null);
+        cancelPendingTicketRefresh();
+    }
+
+    private void updateCurrentDevice(LwtDevice device) {
+        currentDevice = device;
+        currentDeviceLiveData.setValue(currentDevice);
+        updateServiceState();
+    }
+
+    private int stateFlags = 0;
+    private ServiceState lastServiceState = new ServiceState(stateFlags, null, null);
+
+    private void updateServiceState() {
+        ServiceState newState = new ServiceState(stateFlags, currentDevice, currentTicketLiveData.getValue());
+        if (!newState.equals(lastServiceState)) {
+            lastServiceState = newState;
+            publishServiceState();
+        }
+    }
+
+    private void updateStateFlag(int flag, boolean isSet) {
+        int old = stateFlags;
+        if (isSet) {
+            stateFlags |= flag;
+        } else {
+            stateFlags &= ~flag;
+        }
+        if (old != stateFlags) {
+            updateServiceState();
+        }
+    }
+
+    private void publishServiceState() {
+        if (foregroundController != null) {
+            foregroundController.onServiceStateChanged(lastServiceState);
+        }
+    }
+
+    private void cancelPendingTicketRefresh() {
         handler.removeCallbacks(refreshTicketRunnable);
     }
 
@@ -359,6 +593,7 @@ public class CICOService extends Service {
     }
 
     private CompletableFuture<CICOTicketFragment> refreshTicket(boolean changeDeviceIfLost) {
+        Log.d(TAG, "refreshTicket(changeDeviceIfLost=" + changeDeviceIfLost + ")");
         assertSessionActive();
         CICOTicketFragment currentTicket = currentTicketLiveData.getValue();
         if (currentTicket == null) {
@@ -375,17 +610,20 @@ public class CICOService extends Service {
                             restoreConnection();
                         }
                     } else {
+                        Log.d(TAG, "refreshTicket OK");
                         onGotTicket(newTicket);
                     }
                 }, getMainExecutor());
     }
 
     private void restoreConnection() {
+        Log.d(TAG, "restoreConnection");
         if (currentDevice != null) {
             throw new IllegalStateException("A device is already connected.");
         }
         List<LwtDevice> closestDevices = devicesInProximityLiveData.getValue();
         if (closestDevices == null || closestDevices.isEmpty()) {
+            Log.d(TAG, "No device to restore connection with, deferring restore");
             restoreConnectionPending = true;
             return;
         }
@@ -398,28 +636,31 @@ public class CICOService extends Service {
         for (int i = 0; i < closestDevices.size(); i++) {
             attemptFutures.add(new CompletableFuture<>());
         }
+        Log.d(TAG, closestDevices.size() + " candidates for new connection");
         for (int i = 0; i < closestDevices.size(); i++) {
             LwtDevice dev = closestDevices.get(i);
             int devIndex = i;
             Runnable tryNextRunnable = () -> {
-                LwtAPIClient client = new LwtAPIClient(getApplicationContext(), dev.getAddress());
+                Log.d(TAG, "Attempting connection to " + dev.getAddress());
+                LwtAPIClient client = createDeviceClient(dev);
                 try {
                     client
                             .refreshCICO(currentTicket)
                             .executeAsync()
                             .whenCompleteAsync((newTicket, throwable) -> {
                                 if (throwable == null) {
-                                    Log.i(TAG, "Successfully restored connection, now using device " + currentDevice.getAddress());
+                                    Log.i(TAG, "Successfully restored connection, now using device " + dev.getAddress());
                                     connectDevice(dev, client);
                                     onGotTicket(newTicket);
                                     attemptFutures.get(devIndex).complete(null);
                                 } else {
-                                    Log.e(TAG, "Attempt to restore connection using device " + currentDevice.getAddress() + " failed", throwable);
+                                    Log.e(TAG, "Attempt to restore connection using device " + dev.getAddress() + " failed", throwable);
                                     client.close();
                                     attemptFutures.get(devIndex).completeExceptionally(throwable);
                                 }
-                            });
+                            }, getMainExecutor());
                 } catch (Throwable th) {
+                    Log.e(TAG, "Send restore request failed", th);
                     // close client if we failed to start the operation
                     client.close();
                     throw th;
@@ -434,6 +675,12 @@ public class CICOService extends Service {
                 });
             }
         }
+        attemptFutures.get(attemptFutures.size() - 1).whenCompleteAsync((o, throwable) -> {
+            if (throwable != null) {
+                Log.e(TAG, "Failed to connect to any device", throwable);
+                restoreConnectionPending = true;
+            }
+        }, getMainExecutor());
     }
 
     private final BroadcastReceiver bluetoothStateReceiver = new BroadcastReceiver() {
@@ -457,11 +704,9 @@ public class CICOService extends Service {
         return BluetoothLwdnScanner.isSupported(context);
     }
 
-    public static Intent startIntent(Context context, byte[] cicoToken, ForegroundServiceConfig foregroundServiceConfig) {
+    public static Intent startIntent(Context context, Class<? extends ForegroundController> foregroundControllerClass) {
         return new Intent(context, CICOService.class)
-                .putExtra(EXTRA_CICO_TOKEN, cicoToken)
-                .putExtra(EXTRA_NOTIFICATION_ID, foregroundServiceConfig.notificationId())
-                .putExtra(EXTRA_NOTIFICATION, foregroundServiceConfig.notification());
+                .putExtra(EXTRA_FOREGROUND_CONTROLLER_CLASS, foregroundControllerClass);
     }
 
     public static Intent stopIntent(Context context) {
@@ -481,6 +726,11 @@ public class CICOService extends Service {
         }
 
         @Override
+        public void initSecureContext(SSLContext sslContext) {
+            service.clientSSLContext = sslContext;
+        }
+
+        @Override
         public LiveData<List<LwtDevice>> prepareSession() {
             return service.prepareSession();
         }
@@ -491,8 +741,18 @@ public class CICOService extends Service {
         }
 
         @Override
-        public CompletableFuture<?> requestSession(LwtDevice device) {
-            return service.requestSession(device);
+        public boolean isPrepareSessionRunning() {
+            return service.isPrepareSessionRunning();
+        }
+
+        @Override
+        public CompletableFuture<?> requestSession(LwtDevice device, byte[] cicoToken) {
+            return service.requestSession(device, cicoToken);
+        }
+
+        @Override
+        public void cancelRequestSession() {
+            service.cancelRequestSession();
         }
 
         @Override
@@ -541,7 +801,33 @@ public class CICOService extends Service {
 
     }
 
-    public static record ForegroundServiceConfig(int notificationId, Notification notification) {
+    /**
+     * Interface that must be implemented to handle foreground service notifications.
+     * The class implementing this interface must have a constructor that takes a Context as a parameter.
+     */
+    public interface ForegroundController {
 
+        public int getNotificationId();
+
+        public Notification createNotification();
+
+        public void onServiceStateChanged(ServiceState newState);
+
+        public void onServiceError(ErrorCode errorCode);
+    }
+
+    public static record ServiceState(int stateFlags, @Nullable LwtDevice currentDevice,
+                                      @Nullable CICOTicketFragment currentTicket) {
+
+        public static int FLAG_SESSION_ACTIVE = (1 << 0);
+        public static int FLAG_FOREGROUND_SERVICE_ACTIVE = (1 << 1);
+
+        public boolean hasFlag(int flags) {
+            return (stateFlags() & flags) == flags;
+        }
+    }
+
+    public static enum ErrorCode {
+        BLUETOOTH_TURNED_OFF
     }
 }

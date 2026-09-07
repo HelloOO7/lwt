@@ -23,13 +23,25 @@ import javax.xml.parsers.ParserConfigurationException;
 
 public class TextMarkupConverter {
 
+    public static final int TINT_MODE_INTRINSIC = 1;
+    public static final int TINT_MODE_FOLLOW_SYSTEM = 2;
+
     private static final String TAG = "TextMarkupConverter";
 
     private static final String ICON_FONT_FAMILY = "__ICONFONT";
     private final Typeface iconFont;
+    private int fallbackTintMode = TINT_MODE_INTRINSIC;
 
     public TextMarkupConverter(Typeface iconFont) {
         this.iconFont = iconFont;
+    }
+
+    public int getFallbackTintMode() {
+        return fallbackTintMode;
+    }
+
+    public void setFallbackTintMode(int fallbackTintMode) {
+        this.fallbackTintMode = fallbackTintMode;
     }
 
     public Spanned toSpannableString(String markup) {
@@ -159,10 +171,18 @@ public class TextMarkupConverter {
                 String charCode = PIDIconFont.getCharCodeForIcon(type);
                 if (!charCode.isEmpty()) {
                     Element font = document.createElement("font");
-                    font.setAttribute("face", ICON_FONT_FAMILY);
-                    if (!PIDIconFont.isIconTintable(type)) {
-                        // set color to white to prevent Android's setting of font colors
-                        font.setAttribute("color", "#ffffff");
+                    if (iconFont != null) {
+                        font.setAttribute("face", ICON_FONT_FAMILY);
+                        if (!PIDIconFont.isIconTintable(type)) {
+                            // set color to white to prevent Android's setting of font colors
+                            font.setAttribute("color", "#ffffff");
+                        }
+                    } else if (fallbackTintMode == TINT_MODE_INTRINSIC) {
+                        Integer tint = PIDIconFont.getImplicitTint(type);
+                        if (tint != null) {
+                            String hexColor = String.format("#%06X", (0xFFFFFF & tint));
+                            font.setAttribute("color", hexColor);
+                        }
                     }
                     font.setTextContent(" " + charCode + " ");
                     return font;

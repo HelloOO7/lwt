@@ -16,7 +16,7 @@ import cz.spojenka.lwdn.SocketWatchdog;
 public class LwtpSession {
 
     private final List<PendingRequest> pendingRequests = new ArrayList<>();
-    private Duration watchdogTimeout = null;
+    private Duration watchdogTimeout = Duration.ofSeconds(10);
     private final List<ExecutionObserver> observers = new ArrayList<>();
 
     public LwtpSession cloneAsEmpty() {
@@ -125,8 +125,8 @@ public class LwtpSession {
             try {
                 execute(socket, future);
                 future.complete(null);
-            } catch (Exception e) {
-                future.completeExceptionally(e);
+            } catch (Throwable e) {
+                finishRemainingWithException(e, future);
             }
         });
         return future;
@@ -147,7 +147,7 @@ public class LwtpSession {
                 } else {
                     pendingRequest.future.complete(response);
                 }
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 finishRemainingWithException(e, cancellationToken);
                 break;
             }
@@ -155,7 +155,7 @@ public class LwtpSession {
         pendingRequests.clear();
     }
 
-    protected void finishRemainingWithException(Exception ex, CompletableFuture<?> cancellationToken) {
+    protected void finishRemainingWithException(Throwable ex, CompletableFuture<?> cancellationToken) {
         for (PendingRequest pendingRequest : pendingRequests) {
             if (!pendingRequest.future.isDone()) {
                 if (cancellationToken != null && cancellationToken.isCancelled()) {
@@ -191,8 +191,8 @@ public class LwtpSession {
             try {
                 execute(socketFactory, future);
                 future.complete(null);
-            } catch (Exception e) { // catch exceptions outside of the main calls
-                future.completeExceptionally(e);
+            } catch (Throwable e) { // catch exceptions outside of the main calls
+                finishRemainingWithException(e, future);
             }
         }, executor != null ? executor : ForkJoinPool.commonPool());
         return future;

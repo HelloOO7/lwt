@@ -4,18 +4,20 @@
 #include <initializer_list>
 #include <vector>
 #include "vdv_SubscriberCIS.h"
-#include "vdv_SubscriberTVS.h"
 #include "flatbuffer_util.h"
 #include "lwt_AdvData.h"
 #include "CommonTypes.h"
 #include "PSRAMContainers.h"
+#include "lwt_TicketValidationService.h"
+#include "lwt_CicoService.h"
 #include <array>
 #include <functional>
 #include <mutex>
 
 namespace lwt {
 
-    class TripInfoAdvertiser : Observer<vdv301::SubscriberCIS::AllData>, Observer<vdv301::SubscriberTVS::CurrentTariffStop>
+    class TripInfoAdvertiser :
+        Observer<vdv301::SubscriberCIS::AllData>, Observer<TicketValidationState>, Observer<CicoState>
     {
     public:
         enum class ChannelType {
@@ -32,23 +34,26 @@ namespace lwt {
 
     private:
         vdv301::SubscriberCIS& m_CISSubscriber;
-        vdv301::SubscriberTVS& m_TVSSubscriber;
+        TicketValidationService& m_TicketValidationService;
+        CicoService& m_CicoService;
         std::vector<lwdn::Advertiser*> m_Advertisers;
 
         std::mutex m_DataMutex;
         AdvDataExtended m_Data;
-        bool m_IsTVSAvailable{ false };
-        bool m_CISCanUseTicketing{ false };
-        bool m_TVSCanUseTicketing{ false };
         std::array<uint8_t, AdvDataBasic::PACKED_SIZE> m_LegacyDataBuffer{};
         ByteVector m_ExtDataBuffer;
 
     public:
-        TripInfoAdvertiser(vdv301::SubscriberCIS& cisSubscriber, vdv301::SubscriberTVS& tvsSubscriber, std::initializer_list<lwdn::Advertiser*> advertisers);
+        TripInfoAdvertiser(
+            vdv301::SubscriberCIS& cisSubscriber,
+            TicketValidationService& ticketValidationService, CicoService& cicoService,
+            std::initializer_list<lwdn::Advertiser*> advertisers
+        );
         ~TripInfoAdvertiser();
 
         virtual void OnChanged(const vdv301::SubscriberCIS::AllData* result) override;
-        virtual void OnChanged(const vdv301::SubscriberTVS::CurrentTariffStop* result) override;
+        virtual void OnChanged(const TicketValidationState* result) override;
+        virtual void OnChanged(const CicoState* result) override;
 
         void EnumerateAdvertisingChannels(std::function<void(const ChannelInfo&)> callback);
 
@@ -61,9 +66,8 @@ namespace lwt {
         void UpdateLegacyData(const AdvDataBasic& result);
         void UpdateExtendedData(const AdvDataExtended& result);
         void UpdateDataBuffers();
+        void PublishToAdvertisers();
 
         static uint32_t FindCisNumberByRef(const std::string& ref, const vdv301::SubscriberCIS::AllData& result);
-
-        void UpdateTicketingAvailabilityFlag();
     };
 }

@@ -5,9 +5,20 @@ import android.os.IBinder;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import javax.net.ssl.SSLContext;
+
 import androidx.lifecycle.LiveData;
 
 public interface ICICOService extends IBinder {
+
+    /**
+     * Sets the SSL context for secure communication with the ticketing server.
+     * This can be left null to use cleartext communication. However, that is a major
+     * security flaw and the service will warn you about this.
+     *
+     * @param sslContext The SSL context to use
+     */
+    public void initSecureContext(SSLContext sslContext);
 
     /**
      * Prepares a CICO session by starting a device scan.
@@ -28,13 +39,31 @@ public interface ICICOService extends IBinder {
     public void cancelPrepareSession();
 
     /**
+     * Returns whether a CICO session is currently being prepared (device scan is running).
+     * This can be set to false either as a result of {@link #cancelPrepareSession()},
+     * or a failure.
+     *
+     * @return true/false
+     */
+    public boolean isPrepareSessionRunning();
+
+    /**
      * Requests a CICO session with the specified device. This will validate
      * that the user has a valid session start token and the account is eligible
      * for CICO (e.g. not blocked, sufficient funds etc.).
      *
      * @param device The device
+     * @param cicoToken Token obtained from ticketing server for CICO operations
+     * @return Future that will be completed when device communication is done. This future
+     * can not be canceled - for that, use {@link #cancelRequestSession()}.
      */
-    public CompletableFuture<?> requestSession(LwtDevice device);
+    public CompletableFuture<?> requestSession(LwtDevice device, byte[] cicoToken);
+
+    /**
+     * Cancel a pending session request (including disconnecting from client).
+     * If no session is pending, this has no effect.
+     */
+    public void cancelRequestSession();
 
     /**
      * Starts a CICO session with the previously requested device.
@@ -91,7 +120,9 @@ public interface ICICOService extends IBinder {
 
     /**
      * Get a LiveData that is continuously updated with the LWT device that has issued
-     * the most recent CICO ticket.
+     * the most recent CICO ticket. The LiveData will be automatically updated whenever
+     * a BLE advertisement is received from the currently connected device.
+     *
      * @return The LiveData
      */
     public LiveData<LwtDevice> getCurrentDeviceLiveData();

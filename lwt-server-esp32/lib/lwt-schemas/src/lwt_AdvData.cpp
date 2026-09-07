@@ -11,6 +11,16 @@ namespace lwt {
         line_license_number = (ch1 << 17) | (ch2 << 10) | (number & 0x3FF);
     }
 
+    bool AdvDataBasic::set_flag(uint8_t flag, bool value) {
+        auto old = flags;
+        if (value) {
+            flags |= flag;
+        } else {
+            flags &= ~flag;
+        }
+        return old != flags;
+    }
+
     void AdvDataBasic::pack(uint8_t* pDst) const {
         auto out = BitConverter<std::endian::big>::OutputStream(pDst);
         out.WriteUInt8((uint8_t)line_type);

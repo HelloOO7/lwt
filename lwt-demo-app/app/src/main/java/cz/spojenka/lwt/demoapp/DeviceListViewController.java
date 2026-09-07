@@ -1,5 +1,6 @@
 package cz.spojenka.lwt.demoapp;
 
+import android.animation.LayoutTransition;
 import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -19,6 +20,7 @@ import cz.spojenka.android.util.ViewUtils;
 import cz.spojenka.lwt.LwtDevice;
 import cz.spojenka.lwt.demoapp.databinding.DeviceListItemBinding;
 import cz.spojenka.lwt.demoapp.databinding.DeviceListLoadingBinding;
+import cz.spojenka.lwt.demoapp.databinding.DeviceListResizeableBinding;
 import cz.spojenka.lwt.util.TextMarkupConverter;
 
 public class DeviceListViewController {
@@ -30,7 +32,9 @@ public class DeviceListViewController {
     private final TextMarkupConverter markupConverter;
 
     private final BasicListAdapter<LwtDevice, TripAdvertisementViewHolder> itemAdapter;
+
     private final SingleViewAdapter loadingAdapter;
+    private View loadingView;
 
     private LoadingSpinnerDisplayRule loadingDisplayRule = LoadingSpinnerDisplayRule.ALWAYS;
     private boolean onClickEffectEnabled = true;
@@ -66,6 +70,11 @@ public class DeviceListViewController {
             v.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             return v;
         });
+    }
+
+    public DeviceListViewController(DeviceListResizeableBinding binding, DeviceListViewModel viewModel) {
+        this(binding.rvDeviceList, viewModel);
+        loadingView = binding.loadingPlaceholder.getRoot();
     }
 
     public TextMarkupConverter getMarkupConverter() {
@@ -107,7 +116,13 @@ public class DeviceListViewController {
             }
         }.attach(lifecycleOwner, viewModel.getDeviceResults());
 
-        recyclerView.setAdapter(new ConcatAdapter(itemAdapter, loadingAdapter));
+        if (loadingView == null) {
+            recyclerView.setAdapter(new ConcatAdapter(itemAdapter, loadingAdapter));
+        } else {
+            // this is a workaround for a crash caused by ConcatAdapter and LayoutTransition being used
+            // at the same time - we externalize it outside of the RecyclerView
+            recyclerView.setAdapter(itemAdapter);
+        }
         recyclerView.addItemDecoration(new VerticalSpaceItemDecoration(context.getResources().getDimensionPixelSize(R.dimen.device_list_item_spacing)));
         ViewUtils.setRecyclerViewChangeAnimationsEnabled(recyclerView, false);
 
@@ -117,20 +132,28 @@ public class DeviceListViewController {
         });
     }
 
+    private void setLoadingViewVisibility(int visibility) {
+        if (loadingView != null) {
+            loadingView.setVisibility(visibility);
+        } else {
+            loadingAdapter.setVisibility(visibility);
+        }
+    }
+
     private void updateLoadingSpinnerDisplay() {
         if (loadingDisplayRule == LoadingSpinnerDisplayRule.NEVER) {
-            loadingAdapter.setVisibility(View.GONE);
+            setLoadingViewVisibility(View.GONE);
             return;
         }
 
         if (viewModel.isLoading()) {
             if (loadingDisplayRule == LoadingSpinnerDisplayRule.ALWAYS || viewModel.getDeviceResults().isEmpty()) {
-                loadingAdapter.setVisibility(View.VISIBLE);
+                setLoadingViewVisibility(View.VISIBLE);
             } else {
-                loadingAdapter.setVisibility(View.GONE);
+                setLoadingViewVisibility(View.GONE);
             }
         } else {
-            loadingAdapter.setVisibility(View.GONE);
+            setLoadingViewVisibility(View.GONE);
         }
     }
 

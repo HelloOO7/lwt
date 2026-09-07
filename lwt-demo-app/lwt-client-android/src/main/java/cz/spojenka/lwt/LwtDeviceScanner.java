@@ -20,6 +20,7 @@ import cz.spojenka.lwdn.LwdnScanException;
 import cz.spojenka.lwdn.LwdnScanResult;
 import cz.spojenka.lwdn.LwdnScanner;
 import cz.spojenka.lwdn.LwdnServiceID;
+import cz.spojenka.lwdn.WifiAwareLwdnScanner;
 
 public class LwtDeviceScanner {
 
@@ -41,13 +42,17 @@ public class LwtDeviceScanner {
 
     public static HybridLwdnScanner createHybridScanner(Context context, LwtLinkSession session) {
         HybridLwdnScanner hybridScanner = new HybridLwdnScanner();
-        BluetoothLwdnScanner btScanner = createBluetoothScanner(context);
-        if (btScanner != null) {
-            hybridScanner.addBluetoothScanner(btScanner);
+        if (BluetoothLwdnScanner.isSupported(context)) {
+            BluetoothLwdnScanner btScanner = createBluetoothScanner(context);
+            if (btScanner != null) {
+                hybridScanner.addBluetoothScanner(btScanner);
+            }
         }
-        WifiAwareManager wam = context.getSystemService(WifiAwareManager.class);
-        if (wam != null) {
-            hybridScanner.addWifiAwareScanner(wam, session.getAwareSessionManager(wam), LwtServiceConstants.WIFI_API_PORT);
+        if (WifiAwareLwdnScanner.isSupported(context)) {
+            WifiAwareManager wam = context.getSystemService(WifiAwareManager.class);
+            if (wam != null) {
+                hybridScanner.addWifiAwareScanner(wam, session.getAwareSessionManager(wam), LwtServiceConstants.WIFI_API_PORT);
+            }
         }
         return hybridScanner;
     }
@@ -70,6 +75,8 @@ public class LwtDeviceScanner {
         if (deviceTypes == null || deviceTypes.isEmpty()) {
             deviceTypes = List.of(LwtDeviceType.values());
         }
+
+        serviceIDs.add(new LwdnServiceID.DeviceName(LwtServiceConstants.BLE_DEVICE_NAME));
 
         for (LwtDeviceType deviceType : deviceTypes) {
             serviceIDs.add(LwtServiceConstants.serviceNameForDeviceType(deviceType));

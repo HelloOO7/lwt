@@ -19,6 +19,7 @@ import androidx.annotation.ColorRes;
 import androidx.annotation.DrawableRes;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
+import androidx.core.content.res.ResourcesCompat;
 import androidx.core.widget.TextViewCompat;
 import cz.dpp.praguepublictransport.LitackaUtils;
 import cz.dpp.praguepublictransport.etd.LitackaETD;
@@ -49,17 +50,17 @@ public class TicketInspectionDetailActivity extends BaseActivity {
         clock = new TicketDisplayActivity.ClockView(binding.tvClock);
 
         String etdString = Objects.requireNonNull(getIntent().getStringExtra(EXTRA_ETD));
-        LitackaETD etd = LitackaETD.parse(etdString);
+        TicketETDParser etd = new TicketETDParser(etdString);
 
         List<String> inspectionZones = getIntent().getStringArrayListExtra(EXTRA_INSPECTION_ZONES);
         Instant inspectionTime = Instant.ofEpochMilli(getIntent().getLongExtra(EXTRA_INSPECTION_TIME, System.currentTimeMillis()));
         String inspectionTk = getIntent().getStringExtra(EXTRA_INSPECTION_TK);
 
-        OffsetDateTime validSince = OffsetDateTime.parse(etd.getProperty("VS"));
+        OffsetDateTime validSince = etd.getValidSince();
         addTimeInfoViews(R.string.ticket_display_valid_since, validSince, inspectionTime, false);
-        OffsetDateTime validUntil = OffsetDateTime.parse(etd.getProperty("VU"));
+        OffsetDateTime validUntil = etd.getValidUntil();
         addTimeInfoViews(R.string.ticket_display_valid_until, validUntil, inspectionTime, true);
-        List<String> zones = LitackaUtils.parseCommaSeparatedList(etd.getProperty("VZ"));
+        List<String> zones = etd.getValidZones();
         addInfoView(R.string.ticket_display_valid_zones, String.join(", ", zones));
         if (inspectionZones != null && !inspectionZones.isEmpty()) {
             List<String> checkZones = new ArrayList<>(zones);
@@ -90,7 +91,7 @@ public class TicketInspectionDetailActivity extends BaseActivity {
                 }
             }
         }
-        String lwtInfoString = etd.getProperty("X-LWT");
+        String lwtInfoString = etd.getLwtMetadata();
         if (lwtInfoString != null) {
             LwtTicketMetadata lwtMetadata = LwtTicketMetadata.parse(lwtInfoString);
             addInfoView(R.string.ticket_inspection_detail_linsp, lwtMetadata.getTripKey());
@@ -132,7 +133,7 @@ public class TicketInspectionDetailActivity extends BaseActivity {
         if (isShouldWarnTime(time, now, warnIfAfter)) {
             return R.color.delay_mid;
         } else {
-            return Resources.ID_NULL;
+            return ResourcesCompat.ID_NULL;
         }
     }
 
@@ -146,18 +147,18 @@ public class TicketInspectionDetailActivity extends BaseActivity {
     }
 
     private void addInfoView(@StringRes int titleRes, String text) {
-        addInfoView(titleRes, text, Resources.ID_NULL);
+        addInfoView(titleRes, text, ResourcesCompat.ID_NULL);
     }
 
     private void addInfoView(@StringRes int titleRes, String text, @DrawableRes int textIcon) {
-        addInfoView(titleRes, text, textIcon, Resources.ID_NULL);
+        addInfoView(titleRes, text, textIcon, ResourcesCompat.ID_NULL);
     }
 
     private TicketInfoLineRowBinding addInfoView(@StringRes int titleRes, String text, @DrawableRes int textIcon, @ColorRes int textColor) {
         TicketInfoLineRowBinding row = TicketInfoLineRowBinding.inflate(getLayoutInflater(), binding.llTicketInfoRows, false);
         updateInfoView(row, titleRes, text, textIcon, textColor);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        if (titleRes != Resources.ID_NULL) {
+        if (titleRes != ResourcesCompat.ID_NULL) {
             lp.topMargin = ViewUtils.dpToPx(this, 10);
         }
         binding.llTicketInfoRows.addView(row.getRoot(), lp);
@@ -165,7 +166,7 @@ public class TicketInspectionDetailActivity extends BaseActivity {
     }
 
     private void updateInfoView(TicketInfoLineRowBinding row, @StringRes int titleRes, String text, @DrawableRes int textIcon, @ColorRes int textColor) {
-        if (titleRes != Resources.ID_NULL) {
+        if (titleRes != ResourcesCompat.ID_NULL) {
             row.tvLabel.setText(titleRes);
             row.tvLabel.setVisibility(View.VISIBLE);
         } else {

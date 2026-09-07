@@ -1,6 +1,7 @@
 package cz.spojenka.lwdn;
 
 import android.bluetooth.BluetoothDevice;
+import android.net.MacAddress;
 import android.os.Parcel;
 
 import java.util.Objects;
@@ -21,16 +22,7 @@ public final class BluetoothLwdnAddress implements LwdnAddress {
     @NonNull
     @Override
     public byte[] getRawLinkAddress() {
-        return addressToBytes(device.getAddress());
-    }
-
-    private byte[] addressToBytes(String address) {
-        String[] parts = address.split(":");
-        byte[] bytes = new byte[parts.length];
-        for (int i = 0; i < parts.length; i++) {
-            bytes[i] = (byte) Integer.parseInt(parts[i], 16);
-        }
-        return bytes;
+        return MacAddress.fromString(device.getAddress()).toByteArray();
     }
 
     public BluetoothDevice getDevice() {

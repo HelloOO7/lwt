@@ -11,10 +11,18 @@
 #include <condition_variable>
 #include "lwdn_generated.h"
 #include "cico_generated.h"
+#include "esp_event.h"
 
 namespace lwt {
 
-    class CicoService {
+    struct CicoState {
+        bool IsReady{ false };
+    };
+
+    class CicoService :
+        Observer<TicketValidationState>,
+        public Observable<CicoState>
+    {
     private:
         struct ParsedRefreshToken {
             int64_t IssuedAt;
@@ -46,6 +54,12 @@ namespace lwt {
         std::string m_LastSeedTripKey;
         ByteVector m_SeedDerivationSecret;
 
+        std::mutex m_StateMutex;
+        bool m_CicoTimeReady{ false };
+        bool m_CicoDataReady{ false };
+
+        esp_event_handler_instance_t m_TimeSyncEventInstance{ nullptr };
+
     public:
         CicoService(
             const TicketValidationConfig& config,
@@ -58,8 +72,16 @@ namespace lwt {
 
         void Register(ServiceRegistry& registry);
 
+        virtual void OnChanged(const TicketValidationState* result) override;
+
+        void ObserveServiceState(Observer<CicoState>& observer);
+        void RemoveObserver(Observer<CicoState>& observer);
+
     private:
         bool IsCicoReady();
+        bool IsCicoReadyNoLock();
+        void OnTimeSyncDone();
+        void PublishServiceState();
 
         ByteVector CreateConfirmationToken(const MOSCheckInResponse& checkIn);
         bool VerifyConfirmationToken(const ByteSpan& token);

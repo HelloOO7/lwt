@@ -9,6 +9,7 @@ import cz.spojenka.lwdn.AbstractScan;
 import cz.spojenka.lwdn.LwdnScan;
 import cz.spojenka.lwdn.LwdnScanException;
 import cz.spojenka.lwdn.LwdnScanResult;
+import cz.spojenka.lwdn.LwdnServiceID;
 
 public class LwtScan extends AbstractScan<LwtDevice, LwdnScanException, LwtScan> {
 
@@ -105,11 +106,17 @@ public class LwtScan extends AbstractScan<LwtDevice, LwdnScanException, LwtScan>
     }
 
     private byte[] getVehicleResultData(LwdnScanResult result) {
-        byte[] data = result.serviceData().get(LwtServiceConstants.serviceNameForDeviceType(LwtDeviceType.VEHICLE));
-        if (data == null) {
-            data = result.serviceData().get(LwtServiceConstants.serviceExtendedUUIDForDeviceType(LwtDeviceType.VEHICLE));
+        for (LwdnServiceID sid : new LwdnServiceID[] {
+                LwtServiceConstants.serviceNameForDeviceType(LwtDeviceType.VEHICLE),
+                LwtServiceConstants.serviceExtendedUUIDForDeviceType(LwtDeviceType.VEHICLE),
+                LwtServiceConstants.serviceUUIDForDeviceType(LwtDeviceType.VEHICLE)
+        }) {
+            byte[] data = result.serviceData().get(sid);
+            if (data != null) {
+                return data;
+            }
         }
-        return data;
+        return null;
     }
 
     @Override

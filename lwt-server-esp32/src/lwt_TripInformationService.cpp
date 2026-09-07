@@ -145,8 +145,7 @@ namespace lwt {
 
         m_MainFBB.Clear();
         if (!result) {
-            m_HasData = false;
-            Observable<TripStateInfo>::InvalidateObservers();
+            OnReceivedNoData();
             return;
         }
 
@@ -154,8 +153,7 @@ namespace lwt {
         auto curStop = vdv301::SubscriberCIS::GetCurrentStopFromAllData(*result);
 
         if (!tripInfo || !curStop) {
-            m_HasData = false;
-            Observable<TripStateInfo>::InvalidateObservers();
+            OnReceivedNoData();
             return;
         }
 
@@ -164,6 +162,13 @@ namespace lwt {
 
         Observable<TripRouteInfo>::NotifyObservers(GetTripRouteInfo());
         Observable<TripStateInfo>::NotifyObservers(GetTripStateInfo());
+    }
+
+    void TripInformationService::OnReceivedNoData()
+    {
+        m_HasData = false;
+        Observable<TripStateInfo>::InvalidateObservers();
+        Observable<TripRouteInfo>::InvalidateObservers();
     }
 
     void TripInformationService::ObserveTripStateInfo(Observer<TripStateInfo>& observer)

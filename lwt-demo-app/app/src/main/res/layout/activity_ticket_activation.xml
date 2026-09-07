@@ -64,7 +64,8 @@
                 android:orientation="vertical"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:clipChildren="false">
+                android:clipChildren="false"
+                android:animateLayoutChanges="true">
 
                 <LinearLayout
                     android:id="@+id/llZoneChoiceType"
@@ -93,39 +94,15 @@
 
                 </LinearLayout>
 
-                <FrameLayout
+                <include
                     android:id="@+id/tripChoiceSubscreens"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:clipChildren="false"
-                    android:clipToPadding="false"
-                    app:paddingWindowInsets="horizontal">
-
-                    <androidx.recyclerview.widget.RecyclerView
-                        android:id="@+id/rvDeviceList"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:clipToPadding="false"
-                        android:paddingHorizontal="@dimen/activity_horizontal_margin"
-                        android:visibility="visible"
-                        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-                        tools:itemCount="3"
-                        tools:listitem="@layout/device_list_item" />
-
-                    <include
-                        android:id="@+id/selectedDeviceView"
-                        layout="@layout/device_list_item"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginHorizontal="@dimen/activity_horizontal_margin"
-                        android:visibility="gone" />
-
-                </FrameLayout>
+                    layout="@layout/inline_device_picker" />
 
                 <androidx.cardview.widget.CardView
                     android:id="@+id/cvActivationStopCard"
                     android:layout_width="match_parent"
-                    android:layout_height="50dp"
+                    android:minHeight="50dp"
+                    android:layout_height="wrap_content"
                     android:layout_marginHorizontal="@dimen/activity_horizontal_margin"
                     android:layout_marginTop="@dimen/item_margin_normal"
                     app:marginWindowInsets="horizontal">

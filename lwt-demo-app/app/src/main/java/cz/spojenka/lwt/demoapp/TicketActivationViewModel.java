@@ -28,6 +28,7 @@ import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.Transformations;
 import cz.dpp.praguepublictransport.LitackaUtils;
 import cz.spojenka.android.system.TickNotifier;
+import cz.spojenka.android.system.livedata.LiveErrorSignal;
 import cz.spojenka.android.system.livedata.LiveList;
 import cz.spojenka.android.util.AsyncUtils;
 import cz.spojenka.android.util.LiveDataUtils;
@@ -80,7 +81,7 @@ public class TicketActivationViewModel extends AndroidViewModel {
     private MutableLiveData<TokenWithExpiration<PreauthorizationTokenResult>> devicePreauthToken = new MutableLiveData<>();
     private MutableLiveData<Long> preauthExpirationSecondsLeft = new MutableLiveData<>(null);
 
-    private MutableLiveData<Throwable> autoDownloadException = new MutableLiveData<>();
+    private LiveErrorSignal autoDownloadException = new LiveErrorSignal();
 
     private List<String> prepaidZones = List.of();
     private List<String> lastChosenZones = List.of();
@@ -102,7 +103,7 @@ public class TicketActivationViewModel extends AndroidViewModel {
     private List<String> activationStopTicketZones = List.of();
 
     private CompletableFuture<?> currentActivationCall;
-    private MutableLiveData<Throwable> activationError = new MutableLiveData<>();
+    private LiveErrorSignal activationError = new LiveErrorSignal();
     private MutableLiveData<TicketData> activationResult = new MutableLiveData<>();
     private MutableLiveData<Boolean> isActivationInProgress = new MutableLiveData<>(false);
 
@@ -157,10 +158,10 @@ public class TicketActivationViewModel extends AndroidViewModel {
     }
 
     public void discardAutoActivationDeviceFull() {
-        clearAutoActivationDevice(true);
+        clearAutoActivationDevice(true, true);
     }
 
-    private void clearAutoActivationDevice(boolean full) {
+    private void clearAutoActivationDevice(boolean full, boolean setLiveData) {
         currentDeviceDataRequests.forEach(r -> r.cancel(true));
         currentDeviceDataRequests = List.of();
 
@@ -172,8 +173,10 @@ public class TicketActivationViewModel extends AndroidViewModel {
         canNotUseTicketWithDevice = false;
         activationStopTicketZones = List.of();
 
-        selectedAutoActivationDevice.setValue(null);
-        autoDownloadException.setValue(null);
+        if (setLiveData) {
+            selectedAutoActivationDevice.setValue(null);
+        }
+        autoDownloadException.ack();
         deviceValidationInfo.setValue(null);
         deviceRouteInfo.setValue(null);
         rawServerAuthenticationResult.setValue(null);
@@ -214,7 +217,7 @@ public class TicketActivationViewModel extends AndroidViewModel {
     }
 
     public void selectAutoActivationDevice(LwtDevice device) {
-        clearAutoActivationDevice(false);
+        clearAutoActivationDevice(false, false);
         if (device == null) {
             return;
         }
@@ -494,18 +497,7 @@ public class TicketActivationViewModel extends AndroidViewModel {
     }
 
     private <T> CompletableFuture<T> enqueueDataDownloadRequest(LwtSession session, LwtCall<T> call, MutableLiveData<T> resultsLiveData) {
-        return call.enqueue(session).whenCompleteAsync((result, throwable) -> {
-            if (AsyncUtils.unwrapCompletionException(throwable) instanceof CancellationException) {
-                // something upstream was cancelled
-                return;
-            }
-            if (throwable == null) {
-                resultsLiveData.setValue(result);
-            } else {
-                Log.e(TAG, "Failed to download data from device", throwable);
-                autoDownloadException.setValue(throwable);
-            }
-        }, getApplication().getMainExecutor());
+        return autoDownloadException.catchError(call.enqueue(session), resultsLiveData::setValue, getApplication().getMainExecutor());
     }
 
     public LiveData<Boolean> getDeviceDataIsLoading() {
@@ -967,28 +959,18 @@ public class TicketActivationViewModel extends AndroidViewModel {
                         .build()
         ).executeAsync(lwtRequestThread);
         currentActivationCall = resultFuture;
-        resultFuture.whenCompleteAsync((result, throwable) -> {
-            currentActivationCall = null;
-            if (throwable != null) {
-                Log.e(TAG, "Failed to activate ticket via LWT", throwable);
-                activationError.setValue(throwable);
-            } else {
-                try {
-                    TicketData activatedTicket = new TicketData(ticket);
-                    activatedTicket.setActivatedAt(LwtTime.convertOffsetDateTime(result.activatedAtTime()));
-                    activatedTicket.setValidSince(LwtTime.convertOffsetDateTime(result.validSinceTime()));
-                    activatedTicket.setValidUntil(LwtTime.convertOffsetDateTime(result.validUntilTime()));
-                    activatedTicket.setEtd(ByteBufferUtils.toByteArray(result.signedEtdAsByteBuffer()));
-                    activatedTicket.setTotpSeed(ByteBufferUtils.toByteArray(result.totpSeedAsByteBuffer()));
-                    activatedTicket.setChosenZones(info.zones());
-                    activationResult.setValue(activatedTicket);
-                } catch (Exception ex) {
-                    Log.e(TAG, "Failed to process activated ticket data", ex);
-                    activationError.setValue(ex);
-                }
-            }
+        activationError.catchError(resultFuture, result -> {
+            TicketData activatedTicket = new TicketData(ticket);
+            activatedTicket.setActivatedAt(LwtTime.convertOffsetDateTime(result.activatedAtTime()));
+            activatedTicket.setValidSince(LwtTime.convertOffsetDateTime(result.validSinceTime()));
+            activatedTicket.setValidUntil(LwtTime.convertOffsetDateTime(result.validUntilTime()));
+            activatedTicket.setEtd(ByteBufferUtils.toByteArray(result.signedEtdAsByteBuffer()));
+            activatedTicket.setTotpSeed(ByteBufferUtils.toByteArray(result.totpSeedAsByteBuffer()));
+            activatedTicket.setChosenZones(info.zones());
+            activationResult.setValue(activatedTicket);
+        }, getApplication().getMainExecutor()).whenComplete((ticketActivationResponse, throwable) -> {
             isActivationInProgress.setValue(false);
-        }, getApplication().getMainExecutor());
+        });
     }
 
     public LiveData<Boolean> getIsActivationInProgress() {
@@ -1003,12 +985,8 @@ public class TicketActivationViewModel extends AndroidViewModel {
         return activationResult.getValue() != null;
     }
 
-    public LiveData<Throwable> getActivationError() {
+    public LiveErrorSignal getActivationError() {
         return activationError;
-    }
-
-    public void ackActivationError() {
-        activationError.setValue(null);
     }
 
     public static record ZoneChoice(boolean isManual, List<String> zones) {
@@ -1022,7 +1000,8 @@ public class TicketActivationViewModel extends AndroidViewModel {
         }
     }
 
-    public static record ActivationInfo(LocalDateTime time, boolean isCurrentStop, List<String> zones, byte[] preauthorizationToken) {
+    public static record ActivationInfo(LocalDateTime time, boolean isCurrentStop,
+                                        List<String> zones, byte[] preauthorizationToken) {
 
     }
 }

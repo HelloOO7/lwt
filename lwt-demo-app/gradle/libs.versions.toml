@@ -9,7 +9,9 @@ appcompat = "1.8.0"
 material = "1.14.0"
 flatbuffers = "25.2.10"
 okhttp = "5.5.0"
+restrictionbypass = "2.2"
 retrofit = "3.0.0"
+slidetoact = "0.11.0"
 tlsChannel = "1.0.0"
 swipeRefreshLayout = "1.2.0"
 flexboxLayout = "3.0.0"
@@ -29,8 +31,10 @@ appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "a
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 flatbuffers-java = { group = "com.google.flatbuffers", name = "flatbuffers-java", version.ref = "flatbuffers" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+restrictionbypass = { module = "com.github.ChickenHook:RestrictionBypass", version.ref = "restrictionbypass" }
 retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
 retrofit-converter-jackson = { module = "com.squareup.retrofit2:converter-jackson", version.ref = "retrofit" }
+slidetoact = { module = "com.ncorti:slidetoact", version.ref = "slidetoact" }
 tlsChannel = { group = "com.github.marianobarrios", name = "tls-channel", version.ref = "tlsChannel" }
 swipeRefreshLayout = { group = "androidx.swiperefreshlayout", name = "swiperefreshlayout", version.ref = "swipeRefreshLayout" }
 flexboxLayout = { group = "com.google.android.flexbox", name = "flexbox", version.ref = "flexboxLayout" }

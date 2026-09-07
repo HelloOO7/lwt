@@ -22,6 +22,15 @@ public class PIDIconFont {
             "c_RequestStop", "c_Train", "c_SBahn"
     );
 
+    private static final Map<String, Integer> IMPLICIT_TINTS = Map.of(
+            "c_Air", 0xFF9BCBEA,
+            "c_Ferry", 0xFF004243,
+            "c_UndergroundA", 0xFF00A562,
+            "c_UndergroundB", 0xFFF8B322,
+            "c_UndergroundC", 0xFFCF003D,
+            "c_UndergroundD", 0xFF008CBE
+    );
+
     private static final Map<String, String> ICON_MAP = new HashMap<>();
 
     static {
@@ -36,5 +45,9 @@ public class PIDIconFont {
 
     public static boolean isIconTintable(String iconId) {
         return TINTABLE_ICONS.contains(iconId);
+    }
+
+    public static Integer getImplicitTint(String iconId) {
+        return IMPLICIT_TINTS.get(iconId);
     }
 }

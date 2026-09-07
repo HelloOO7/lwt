@@ -1,6 +1,70 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:animateLayoutChanges="true"
+    android:clipChildren="false">
+
+    <TextView
+        android:id="@+id/tvHeaderText"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_margin="@dimen/check_in_huge_margin"
+        android:layout_marginTop="@dimen/activity_vertical_margin"
+        android:text="@string/check_in_header"
+        android:textAlignment="center"
+        android:textSize="@dimen/text_title_l"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:marginWindowInsets="top|horizontal" />
+
+    <TextView
+        android:id="@+id/tvCheckInInstructions"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="@dimen/activity_horizontal_margin"
+        android:layout_marginTop="@dimen/section_margin_large"
+        android:text="@string/check_in_instructions"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tvHeaderText"
+        app:marginWindowInsets="horizontal" />
+
+    <FrameLayout
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:paddingVertical="@dimen/section_margin_large"
+        app:layout_constraintBottom_toTopOf="@id/confirmCheckin"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvCheckInInstructions"
+        android:clipToPadding="false"
+        android:clipChildren="false">
+
+        <!-- wrap so that we can use match_parent which forces the inline device picker
+         to be a scrollable recyclerview -->
+
+        <include
+            android:id="@+id/tripChoiceSubscreens"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            layout="@layout/inline_device_picker" />
+    </FrameLayout>
+
+    <com.ncorti.slidetoact.SlideToActView
+        android:id="@+id/confirmCheckin"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_margin="@dimen/check_in_huge_margin"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintWidth_min="wrap"
+        app:marginWindowInsets="horizontal|bottom"
+        app:text="@string/check_in_confirm"
+        app:text_appearance="@style/TextAppearance.LWTDemo.SlideToAct" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

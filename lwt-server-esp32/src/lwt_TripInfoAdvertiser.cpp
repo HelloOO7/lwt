@@ -16,21 +16,28 @@ namespace lwt {
     using namespace vdv301;
     using namespace IBIS_IP_CustomerInformationService_V2_3CZ1_0;
 
-    TripInfoAdvertiser::TripInfoAdvertiser(SubscriberCIS& cisSubscriber, SubscriberTVS& tvsSubscriber, std::initializer_list<lwdn::Advertiser*> advertisers) :
+    TripInfoAdvertiser::TripInfoAdvertiser(
+        SubscriberCIS& cisSubscriber,
+        TicketValidationService& ticketValidationService, CicoService& cicoService,
+        std::initializer_list<lwdn::Advertiser*> advertisers
+    ) :
         m_CISSubscriber{ cisSubscriber },
-        m_TVSSubscriber{ tvsSubscriber },
+        m_TicketValidationService{ ticketValidationService },
+        m_CicoService{ cicoService },
         m_Advertisers{ advertisers },
         m_Data{ {} }
     {
         memset(static_cast<AdvDataBasic*>(&m_Data), 0, sizeof(AdvDataBasic));
         ESP_LOGI("TripInfoAdvertiser", "Created TripInfoAdvertiser with %zu advertisers", m_Advertisers.size());
         m_CISSubscriber.ObserveAllData(*this);
-        m_TVSSubscriber.ObserveCurrentTariffStop(*this);
+        m_TicketValidationService.ObserveServiceState(*this);
+        m_CicoService.ObserveServiceState(*this);
     }
 
     TripInfoAdvertiser::~TripInfoAdvertiser() {
         m_CISSubscriber.RemoveObserver(*this);
-        m_TVSSubscriber.RemoveObserver(*this);
+        m_TicketValidationService.RemoveObserver(*this);
+        m_CicoService.RemoveObserver(*this);
     }
 
     void TripInfoAdvertiser::OnChanged(const SubscriberCIS::AllData* result)
@@ -43,9 +50,9 @@ namespace lwt {
             }
         }
         else {
+            auto oldExternalFlags = m_Data.flags & (AdvDataBasic::FLAG_CAN_USE_TICKETING | AdvDataBasic::FLAG_CAN_USE_CICO);
             m_Data = CreateExtendedAdvData(CreateBasicAdvData(*result), *result);
-            m_CISCanUseTicketing = !result->TripInformation.empty() && result->CurrentStopIndex.Value != result->TripInformation.back().StopSequence.StopPoint.back().StopIndex.Value;
-            UpdateTicketingAvailabilityFlag();
+            m_Data.flags |= oldExternalFlags;
             UpdateDataBuffers();
 
             // dump hex of extended data
@@ -59,44 +66,31 @@ namespace lwt {
 
             ESP_LOGI("TripInfoAdvertiser", "Updated advertisement data; legacy size=%zu, extended size=%zu", m_LegacyDataBuffer.size(), m_ExtDataBuffer.size());
 
-            for (auto* advertiser : m_Advertisers) {
-                ESP_LOGI("TripInfoAdvertiser", "Advertiser %p max size=%zu", advertiser, advertiser->GetMaxAdvDataSize());
-                if (IsUseExtendedDataForAdvertiser(advertiser)) {
-                    advertiser->SetLwdnAdvData(m_ExtDataBuffer);
-                }
-                else {
-                    advertiser->SetLwdnAdvData(m_LegacyDataBuffer);
-                }
-                advertiser->Start();
-            }
+            PublishToAdvertisers();
         }
     }
 
-    void TripInfoAdvertiser::OnChanged(const SubscriberTVS::CurrentTariffStop* result)
+    void TripInfoAdvertiser::OnChanged(const TicketValidationState* result)
     {
         std::lock_guard lock(m_DataMutex);
 
-        if (result) {
-            m_IsTVSAvailable = true;
-            m_TVSCanUseTicketing = result->CurrentTariffStop.DepartureScheduled && !result->CurrentTariffStop.FareZone.empty();
-            UpdateTicketingAvailabilityFlag();
+        bool flag = result ? (result->IsAvailable && !result->IsOutsideOfTariff && !result->IsInLastStop) : false;
+
+        if (m_Data.set_flag(AdvDataBasic::FLAG_CAN_USE_TICKETING, flag)) {
             UpdateDataBuffers();
-        }
-        else {
-            m_IsTVSAvailable = false;
-            m_TVSCanUseTicketing = false;
+            PublishToAdvertisers();
         }
     }
 
-    void TripInfoAdvertiser::UpdateTicketingAvailabilityFlag()
+    void TripInfoAdvertiser::OnChanged(const CicoState* result)
     {
-        bool canUse = m_IsTVSAvailable ? m_TVSCanUseTicketing : m_CISCanUseTicketing;
+        std::lock_guard lock(m_DataMutex);
 
-        if (canUse) {
-            m_Data.flags |= AdvDataBasic::FLAG_CAN_USE_TICKETING;
-        }
-        else {
-            m_Data.flags &= ~AdvDataBasic::FLAG_CAN_USE_TICKETING;
+        bool flag = result ? result->IsReady : false;
+
+        if (m_Data.set_flag(AdvDataBasic::FLAG_CAN_USE_CICO, flag)) {
+            UpdateDataBuffers();
+            PublishToAdvertisers();
         }
     }
 
@@ -137,7 +131,7 @@ namespace lwt {
 
                 if (tripInfo->LocationState) {
                     if (*tripInfo->LocationState == LocationStateEnumeration::AtStop) {
-                        legacyData.flags |= AdvDataBasic::FLAG_IS_AT_STOP;
+                        legacyData.set_flag(AdvDataBasic::FLAG_IS_AT_STOP, true);
                     }
                 }
 
@@ -202,6 +196,20 @@ namespace lwt {
     {
         UpdateLegacyData(m_Data);
         UpdateExtendedData(m_Data);
+    }
+
+    void TripInfoAdvertiser::PublishToAdvertisers()
+    {
+        for (auto* advertiser : m_Advertisers) {
+            ESP_LOGI("TripInfoAdvertiser", "Advertiser %p max size=%zu", advertiser, advertiser->GetMaxAdvDataSize());
+            if (IsUseExtendedDataForAdvertiser(advertiser)) {
+                advertiser->SetLwdnAdvData(m_ExtDataBuffer);
+            }
+            else {
+                advertiser->SetLwdnAdvData(m_LegacyDataBuffer);
+            }
+            advertiser->Start();
+        }
     }
 
     uint32_t TripInfoAdvertiser::FindCisNumberByRef(const std::string& ref, const SubscriberCIS::AllData& result)

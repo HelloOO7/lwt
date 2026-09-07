@@ -11,6 +11,7 @@
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" tools:ignore="BackgroundLocationPolicy" android:maxSdkVersion="33" />
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
@@ -29,7 +30,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:localeConfig="@xml/locale_config"
         android:supportsRtl="true"
-        android:theme="@style/Theme.LWTDemo"
+        android:theme="@style/Theme.LWTDemo.EdgeToEdge"
         tools:targetApi="33">
 
         <activity
@@ -41,16 +42,20 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".DeviceListActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
-        <activity android:name=".DevicePickerActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
-        <activity android:name=".LitackaZonePickerActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
-        <activity android:name=".TripStopPickerActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
-        <activity android:name=".TicketActivationActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
+        <activity android:name=".DeviceListActivity" android:exported="false" />
+        <activity android:name=".DevicePickerActivity" android:exported="false" />
+        <activity android:name=".LitackaZonePickerActivity" android:exported="false" />
+        <activity android:name=".TripStopPickerActivity" android:exported="false" />
+        <activity android:name=".TicketActivationActivity" android:exported="false" />
         <activity android:name=".TicketDisplayActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge.QRContrast" />
-        <activity android:name=".ClientCertImportActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
-        <activity android:name=".ZxingScanActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
-        <activity android:name=".TicketInspectionHomeActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
-        <activity android:name=".TicketInspectionDetailActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge" />
+        <activity android:name=".ClientCertImportActivity" android:exported="false" />
+        <activity android:name=".ZxingScanActivity" android:exported="false" />
+        <activity android:name=".TicketInspectionHomeActivity" android:exported="false" />
+        <activity android:name=".TicketInspectionDetailActivity" android:exported="false" />
+        <activity android:name=".CICOPrerequisitesActivity" android:exported="false" />
+        <activity android:name=".CheckInActivity" android:exported="false" />
+        <activity android:name=".CheckOutActivity" android:exported="false" />
+        <activity android:name=".CICOTicketDisplayActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge.QRContrast" />
 
         <service
             android:name=".BleScanService"
@@ -63,6 +68,12 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
+
+        <receiver android:name=".LocaleChangedReceiver" android:exported="true" android:enabled="true">
+            <intent-filter>
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
