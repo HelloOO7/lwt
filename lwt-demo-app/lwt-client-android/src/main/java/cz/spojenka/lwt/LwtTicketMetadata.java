@@ -16,6 +16,9 @@ public class LwtTicketMetadata {
     }
 
     public static LwtTicketMetadata parse(String metadata) {
+        if (metadata.isEmpty()) {
+            return new LwtTicketMetadata(Map.of());
+        }
         String[] kvPairs = metadata.split("\\|");
         Map<String, String> res = new HashMap<>();
         for (String kv : kvPairs) {

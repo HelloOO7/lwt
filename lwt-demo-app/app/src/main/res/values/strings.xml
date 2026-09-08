@@ -171,9 +171,13 @@
     <string name="check_in_error_title">Check-in failed</string>
     <string name="check_in_service_connecting">Connecting to CI/CO service</string>
     <string name="check_out_confirm">Check out</string>
-
-
     <string name="cico_prerequisites_bg_location_desc_granted">Background location access is enabled.</string>
     <string name="cico_prerequisites_bg_location_title">Background location</string>
     <string name="cico_prerequisites_bg_location_desc_none">In order to be able to scan for vehicles with the screen off, the app needs permission to access your location in the background. Your precise location will not be used.</string>
+    <string name="cico_ticket_offline_text">You\'ve checked out of the network. See you next time!</string>
+    <string name="ticket_inspection_action_required_title">Action is required</string>
+    <string name="ticket_inspection_cico_not_connected">The presented ticket uses the CI/CO system. To verify it, the inspection app needs to be connected to a vehicle.</string>
+    <string name="ticket_inspection_cico_wrong_device">Instruct the passenger to validate the ticket on the correct vehicle, then scan it again.</string>
+    <string name="ticket_display_valid_zones_cico">all</string>
+    <string name="ticket_inspection_detail_valid_zones_cico">CI/CO ticket</string>
 </resources>

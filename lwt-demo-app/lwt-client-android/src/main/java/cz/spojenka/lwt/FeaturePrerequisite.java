@@ -175,16 +175,11 @@ public interface FeaturePrerequisite {
 
     public static final FeaturePrerequisite LOCATION_FOR_AWARE_SCAN = new AbstractPermissionPrerequisite(Manifest.permission.ACCESS_FINE_LOCATION);
 
-    // permissions needed for BLE scan in LOW_POWER mode
-    public static final FeaturePrerequisite BACKGROUND_LOCATION_FOR_LE_SCAN_LP = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ?
+    public static final FeaturePrerequisite BACKGROUND_LOCATION_FOR_LE_SCAN = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ?
             new AbstractPermissionPrerequisite(Manifest.permission.ACCESS_BACKGROUND_LOCATION) {
 
                 @Override
                 public boolean isApplicable(Context context) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                        // on Android 14 and up, scans are downgraded to low power mode, which is fine by us
-                        return false;
-                    }
                     return BluetoothLwdnScanner.isBackgroundLocationPermissionNeeded(context);
                 }
 
@@ -254,7 +249,7 @@ public interface FeaturePrerequisite {
             CICO_HARDWARE,
             BLUETOOTH_ON,
             LOCATION_FOR_LE_SCAN,
-            BACKGROUND_LOCATION_FOR_LE_SCAN_LP,
+            BACKGROUND_LOCATION_FOR_LE_SCAN,
             NOTIFICATION_PERMISSION,
             BATTERY_EXEMPTION
     };

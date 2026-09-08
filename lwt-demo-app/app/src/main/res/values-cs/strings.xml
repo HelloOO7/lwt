@@ -173,4 +173,10 @@
     <string name="cico_prerequisites_bg_location_desc_granted">Přístup k poloze na pozadí je povolen.</string>
     <string name="cico_prerequisites_bg_location_title">Poloha na pozadí</string>
     <string name="cico_prerequisites_bg_location_desc_none">Aby mohla aplikace vyhledávat vozidla se zhasnutou obrazovkou, je třeba povolit přístup k poloze na pozadí. Vaše skutečná poloha nikdy nebude odesílána.</string>
+    <string name="cico_ticket_offline_text">Jízda byla ukončena. Na shledanou příště!</string>
+    <string name="ticket_inspection_action_required_title">Je vyžadována akce</string>
+    <string name="ticket_inspection_cico_not_connected">Předložený doklad byl vydán systémem CI/CO. Aby jej bylo možné zkontrolovat, je potřeba propojit revizorskou aplikaci s vozidlem.</string>
+    <string name="ticket_inspection_cico_wrong_device">Požádejte cestujícího, aby jízdenku propojil se správným vozidlem, a zkuste to znovu.</string>
+    <string name="ticket_display_valid_zones_cico">vše</string>
+    <string name="ticket_inspection_detail_valid_zones_cico">Flexibilní jízdenka (CI/CO)</string>
 </resources>

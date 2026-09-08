@@ -10,6 +10,7 @@ import android.view.View;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.zxing.BarcodeFormat;
 
+import java.security.PublicKey;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -34,9 +35,11 @@ import cz.spojenka.android.ui.dialog.ProgressDialog;
 import cz.spojenka.android.ui.resources.ListFormat;
 import cz.spojenka.android.util.AsyncUtils;
 import cz.spojenka.lwdn.LwdnAddress;
+import cz.spojenka.lwt.LocalCICOInspectionData;
 import cz.spojenka.lwt.LwtAPIClient;
 import cz.spojenka.lwt.LwtDevice;
 import cz.spojenka.lwt.LwtDeviceType;
+import cz.spojenka.lwt.LwtSession;
 import cz.spojenka.lwt.TicketValidationInfo;
 import cz.spojenka.lwt.demoapp.databinding.ActivityTicketInspectionHomeBinding;
 import cz.spojenka.lwt.util.LwtTariffZones;
@@ -53,6 +56,7 @@ public class TicketInspectionHomeActivity extends BaseActivity {
     private static final String STATE_CURRENT_VALIDATION_ZONES = "current_validation_zones";
     private static final String STATE_CURRENT_LINE_NAME = "current_line_name";
     private static final String STATE_CURRENT_TRIP_KEY = "current_trip_key";
+    private static final String STATE_VEHICLE_CICO_DATA = "vehicle_cico_data";
 
     private ActivityTicketInspectionHomeBinding binding;
 
@@ -65,6 +69,7 @@ public class TicketInspectionHomeActivity extends BaseActivity {
     private ArrayList<String> currentValidationZones;
     private String currentTripKey;
     private String currentLineName;
+    private LocalCICOInspectionData currentCicoData;
 
     private ViewModel viewModel;
 
@@ -84,6 +89,7 @@ public class TicketInspectionHomeActivity extends BaseActivity {
             currentValidationZones = savedInstanceState.getStringArrayList(STATE_CURRENT_VALIDATION_ZONES);
             currentLineName = savedInstanceState.getString(STATE_CURRENT_LINE_NAME);
             currentTripKey = savedInstanceState.getString(STATE_CURRENT_TRIP_KEY);
+            currentCicoData = BundleCompat.getParcelable(savedInstanceState, STATE_VEHICLE_CICO_DATA, LocalCICOInspectionData.class);
 
             if (linkedVehicle != null) {
                 viewModel.onVehicleConnected(linkedVehicle);
@@ -95,13 +101,30 @@ public class TicketInspectionHomeActivity extends BaseActivity {
                 try {
                     Instant time = Instant.now();
                     LitackaETD etd = LitackaETD.parse(result);
-                    if (!repository.verifyTicketAuthenticity(etd, time)) {
-                        new MaterialAlertDialogBuilder(this)
-                                .setIcon(R.drawable.ic_untrusted_48px)
-                                .setTitle(R.string.ticket_inspection_auth_error_title)
-                                .setMessage(R.string.ticket_inspection_auth_error_desc)
-                                .setPositiveButton(R.string.ok, null)
+                    boolean isCico = repository.isCicoTicket(etd);
+                    if (isCico && currentCicoData == null) {
+                        CommonDialogs
+                                .newInfoDialog(this, R.string.ticket_inspection_action_required_title, R.string.ticket_inspection_cico_not_connected)
                                 .show();
+                        return;
+                    }
+                    if (isCico) {
+                        Boolean keyMatch = repository.checkCicoTripKeyMatch(etd, currentTripKey);
+                        if (keyMatch != null) {
+                            if (!keyMatch) {
+                                CommonDialogs
+                                        .newInfoDialog(this, R.string.ticket_inspection_action_required_title, R.string.ticket_inspection_cico_wrong_device)
+                                        .show();
+                                return;
+                            }
+                        }
+                        // if parsing failed/attribute was not present, ticket was probably tampered,
+                        // so fall through to trust check
+                    }
+                    PublicKey forcedKey = isCico ? currentCicoData.deviceCertificate().getPublicKey() : null;
+                    byte[] forcedSecret = isCico ? currentCicoData.seedDerivationSecrets().get(0).token() : null;
+                    if (!repository.verifyTicketAuthenticity(etd, time, forcedKey, forcedSecret)) {
+                        showUntrustedTicketDialog();
                     } else {
                         startActivity(
                                 new Intent(this, TicketInspectionDetailActivity.class)
@@ -167,6 +190,15 @@ public class TicketInspectionHomeActivity extends BaseActivity {
         updateVehicleInfoUI();
     }
 
+    private void showUntrustedTicketDialog() {
+        new MaterialAlertDialogBuilder(this)
+                .setIcon(R.drawable.ic_untrusted_48px)
+                .setTitle(R.string.ticket_inspection_auth_error_title)
+                .setMessage(R.string.ticket_inspection_auth_error_desc)
+                .setPositiveButton(R.string.ok, null)
+                .show();
+    }
+
     private void ensureNewestKeysAndRun(Runnable callback) {
         if (repository.hasSecretForTime(Instant.now())) {
             callback.run();
@@ -197,21 +229,25 @@ public class TicketInspectionHomeActivity extends BaseActivity {
         outState.putStringArrayList(STATE_CURRENT_VALIDATION_ZONES, currentValidationZones);
         outState.putString(STATE_CURRENT_LINE_NAME, currentLineName);
         outState.putString(STATE_CURRENT_TRIP_KEY, currentTripKey);
+        outState.putParcelable(STATE_VEHICLE_CICO_DATA, currentCicoData);
     }
 
     private void updateVehicleData() {
-        ProgressDialog.doInBackground(this, R.string.ticket_inspection_syncing_vehicle, viewModel.lwtClient.getTicketValidationInfo().executeAsync())
-                .whenCompleteAsync((ticketValidationInfo, throwable) -> {
-                    if (ticketValidationInfo != null) {
-                        onVehicleDataUpdated(ticketValidationInfo);
-                    } else {
+        LwtSession session = viewModel.lwtClient.newSession();
+        CompletableFuture<TicketValidationInfo> validationInfo = viewModel.lwtClient.getTicketValidationInfo().enqueue(session);
+        CompletableFuture<LocalCICOInspectionData> cicoDataCall = viewModel.lwtClient.getCICOInspectionData().enqueue(session);
+        ProgressDialog.doInBackground(this, R.string.ticket_inspection_syncing_vehicle, session.executeAsync())
+                .whenCompleteAsync((unused, throwable) -> {
+                    if (throwable != null) {
                         Log.e(TAG, "Failed to get ticket validation info from vehicle", throwable);
                         onVehicleLost();
+                    } else {
+                        onVehicleDataUpdated(validationInfo.getNow(null), cicoDataCall.getNow(null));
                     }
                 }, getLifecycleExecutor());
     }
 
-    private void onVehicleDataUpdated(TicketValidationInfo validationInfo) {
+    private void onVehicleDataUpdated(TicketValidationInfo validationInfo, LocalCICOInspectionData cicoData) {
         currentValidationZones = new ArrayList<>();
         var tzEntry = LwtTariffZones.findEntryForTariffSystem(validationInfo.tariffZones(), "PID");
         if (tzEntry != null) {
@@ -223,11 +259,11 @@ public class TicketInspectionHomeActivity extends BaseActivity {
         }
         var trip = validationInfo.trip().trip();
         currentLineName = TextMarkupConverter.toPlainText(trip.line().name(), false);
-        currentTripKey = Long.toString(trip.line().globalRefId());
+        currentTripKey = cicoData.tripKey();
         if (trip.globalRefId() > 0) {
             currentLineName += "/" + trip.globalRefId();
-            currentTripKey += "/" + trip.globalRefId();
         }
+        currentCicoData = cicoData;
         updateVehicleInfoUI();
     }
 

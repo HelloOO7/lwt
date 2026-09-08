@@ -21,8 +21,6 @@ import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.core.content.res.ResourcesCompat;
 import androidx.core.widget.TextViewCompat;
-import cz.dpp.praguepublictransport.LitackaUtils;
-import cz.dpp.praguepublictransport.etd.LitackaETD;
 import cz.spojenka.android.ui.activity.BaseActivity;
 import cz.spojenka.android.util.DateTimeUtils;
 import cz.spojenka.android.util.ViewUtils;
@@ -61,33 +59,38 @@ public class TicketInspectionDetailActivity extends BaseActivity {
         OffsetDateTime validUntil = etd.getValidUntil();
         addTimeInfoViews(R.string.ticket_display_valid_until, validUntil, inspectionTime, true);
         List<String> zones = etd.getValidZones();
-        addInfoView(R.string.ticket_display_valid_zones, String.join(", ", zones));
-        if (inspectionZones != null && !inspectionZones.isEmpty()) {
-            List<String> checkZones = new ArrayList<>(zones);
-            checkZones.retainAll(inspectionZones);
-            if (!checkZones.isEmpty()) {
-                addInfoView(0, getString(R.string.ticket_inspection_detail_valid_current_zone), R.drawable.ic_check_24px, R.color.delay_ok);
-            } else {
-                if (inspectionZones.size() == 1) {
-                    addInfoView(
-                            0,
-                            getString(
-                                    R.string.ticket_inspection_detail_not_valid_current_zone,
-                                    inspectionZones.get(0)
-                            ),
-                            R.drawable.ic_warning_f_24px,
-                            R.color.delay_mid
-                    );
+        if (zones.isEmpty() && etd.getCicoSessionId() != null) {
+            addInfoView(R.string.ticket_display_valid_zones, getString(R.string.ticket_display_valid_zones_cico));
+            addInfoView(0, getString(R.string.ticket_inspection_detail_valid_zones_cico), R.drawable.ic_mobile_sensor_hi_24px, R.color.delay_ok);
+        } else {
+            addInfoView(R.string.ticket_display_valid_zones, String.join(", ", zones));
+            if (inspectionZones != null && !inspectionZones.isEmpty()) {
+                List<String> checkZones = new ArrayList<>(zones);
+                checkZones.retainAll(inspectionZones);
+                if (!checkZones.isEmpty()) {
+                    addInfoView(0, getString(R.string.ticket_inspection_detail_valid_current_zone), R.drawable.ic_check_24px, R.color.delay_ok);
                 } else {
-                    addInfoView(
-                            0,
-                            getString(
-                                    R.string.ticket_inspection_detail_not_valid_current_zones,
-                                    String.join(", ", inspectionZones)
-                            ),
-                            R.drawable.ic_warning_f_24px,
-                            R.color.delay_mid
-                    );
+                    if (inspectionZones.size() == 1) {
+                        addInfoView(
+                                0,
+                                getString(
+                                        R.string.ticket_inspection_detail_not_valid_current_zone,
+                                        inspectionZones.get(0)
+                                ),
+                                R.drawable.ic_warning_f_24px,
+                                R.color.delay_mid
+                        );
+                    } else {
+                        addInfoView(
+                                0,
+                                getString(
+                                        R.string.ticket_inspection_detail_not_valid_current_zones,
+                                        String.join(", ", inspectionZones)
+                                ),
+                                R.drawable.ic_warning_f_24px,
+                                R.color.delay_mid
+                        );
+                    }
                 }
             }
         }
@@ -133,7 +136,7 @@ public class TicketInspectionDetailActivity extends BaseActivity {
         if (isShouldWarnTime(time, now, warnIfAfter)) {
             return R.color.delay_mid;
         } else {
-            return ResourcesCompat.ID_NULL;
+            return R.color.ticket_inspection_status_informative;
         }
     }
 

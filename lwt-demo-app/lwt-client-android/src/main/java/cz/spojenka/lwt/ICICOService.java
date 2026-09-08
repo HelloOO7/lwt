@@ -119,6 +119,13 @@ public interface ICICOService extends IBinder {
     public CompletableFuture<?> forceDeviceChange(LwtDevice device);
 
     /**
+     * Check if a device is connected, either as part of a requested or active session.
+     *
+     * @return true/false
+     */
+    public boolean isConnectedToDevice();
+
+    /**
      * Get a LiveData that is continuously updated with the LWT device that has issued
      * the most recent CICO ticket. The LiveData will be automatically updated whenever
      * a BLE advertisement is received from the currently connected device.

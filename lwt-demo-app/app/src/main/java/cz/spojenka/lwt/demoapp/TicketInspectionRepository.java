@@ -23,6 +23,7 @@ import cz.dpp.praguepublictransport.etd.ETDUtils;
 import cz.dpp.praguepublictransport.etd.LitackaETD;
 import cz.spojenka.android.settings.SharedPrefsHelper;
 import cz.spojenka.android.util.AsyncUtils;
+import cz.spojenka.lwt.LwtTicketMetadata;
 import cz.spojenka.lwt.inspectionapi.InspectionAPI;
 import cz.spojenka.lwt.inspectionapi.InspectionSecretResponse;
 import cz.spojenka.lwt.util.PIDTicketTOTP;
@@ -186,7 +187,30 @@ public class TicketInspectionRepository {
         return getInspectionSecretForTime(time) != null;
     }
 
+    public boolean isCicoTicket(LitackaETD ticketData) {
+        return new TicketETDParser(ticketData).getCicoSessionId() != null; //CICO session ID
+    }
+
+    public Boolean checkCicoTripKeyMatch(LitackaETD ticketData, String tripKey) {
+        try {
+            LwtTicketMetadata parsed = new TicketETDParser(ticketData).parseLwtMetadata();
+            String ticketTripKey = parsed.getTripKey();
+            if (ticketTripKey != null) {
+                return Objects.equals(ticketTripKey, tripKey);
+            } else {
+                return null;
+            }
+        } catch (IllegalArgumentException ex) {
+            Log.e(TAG, "Failed to parse ticket metadata", ex);
+            return null;
+        }
+    }
+
     public boolean verifyTicketAuthenticity(LitackaETD ticketData, Instant totpInstant) {
+        return verifyTicketAuthenticity(ticketData, totpInstant, null, null);
+    }
+
+    public boolean verifyTicketAuthenticity(LitackaETD ticketData, Instant totpInstant, PublicKey key, byte[] derivationSecret) {
         String totp = ticketData.getProperty("X-TOTP");
         if (totp == null) {
             Log.w(TAG, "Ticket TOTP is missing");
@@ -204,7 +228,9 @@ public class TicketInspectionRepository {
             Log.w(TAG, "Failed to parse ticket VS: " + vs, ex);
             return false;
         }
-        byte[] derivationSecret = getInspectionSecretForTime(validityStart.toInstant());
+        if (derivationSecret == null) {
+            derivationSecret = getInspectionSecretForTime(validityStart.toInstant());
+        }
         if (derivationSecret == null) {
             Log.w(TAG, "No inspection secret available for the given time");
             return false;
@@ -220,7 +246,14 @@ public class TicketInspectionRepository {
         byte[] decodedSignature = ETDUtils.decodeTicketSignature(signature);
         byte[] rawTicketData = ticketData.encode().getBytes(StandardCharsets.UTF_8);
 
-        if (!validateSignature(rawTicketData, decodedSignature)) {
+        boolean verifyResult;
+        if (key != null) {
+            verifyResult = validateSignature(rawTicketData, decodedSignature, key);
+        } else {
+            verifyResult = validateSignature(rawTicketData, decodedSignature);
+        }
+
+        if (!verifyResult) {
             Log.w(TAG, "Ticket signature validation failed");
             return false;
         }

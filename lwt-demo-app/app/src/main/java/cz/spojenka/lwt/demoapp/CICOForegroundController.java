@@ -34,7 +34,7 @@ public class CICOForegroundController implements CICOService.ForegroundControlle
     private static final boolean TEST_LEGACY_TINT = true;
 
     private static final int NOTIFICATION_ID_SERVICE = 0xC1C0001;
-    private static final int NOTIFICATION_ID_ERROR = 0xC1C0002;
+    private static final int NOTIFICATION_ID_ERROR_BT_OFF = 0xC1C0002;
 
     private static final String NOTIFICATION_GROUP = "CICO";
     private static final String NOTIFICATION_CHANNEL_SERVICE = "CICOService";
@@ -116,8 +116,8 @@ public class CICOForegroundController implements CICOService.ForegroundControlle
                 .setOngoing(true)
                 .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setColorized(true)
-                .setColor(context.getColor(R.color.cico_notification_service_color))
+                //.setColorized(true)
+                //.setColor(context.getColor(R.color.cico_notification_service_color))
                 .setSmallIcon(R.drawable.ic_transit_ticket_24px)
                 .setContentTitle(context.getString(R.string.cico_notification_title))
                 .setStyle(new NotificationCompat.DecoratedCustomViewStyle());
@@ -255,7 +255,8 @@ public class CICOForegroundController implements CICOService.ForegroundControlle
                         advData.getLineLicenseNumber(),
                         advData.getStopCisNumber(),
                         advData.getDirectionCisNumber(),
-                        advData.getDelay()
+                        advData.getDelay(),
+                        advData.isAtStop()
                 );
                 if (advData instanceof TripAdvertisementDataExt ext) {
                     parts = new ArrayList<>(parts);
@@ -314,6 +315,8 @@ public class CICOForegroundController implements CICOService.ForegroundControlle
 
     private void ensureTripViewController() {
         if (tempTripInfoView == null) {
+            // null font to force using fallback characters, as notifications can not use
+            // our XML fonts (and users can override them anyway)
             textMarkupConverter = new TextMarkupConverter(null);
             tempDevListItem = DeviceListItemBinding.inflate(LayoutInflater.from(context));
             tempTripInfoView = new TripInfoViewController(tempDevListItem, textMarkupConverter);
@@ -328,7 +331,7 @@ public class CICOForegroundController implements CICOService.ForegroundControlle
                 .setContentIntent(action)
                 .build();
 
-        notificationManager.notify(NOTIFICATION_ID_ERROR, notification);
+        notificationManager.notify(NOTIFICATION_ID_ERROR_BT_OFF, notification);
     }
 
     @Override
@@ -345,6 +348,13 @@ public class CICOForegroundController implements CICOService.ForegroundControlle
                             PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
                     )
             );
+        }
+    }
+
+    @Override
+    public void onServiceErrorResolved(CICOService.ErrorCode errorCode) {
+        if (errorCode == CICOService.ErrorCode.BLUETOOTH_TURNED_OFF) {
+            notificationManager.cancel(NOTIFICATION_ID_ERROR_BT_OFF);
         }
     }
 }

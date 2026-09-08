@@ -5,12 +5,18 @@ import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.view.View;
+import android.widget.FrameLayout;
 
+import com.ncorti.slidetoact.SlideToActView;
+
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import cz.spojenka.android.ui.activity.BaseActivity;
 import cz.spojenka.android.ui.view.LoadingPlaceholderContainer;
+import cz.spojenka.android.ui.view.LoadingScreen;
 import cz.spojenka.lwt.CICOService;
 import cz.spojenka.lwt.ICICOService;
+import cz.spojenka.lwt.demoapp.databinding.CicoLoadingScreenBinding;
 
 public abstract class CICOActivityBase extends BaseActivity {
 
@@ -23,24 +29,29 @@ public abstract class CICOActivityBase extends BaseActivity {
             CICOActivityBase.this.service = (ICICOService) service;
             startService(CICOService.startIntent(CICOActivityBase.this, CICOForegroundController.class));
             CICOActivityBase.this.onServiceConnected();
-            loading.showContent();
+            loading.hide();
         }
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
             service = null;
-            loading.showLoading();
+            loading.show();
         }
     };
 
-    private LoadingPlaceholderContainer loading;
+    private LoadingScreen loading;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        loading = LoadingPlaceholderContainer.wrapScreens(this, doCreateView(savedInstanceState));
-        loading.setLoadingDescription(R.string.check_in_service_connecting);
-        setContentView(loading.getRoot());
+        View loadingView = CicoLoadingScreenBinding.inflate(getLayoutInflater()).getRoot();
+        View contentView = doCreateView(savedInstanceState);
+        loading = new LoadingScreen(loadingView, contentView);
+        FrameLayout root = new FrameLayout(this);
+        root.addView(loadingView);
+        root.addView(contentView);
+        loading.show();
+        setContentView(root);
         if (CICOService.isSupported(this)) {
             // we will connect to the service regardless of permissions
             // - it can always be started fine, whether it can be used is a different story.
@@ -82,4 +93,32 @@ public abstract class CICOActivityBase extends BaseActivity {
     protected abstract View doCreateView(Bundle savedInstanceState);
 
     protected abstract void onServiceConnected();
+
+    protected void bindSlideAction(SlideToActView view, Runnable action) {
+        if (action != null) {
+            view.setOnSlideToActAnimationEventListener(new SlideToActView.OnSlideToActAnimationEventListener() {
+                @Override
+                public void onSlideCompleteAnimationStarted(@NonNull SlideToActView slideToActView, float v) {
+                    action.run();
+                }
+
+                @Override
+                public void onSlideCompleteAnimationEnded(@NonNull SlideToActView slideToActView) {
+
+                }
+
+                @Override
+                public void onSlideResetAnimationStarted(@NonNull SlideToActView slideToActView) {
+
+                }
+
+                @Override
+                public void onSlideResetAnimationEnded(@NonNull SlideToActView slideToActView) {
+
+                }
+            });
+        } else {
+            view.setOnSlideToActAnimationEventListener(null);
+        }
+    }
 }

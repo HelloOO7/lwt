@@ -15,5 +15,6 @@ enum Operation : ushort {
     CICOCheckIn,
     CICOCheckInConfirm,
     CICORefresh,
-    CICOCheckOut
+    CICOCheckOut,
+    CICOGetInspectionData
 }

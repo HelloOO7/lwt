@@ -3,7 +3,6 @@ package cz.spojenka.lwt;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.function.Function;
 
 public interface LwtCall<T> {
 
@@ -24,6 +23,7 @@ public interface LwtCall<T> {
      *
      * @return the result of the operation
      * @throws IOException                                if there was an I/O error executing the operation
+     * @throws java.util.concurrent.CompletionException   if something else during the operation failed
      * @throws java.util.concurrent.CancellationException if the operation was cancelled
      */
     public T execute() throws IOException;
@@ -36,7 +36,15 @@ public interface LwtCall<T> {
 
     public void cancel();
 
-    public <M> LwtCall<M> map(Function<T, M> mapper);
+    public <M> LwtCall<M> map(MappingFunction<T, M> mapper);
 
     public void onFinished(Runnable action);
+
+    public void observeExecution(LwtClient.ExecutionObserver observer);
+
+    @FunctionalInterface
+    public static interface MappingFunction<T, M> {
+
+        public M apply(T value) throws Exception;
+    }
 }

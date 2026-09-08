@@ -88,6 +88,8 @@ public class TicketDisplayViewModel extends AndroidViewModel {
     }
 
     public void updateQR() {
-        qrDrawableError.catchError(CompletableFuture.supplyAsync(this::createQRDrawable), qrDrawable::setValue, getApplication().getMainExecutor());
+        if (hasTicket()) {
+            qrDrawableError.catchError(CompletableFuture.supplyAsync(this::createQRDrawable), qrDrawable::setValue, getApplication().getMainExecutor());
+        }
     }
 }

@@ -92,7 +92,7 @@ namespace lwt {
         void EnqueuePushEvent(MOSCICOEvent&& event);
 
         ByteVector GenerateETD(int64_t validFromEMs, int64_t validToEMs, const UUID& sessionId, const psram_string& metadata);
-        void SignETD(const ByteVector& etd, ByteVector* pSignature);
+        void SignETD(ByteVector& etd, ByteVector* pSignature);
 
         flatbuffers::Offset<flatbuffers::Vector<uint8_t>> GetSeedDerivationSecretToFlatbuffer(flatbuffers::FlatBufferBuilder& builder);
         void UpdateSeedDerivationSecret();

@@ -17,6 +17,7 @@
 #include "lwt_CertRole.h"
 #include "esp_netif_sntp.h"
 #include <iostream>
+#include <climits>
 
 #define CICO_WITHOUT_MOS
 
@@ -274,6 +275,36 @@ namespace lwt {
                 }
             )
         );
+        registry.RegisterServiceCallback(
+            Operation_CICOGetInspectionData,
+            ApplicationServer::CreateOperationServiceFunc<void>(
+                [this](flatbuffers::FlatBufferBuilder& fbb) -> ResponseStatus {
+                    std::lock_guard lock(m_SeedDerivationMutex);
+
+                    UpdateSeedDerivationSecret();
+
+                    fbb.Finish(CreateCICOInspectionData(
+                        fbb,
+                        fbb.CreateString(m_LastSeedTripKey),
+                        CreateVector(fbb, m_DeviceCert.GetCertificateDer()),
+                        fbb.CreateVector(
+                            {
+                                CreateCICOSeedDerivationSecret(
+                                    fbb,
+                                    fbb.CreateVector(m_SeedDerivationSecret),
+                                    0,
+                                    INT64_MAX
+                                )
+                            }
+                        ),
+                        SystemTime::UptimeMillis()
+                    ));
+
+                    return 200;
+                }
+            ),
+            CertRole::TICKET_INSPECTOR
+        );
     }
 
     int CicoService::VerifyAndParseRefreshToken(const CICOFragmentRefreshRequest& request, ParsedRefreshToken* pParsedToken, bool* pSameIssuer) {
@@ -421,15 +452,15 @@ namespace lwt {
         return ByteVector(etdString.begin(), etdString.end());
     }
 
-    void CicoService::SignETD(const ByteVector& etd, ByteVector* pSignature) {
+    void CicoService::SignETD(ByteVector& etd, ByteVector* pSignature) {
         ByteVector sig;
         int res = m_SigningKey.Sign(etd, &sig);
         if (res != 0) {
             ESP_LOGE(TAG, "Failed to sign ETD: %d", res);
             return;
         }
-        psram_string suffix = "SG:" + Base32Hex::Encode<psram_string>(sig) + "*";
-        sig.insert(sig.end(), suffix.begin(), suffix.end());
+        psram_string suffix = "SG:" + Base32Hex::Encode<psram_string>(sig, false) + "*";
+        etd.insert(etd.end(), suffix.begin(), suffix.end());
         if (pSignature) {
             *pSignature = std::move(sig);
         }
@@ -439,11 +470,14 @@ namespace lwt {
         std::lock_guard lock(m_SeedDerivationMutex);
 
         UpdateSeedDerivationSecret();
+
         return builder.CreateVector(m_SeedDerivationSecret);
     }
 
     SHA256Hash CicoService::DeriveTotpSeed(const ByteSpan& ticketSignature) {
         std::lock_guard lock(m_SeedDerivationMutex);
+
+        UpdateSeedDerivationSecret();
 
         ByteVector mergedSecret;
         mergedSecret.insert(mergedSecret.end(), ticketSignature.begin(), ticketSignature.end());

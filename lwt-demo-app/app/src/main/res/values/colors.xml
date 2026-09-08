@@ -24,4 +24,5 @@
     <color name="overlay_white">#80FFFFFF</color>
     <color name="cico_notification_alerts_light_color">#ff0000</color>
     <color name="cico_notification_service_color">#43b02a</color>
+    <color name="ticket_inspection_status_informative">#2196F3</color>
 </resources>

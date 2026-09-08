@@ -13,6 +13,7 @@ import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -24,6 +25,7 @@ import cz.spojenka.lwdn.BluetoothLwdnAddress;
 import cz.spojenka.lwdn.LwdnAddress;
 import cz.spojenka.lwdn.WifiAwareLwdnAddress;
 import cz.spojenka.lwt.util.ByteBufferUtils;
+import cz.spojenka.lwt.util.CertificateLoader;
 import cz.spojenka.lwt.util.LwtTime;
 import cz.spojenka.lwt.util.RTTExecutionObserver;
 import cz.spojenka.lwt.util.RemoteTime;
@@ -78,7 +80,7 @@ public class LwtAPIClient extends LwtClient {
                 System.arraycopy(SERVER_CHALLENGE_SALT, 0, saltedChallenge, 0, SERVER_CHALLENGE_SALT.length);
                 System.arraycopy(challenge, 0, saltedChallenge, SERVER_CHALLENGE_SALT.length, challenge.length);
 
-                X509Certificate[] certChain = trustManager.loadCertificates(authResponse.certificateAsByteBuffer());
+                X509Certificate[] certChain = CertificateLoader.loadCertificates(authResponse.certificateAsByteBuffer());
                 if (trustManager.isCertificateChainTrusted(certChain)) {
                     if (trustManager.isDNSNameMatched(certChain, getPeerAddress().getLocalHostName())) {
                         byte[] challengeResponse = ByteBufferUtils.toByteArray(authResponse.responseAsByteBuffer());
@@ -126,10 +128,8 @@ public class LwtAPIClient extends LwtClient {
     public LwtCall<Map<byte[], TokenWithExpiration<PreauthorizationTokenResult>>> requestPreauthorizationTokens(List<byte[]> activationTokenHashes) {
         LwtCall<PreauthorizationTokenResponse> responseFuture = newCall(LwtAPI::createPreauthorizationToken, createPreauthorizationTokensRequest(activationTokenHashes));
         RTTExecutionObserver rtt = new RTTExecutionObserver(responseFuture);
-        addExecutionObserver(rtt);
-        responseFuture.onFinished(() -> removeExecutionObserver(rtt));
         return responseFuture.map(response -> {
-            RemoteTime remoteTime = new RemoteTime(rtt.getRoundTripStartTime(), Instant.ofEpochMilli(response.issuedAt()), rtt.getRoundTripDuration());
+            RemoteTime remoteTime = rtt.deriveRemoteTime(Instant.ofEpochMilli(response.issuedAt()));
 
             Instant issuedAt = remoteTime.remoteToLocal(Instant.ofEpochMilli(response.issuedAt()));
 
@@ -249,5 +249,28 @@ public class LwtAPIClient extends LwtClient {
                 createFragmentRefreshRequest(builder, ticketFragment)
         ));
         return newCall(LwtAPI::cicoCheckOut, builder.dataBuffer());
+    }
+
+    public LwtCall<LocalCICOInspectionData> getCICOInspectionData() {
+        LwtCall<CICOInspectionData> call = newCall(LwtAPI::getCicoInspectionData);
+        RTTExecutionObserver rtt = new RTTExecutionObserver(call);
+        return call.map(data -> {
+            X509Certificate cert = CertificateLoader.loadCertificate(data.deviceCertificateAsByteBuffer());
+
+            var issuedServerTime = Instant.ofEpochMilli(data.serverTime());
+            RemoteTime remoteTime = rtt.deriveRemoteTime(issuedServerTime);
+
+            List<TokenWithExpiration<byte[]>> secrets = new ArrayList<>(data.seedDerivationSecretsLength());
+            for (int i = 0; i < data.seedDerivationSecretsLength(); i++) {
+                var secret = data.seedDerivationSecrets(i);
+                secrets.add(new TokenWithExpiration<>(
+                        remoteTime.remoteToLocalInstant(secret.validFrom()),
+                        remoteTime.remoteToLocalInstant(secret.validTo()),
+                        ByteBufferUtils.toByteArray(secret.dataAsByteBuffer())
+                ));
+            }
+
+            return new LocalCICOInspectionData(data.tripKey(), cert, secrets);
+        });
     }
 }

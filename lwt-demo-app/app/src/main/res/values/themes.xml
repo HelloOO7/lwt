@@ -29,4 +29,8 @@
     <style name="Theme.LWTDemo.EdgeToEdge.QRContrast">
         <item name="android:textColor">?android:attr/textColorPrimary</item>
     </style>
+
+    <style name="Theme.LWTDemo.Notification" parent="@style/Theme.AppCompat.DayNight">
+
+    </style>
 </resources>

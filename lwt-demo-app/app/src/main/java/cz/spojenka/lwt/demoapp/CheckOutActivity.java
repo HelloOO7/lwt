@@ -45,7 +45,7 @@ public class CheckOutActivity extends CICOActivityBase {
     protected View doCreateView(Bundle savedInstanceState) {
         binding = ActivityCheckOutBinding.inflate(getLayoutInflater());
         viewModel = new ViewModelProvider(this).get(ViewModel.class);
-        binding.confirmCheckOut.setOnSlideCompleteListener(slide -> {
+        bindSlideAction(binding.confirmCheckOut, () -> {
             if (service != null) {
                 viewModel.checkOut(service);
                 binding.confirmCheckOut.setEnabled(false);
@@ -85,10 +85,10 @@ public class CheckOutActivity extends CICOActivityBase {
                 checkOutDone.setValue(true);
             } else {
                 service.endSession().whenCompleteAsync((o, throwable) -> {
-                   checkOutDone.setValue(true);
-                   if (throwable != null) {
-                       Log.w(TAG, "Warning: checked out, but device operation failed, see service log");
-                   }
+                    checkOutDone.setValue(true);
+                    if (throwable != null) {
+                        Log.w(TAG, "Warning: checked out, but device operation failed, see service log");
+                    }
                 }, getApplication().getMainExecutor());
             }
         }

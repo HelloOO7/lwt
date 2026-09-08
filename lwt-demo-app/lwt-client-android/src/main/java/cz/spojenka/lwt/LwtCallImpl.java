@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import cz.spojenka.lwt.util.FlatbufferUtils;
@@ -25,6 +26,7 @@ class LwtCallImpl<T> implements LwtCall<T> {
     private CompletableFuture<T> enqueuedFuture;
     private boolean isCancelled = false;
 
+    private final List<LwtClient.ExecutionObserver> executionObservers = new ArrayList<>();
     private final List<Runnable> onFinishedCallbacks = new ArrayList<>();
 
     LwtCallImpl(LwtClient client, int operationId, ByteBuffer requestBuffer, Class<T> responseType) {
@@ -44,7 +46,7 @@ class LwtCallImpl<T> implements LwtCall<T> {
     }
 
     @Override
-    public <M> LwtCall<M> map(Function<T, M> mapper) {
+    public <M> LwtCall<M> map(MappingFunction<T, M> mapper) {
         return new MappingLwtCall<>(this, mapper);
     }
 
@@ -54,20 +56,53 @@ class LwtCallImpl<T> implements LwtCall<T> {
     }
 
     @Override
+    public void observeExecution(LwtClient.ExecutionObserver observer) {
+        executionObservers.add(new LwtClient.ExecutionObserver() {
+            @Override
+            public void onStartRequest(LwtCall<?> future) {
+                invokeObserverIfMatch(future, observer::onStartRequest);
+            }
+
+            @Override
+            public void onRequestSent(LwtCall<?> future) {
+                invokeObserverIfMatch(future, observer::onRequestSent);
+            }
+
+            @Override
+            public void onStartResponse(LwtCall<?> future) {
+                invokeObserverIfMatch(future, observer::onStartResponse);
+            }
+
+            @Override
+            public void onResponseReceived(LwtCall<?> future) {
+                invokeObserverIfMatch(future, observer::onResponseReceived);
+            }
+
+            private void invokeObserverIfMatch(LwtCall<?> future, Consumer<LwtCall<?>> consumer) {
+                if (future == LwtCallImpl.this) {
+                    consumer.accept(future);
+                }
+            }
+        });
+    }
+
+    @Override
     public CompletableFuture<T> enqueue(LwtSession session) {
         if (isCancelled) {
             CompletableFuture<T> cancelledFuture = new CompletableFuture<>();
             cancelledFuture.cancel(true);
             return cancelledFuture;
         }
+        executionObservers.forEach(session::addExecutionObserver);
         LwtpPacket requestPacket = new LwtpPacket(createRequestFlatbuffer(operationId, requestBuffer));
         enqueuedFuture = createResponseFuture(lwtpFuture = session.add(requestPacket), responseType);
         enqueuedFuture.whenComplete((result, ex) -> {
+            executionObservers.forEach(session::removeExecutionObserver);
             for (Runnable callback : onFinishedCallbacks) {
                 callback.run();
             }
         });
-        client.registerPendingRequest(requestPacket, this);
+        session.registerPendingRequest(requestPacket, this);
         return enqueuedFuture;
     }
 

@@ -108,6 +108,9 @@ table CICOSeedDerivationSecret {
 }
 
 table CICOInspectionData {
+    /// Identification of the timetable trip of the vehicle, which will
+    /// match that of the TK attribute in LWT metadata of tickets issued by this device.
+    trip_key: string (required);
     /// DER-format certificate for the private key used by the device to sign
     /// ticket fragments and refresh tokens. This can potentially be its own
     /// cert., albeit at the moment it is the same as the TLS certificate.

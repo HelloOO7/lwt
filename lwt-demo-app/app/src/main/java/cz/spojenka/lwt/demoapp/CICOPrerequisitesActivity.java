@@ -35,7 +35,7 @@ public class CICOPrerequisitesActivity extends BaseActivity {
         bindPrerequisite(FeaturePrerequisite.BLUETOOTH_PERMISSIONS, R.id.permBluetooth, R.string.cico_prerequisites_bt_desc_none, R.string.cico_prerequisites_bt_desc_granted);
         bindPrerequisite(FeaturePrerequisite.BLUETOOTH_ON, R.id.permBluetoothState, R.string.cico_prerequisites_bt_state_desc_off, R.string.cico_prerequisites_bt_state_desc_on);
         bindPrerequisite(FeaturePrerequisite.LOCATION_FOR_LE_SCAN, R.id.permLocation, R.string.cico_prerequisites_location_desc_none, R.string.cico_prerequisites_location_desc_granted);
-        bindPrerequisite(FeaturePrerequisite.BACKGROUND_LOCATION_FOR_LE_SCAN_LP, R.id.permBackgroundLocation, R.string.cico_prerequisites_bg_location_desc_none, R.string.cico_prerequisites_bg_location_desc_granted);
+        bindPrerequisite(FeaturePrerequisite.BACKGROUND_LOCATION_FOR_LE_SCAN, R.id.permBackgroundLocation, R.string.cico_prerequisites_bg_location_desc_none, R.string.cico_prerequisites_bg_location_desc_granted);
         bindPrerequisite(FeaturePrerequisite.NOTIFICATION_PERMISSION, R.id.permNotifications, R.string.cico_prerequisites_notifications_desc_none, R.string.cico_prerequisites_notifications_desc_granted);
         bindPrerequisite(FeaturePrerequisite.BATTERY_EXEMPTION, R.id.permBattery, R.string.cico_prerequisites_battery_desc_none, R.string.cico_prerequisites_battery_desc_granted);
 

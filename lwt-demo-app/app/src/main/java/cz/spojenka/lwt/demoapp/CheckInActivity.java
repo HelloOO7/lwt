@@ -5,21 +5,18 @@ import android.app.Application;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
 import android.content.BroadcastReceiver;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.ServiceConnection;
 import android.graphics.Color;
 import android.os.Bundle;
-import android.os.IBinder;
 import android.os.PersistableBundle;
 import android.view.View;
 
 import com.google.android.material.color.MaterialColors;
+import com.ncorti.slidetoact.SlideToActView;
 
 import java.util.Objects;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 
 import androidx.activity.result.ActivityResult;
@@ -33,12 +30,10 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModelProvider;
 import cz.spojenka.android.system.livedata.LiveErrorSignal;
-import cz.spojenka.android.ui.activity.BaseActivity;
 import cz.spojenka.android.ui.dialog.CommonDialogs;
 import cz.spojenka.android.ui.view.LoadingPlaceholderContainer;
 import cz.spojenka.android.util.ViewUtils;
 import cz.spojenka.lwt.FeaturePrerequisite;
-import cz.spojenka.lwt.CICOService;
 import cz.spojenka.lwt.ICICOService;
 import cz.spojenka.lwt.LwtDevice;
 import cz.spojenka.lwt.demoapp.databinding.ActivityCheckInBinding;
@@ -50,7 +45,6 @@ public class CheckInActivity extends CICOActivityBase {
     private static final String STATE_PERMISSIONS_ASKED = CheckInActivity.class.getName() + ".STATE_PERMISSIONS_ASKED";
 
     private ActivityCheckInBinding binding;
-    private LoadingPlaceholderContainer loading;
 
     private byte[] cicoToken;
 
@@ -114,24 +108,34 @@ public class CheckInActivity extends CICOActivityBase {
         };
         devicePickerUIController.bind(this);
 
-        updateConfirmSlider();
+        updateControlsEnabled();
         registerReceiver(bluetoothOnReceiver, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
 
         viewModel.getSelectedDevice().observe(this, device -> devicePickerUIController.overrideSelectedDevice(device));
 
         viewModel.getCheckInDevice().observe(this, device -> {
-            updateConfirmSlider();
+            updateControlsEnabled();
             if (device != null) {
                 devicePickerUIController.markDeviceAsConfirmed(true);
-                binding.confirmCheckin.setOnSlideCompleteListener(slideToActView -> viewModel.checkIn(service));
+                bindSlideAction(binding.confirmCheckin, () -> {
+                    if (service.isConnectedToDevice()) {
+                        viewModel.checkIn(service);
+                    } else {
+                        viewModel.onDeviceLost(service);
+                    }
+                });
             } else {
-                binding.confirmCheckin.setOnSlideCompleteListener(null);
+                bindSlideAction(binding.confirmCheckin, null);
+                binding.confirmCheckin.setCompleted(false, true);
             }
         });
-        viewModel.isCheckingInLiveData().observe(this, checkingIn -> updateConfirmSlider());
+        viewModel.isCheckingInLiveData().observe(this, checkingIn -> updateControlsEnabled());
         viewModel.isCheckedInLiveData().observe(this, checkedIn -> {
+            updateControlsEnabled();
             if (checkedIn) {
-                finish();
+                binding.confirmCheckin.setCompleteIcon(com.ncorti.slidetoact.R.drawable.slidetoact_animated_ic_check);
+                binding.confirmCheckin.setCompleted(true, false);
+                binding.confirmCheckin.postDelayed(this::finish, 500);
             }
         });
 
@@ -216,11 +220,13 @@ public class CheckInActivity extends CICOActivityBase {
         outState.putBoolean(STATE_PERMISSIONS_ASKED, permissionsAsked);
     }
 
-    private void updateConfirmSlider() {
+    private void updateControlsEnabled() {
         if (viewModel.isCheckingIn() || viewModel.isCheckedIn()) {
             setSliderEnabledState(false);
             setSliderEnabledStyle(true);
+            devicePickerUIController.setEnabled(false);
         } else {
+            devicePickerUIController.setEnabled(true);
             if (viewModel.hasCheckInDevice()) {
                 setSliderEnabledState(true);
                 setSliderEnabledStyle(true);
@@ -283,7 +289,12 @@ public class CheckInActivity extends CICOActivityBase {
             if (requestSessionFuture != null) {
                 requestSessionFuture.cancel(true);
             }
+            onDeviceLost(service);
+        }
+
+        public void onDeviceLost(ICICOService service) {
             selectedDevice.setValue(null);
+            checkInDevice.setValue(null);
             service.cancelRequestSession();
         }
 

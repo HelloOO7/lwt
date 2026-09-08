@@ -6,6 +6,7 @@ import java.util.List;
 import cz.dpp.praguepublictransport.LitackaUtils;
 import cz.dpp.praguepublictransport.etd.ETDUtils;
 import cz.dpp.praguepublictransport.etd.LitackaETD;
+import cz.spojenka.lwt.LwtTicketMetadata;
 
 public class TicketETDParser {
 
@@ -45,6 +46,15 @@ public class TicketETDParser {
 
     public String getLwtMetadata() {
         return etd.getProperty("X-LWT");
+    }
+
+    public LwtTicketMetadata parseLwtMetadata() {
+        String metadata = getLwtMetadata();
+        return LwtTicketMetadata.parse(metadata != null ? metadata : "");
+    }
+
+    public String getCicoSessionId() {
+        return etd.getProperty("X-SID");
     }
 
     public byte[] getSignature() {

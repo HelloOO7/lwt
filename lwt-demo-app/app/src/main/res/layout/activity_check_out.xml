@@ -18,6 +18,7 @@
         app:layout_constraintWidth_min="wrap"
         app:marginWindowInsets="horizontal|bottom"
         app:text="@string/check_out_confirm"
-        app:text_appearance="@style/TextAppearance.LWTDemo.SlideToAct" />
+        app:text_appearance="@style/TextAppearance.LWTDemo.SlideToAct"
+        app:complete_icon="@drawable/ic_inprogress_animated" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

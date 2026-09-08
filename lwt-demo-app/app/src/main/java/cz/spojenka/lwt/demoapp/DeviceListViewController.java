@@ -38,6 +38,7 @@ public class DeviceListViewController {
 
     private LoadingSpinnerDisplayRule loadingDisplayRule = LoadingSpinnerDisplayRule.ALWAYS;
     private boolean onClickEffectEnabled = true;
+    private boolean enabled = true;
 
     public DeviceListViewController(RecyclerView recyclerView, DeviceListViewModel viewModel) {
         this.recyclerView = recyclerView;
@@ -89,6 +90,11 @@ public class DeviceListViewController {
     public void setOnClickEffectEnabled(boolean onClickEffectEnabled) {
         this.onClickEffectEnabled = onClickEffectEnabled;
         ViewUtils.forEachViewHolder(recyclerView, TripAdvertisementViewHolder.class, vh -> vh.setRippleEffectEnabled(onClickEffectEnabled));
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+        ViewUtils.forEachViewHolder(recyclerView, TripAdvertisementViewHolder.class, vh -> vh.setEnabled(enabled));
     }
 
     public void bind(LifecycleOwner lifecycleOwner) {
@@ -173,6 +179,7 @@ public class DeviceListViewController {
             super(binding.getRoot());
             this.viewController = new TripInfoViewController(binding, markupConverter);
             setRippleEffectEnabled(onClickEffectEnabled);
+            setEnabled(enabled);
         }
 
         @Override
@@ -180,6 +187,10 @@ public class DeviceListViewController {
             if (item instanceof LwtDevice.Vehicle v) {
                 viewController.bind(v.getAdvData());
             }
+        }
+
+        private void setEnabled(boolean enabled) {
+            itemView.setEnabled(enabled);
         }
 
         private void setRippleEffectEnabled(boolean enabled) {

@@ -25,6 +25,7 @@ public class CICOTicketDisplayActivity extends TicketDisplayActivity {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
             ICICOService cicoService = (ICICOService) service;
+            CICOTicketDisplayActivity.this.service = cicoService;
             bindCICOTicket(cicoService.getCurrentTicketLiveData());
         }
 
@@ -34,6 +35,9 @@ public class CICOTicketDisplayActivity extends TicketDisplayActivity {
         }
     };
 
+    private ICICOService service;
+
+    private ActivityTicketNoCicoBinding noCicoBinding;
     private LoadingPlaceholderContainer loadingScreen;
     private View ticketDisplayContent;
     private View noTicketContent;
@@ -54,8 +58,7 @@ public class CICOTicketDisplayActivity extends TicketDisplayActivity {
     @Override
     protected View decorateContentView(View baseContentView) {
         ticketDisplayContent = baseContentView;
-        ActivityTicketNoCicoBinding noCicoBinding = ActivityTicketNoCicoBinding.inflate(getLayoutInflater());
-        noCicoBinding.btnCheckOut.setOnClickListener(v -> checkOutLauncher.launch(null));
+        noCicoBinding = ActivityTicketNoCicoBinding.inflate(getLayoutInflater());
         noTicketContent = noCicoBinding.getRoot();
         return (loadingScreen = LoadingPlaceholderContainer.wrapScreens(this, baseContentView, noTicketContent)).getRoot();
     }
@@ -66,9 +69,20 @@ public class CICOTicketDisplayActivity extends TicketDisplayActivity {
         unbindService(cicoServiceConnection);
     }
 
+    private void updateNoCicoScreen() {
+        if (service.isSessionActive()) {
+            noCicoBinding.btnCheckOut.setVisibility(View.VISIBLE);
+            noCicoBinding.btnCheckOut.setOnClickListener(v -> checkOutLauncher.launch(null));
+        } else {
+            noCicoBinding.tvDesc.setText(R.string.cico_ticket_offline_text);
+            noCicoBinding.btnCheckOut.setVisibility(View.GONE);
+        }
+    }
+
     private void bindCICOTicket(LiveData<CICOTicketFragment> ticket) {
         ticket.observe(this, cicoTicket -> {
             if (cicoTicket == null) {
+                updateNoCicoScreen();
                 loadingScreen.showContent(noTicketContent);
             } else {
                 viewModel.loadTicket(cicoToLocalTicket(cicoTicket));

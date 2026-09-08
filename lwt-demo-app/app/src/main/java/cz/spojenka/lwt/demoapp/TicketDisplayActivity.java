@@ -191,7 +191,9 @@ public class TicketDisplayActivity extends BaseActivity {
     protected void onResume() {
         super.onResume();
         clockView.register();
-        qrTicker.register();
+        if (viewModel.hasTicket()) {
+            qrTicker.register();
+        }
     }
 
     @Override

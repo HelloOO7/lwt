@@ -2,7 +2,6 @@ package cz.spojenka.lwt.util;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.concurrent.CompletableFuture;
 
 import cz.spojenka.lwt.LwtCall;
 import cz.spojenka.lwt.LwtClient;
@@ -18,6 +17,7 @@ public class RTTExecutionObserver implements LwtClient.ExecutionObserver {
 
     public RTTExecutionObserver(LwtCall<?> call) {
         this.call = call;
+        call.observeExecution(this);
     }
 
     @Override
@@ -55,5 +55,9 @@ public class RTTExecutionObserver implements LwtClient.ExecutionObserver {
         } else {
             throw new IllegalStateException("Request has not been sent or response has not been received yet.");
         }
+    }
+
+    public RemoteTime deriveRemoteTime(Instant serverTime) {
+        return new RemoteTime(getRoundTripStartTime(), serverTime, getRoundTripDuration());
     }
 }

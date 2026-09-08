@@ -295,11 +295,7 @@ public class BluetoothLwdnScanner implements LwdnScanner {
                 deviceLostTimeoutCallbacks.remove(deviceAddress);
             };
             deviceLostTimeoutCallbacks.put(deviceAddress, newCallback);
-            long timeout = config.getDeviceLostTimeout().toMillis();
-            if (config.getScanMode() == LwdnScanConfig.ScanMode.LOW_POWER) {
-                timeout *= 2;
-            }
-            handler.postDelayed(newCallback, timeout);
+            handler.postDelayed(newCallback, config.getDeviceLostTimeout().toMillis());
         }
 
         private ScanSettings buildScanSettings(LwdnScanConfig config) {

@@ -13,7 +13,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -228,7 +227,7 @@ public class TicketActivationViewModel extends AndroidViewModel {
 
         lwtClient = new LwtAPIClient(getApplication(), device.getAddress());
         lwtClient.disableTLS(); // at this stage, use unencrypted connection
-        lwtClient.addSessionExecutionObserver(new LwtpLoggingObserver());
+        lwtClient.addLwtpExecutionObserver(new LwtpLoggingObserver());
         secureLwtClient = new LwtAPIClient(getApplication(), device.getAddress());
         try {
             SSLContext sslContext;
@@ -245,7 +244,7 @@ public class TicketActivationViewModel extends AndroidViewModel {
                             .setSSLContext(sslContext)
                             .build()
             );
-            secureLwtClient.addSessionExecutionObserver(new LwtpLoggingObserver());
+            secureLwtClient.addLwtpExecutionObserver(new LwtpLoggingObserver());
         } catch (GeneralSecurityException e) {
             Log.e(TAG, "Failed to create SSL context for secure LWT client, fallback to insecure", e);
             secureLwtClient = lwtClient;

@@ -56,6 +56,11 @@ public class InlineDevicePickerViewController {
         devListUIController.setOnClickEffectEnabled(false);
     }
 
+    public void setEnabled(boolean enabled) {
+        selectedDeviceView.setEnabled(enabled);
+        devListUIController.setEnabled(enabled);
+    }
+
     public DeviceListViewController getDevListUIController() {
         return devListUIController;
     }

@@ -70,7 +70,7 @@ public class BluetoothLeThrottling {
     }
 
     private static SharedPreferences getSharedPreferences(Context context) {
-        return context.getSharedPreferences("BluetoothLeThrottling", Context.MODE_PRIVATE);
+        return context.getSharedPreferences(BluetoothLeThrottling.class.getSimpleName(), Context.MODE_PRIVATE);
     }
 
     private static int getBootCount(Context context) {

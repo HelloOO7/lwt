@@ -62,7 +62,7 @@ public class LiveErrorSignal extends AdapterLiveData<Throwable> {
                 futureWithSilentCancel.complete(t);
             }
         });
-        return future;
+        return futureWithSilentCancel;
     }
 
     private void logFailAndSetValue(Consumer<?> onSuccess, Throwable throwable) {

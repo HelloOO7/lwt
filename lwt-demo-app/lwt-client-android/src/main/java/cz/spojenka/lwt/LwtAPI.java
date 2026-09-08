@@ -39,4 +39,7 @@ public interface LwtAPI {
 
     @LwtOperation(Operation.CICOCheckOut)
     public LwtCall<CheckOutResponse> cicoCheckOut(ByteBuffer request);
+
+    @LwtOperation(Operation.CICOGetInspectionData)
+    public LwtCall<CICOInspectionData> getCicoInspectionData();
 }

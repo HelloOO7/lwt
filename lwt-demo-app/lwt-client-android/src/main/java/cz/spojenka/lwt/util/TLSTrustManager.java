@@ -22,7 +22,6 @@ import java.util.List;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 
@@ -32,8 +31,6 @@ public class TLSTrustManager {
 
     private static final String TAG = "TLSTrustManager";
 
-    private final CertificateFactory certFactoryX509;
-
     private KeyStore clientKeyStore;
     private char[] clientKeyStorePassword;
     private final KeyStore peerKeyStore;
@@ -42,45 +39,8 @@ public class TLSTrustManager {
     private KeyManagerFactory kmf;
 
     public TLSTrustManager() throws IOException, GeneralSecurityException {
-        certFactoryX509 = CertificateFactory.getInstance("X.509");
         peerKeyStore = KeyStore.getInstance(KeyStore.getDefaultType());
         peerKeyStore.load(null, null);
-    }
-
-    private X509Certificate loadCertificate(InputStream in) throws CertificateException {
-        return (X509Certificate) certFactoryX509.generateCertificate(in);
-    }
-
-    private X509Certificate[] loadCertificates(InputStream in) throws CertificateException {
-        List<X509Certificate> certs = new ArrayList<>();
-        for (var cert : certFactoryX509.generateCertificates(in)) {
-            certs.add((X509Certificate) cert);
-        }
-        return certs.toArray(new X509Certificate[0]);
-    }
-
-    public X509Certificate loadCertificate(Context context, @RawRes int resId) throws IOException, CertificateException {
-        try (InputStream in = context.getResources().openRawResource(resId)) {
-            return loadCertificate(in);
-        }
-    }
-
-    public X509Certificate loadCertificate(AssetManager assetManager, String assetPath) throws IOException, CertificateException {
-        try (InputStream in = assetManager.open(assetPath)) {
-            return loadCertificate(in);
-        }
-    }
-
-    public X509Certificate[] loadCertificates(byte[] certData) throws IOException, CertificateException {
-        try (InputStream in = new ByteArrayInputStream(certData)) {
-            return loadCertificates(in);
-        }
-    }
-
-    public X509Certificate[] loadCertificates(ByteBuffer certData) throws IOException, CertificateException {
-        try (InputStream in = new ByteBufferInputStream(certData)) {
-            return loadCertificates(in);
-        }
     }
 
     public KeyStore loadPKCS12(InputStream in, char[] password) throws IOException, GeneralSecurityException {
@@ -115,13 +75,13 @@ public class TLSTrustManager {
     }
 
     public void addCertificate(Context context, @RawRes int resId, String alias) throws IOException, GeneralSecurityException {
-        X509Certificate cert = loadCertificate(context, resId);
+        X509Certificate cert = CertificateLoader.loadCertificate(context, resId);
         peerKeyStore.setCertificateEntry(alias, cert);
         invalidateTmf();
     }
 
     public void addCertificate(AssetManager assetManager, String assetPath, String alias) throws IOException, GeneralSecurityException {
-        X509Certificate cert = loadCertificate(assetManager, assetPath);
+        X509Certificate cert = CertificateLoader.loadCertificate(assetManager, assetPath);
         peerKeyStore.setCertificateEntry(alias, cert);
         invalidateTmf();
     }
@@ -187,7 +147,7 @@ public class TLSTrustManager {
     }
 
     public boolean isCertificateChainTrusted(byte[] certChainData) throws GeneralSecurityException, IOException {
-        return isCertificateChainTrusted(loadCertificates(certChainData));
+        return isCertificateChainTrusted(CertificateLoader.loadCertificates(certChainData));
     }
 
     public boolean isCertificateChainTrusted(X509Certificate[] chain) throws GeneralSecurityException {

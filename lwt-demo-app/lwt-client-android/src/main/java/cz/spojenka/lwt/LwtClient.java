@@ -14,15 +14,12 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.WeakHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.function.BiConsumer;
 
 import cz.spojenka.lwdn.LwdnAddress;
 import cz.spojenka.lwdn.LwdnSocketFactory;
 import cz.spojenka.lwdn.TLSLwdnSocketFactory;
-import cz.spojenka.lwtp.LwtpPacket;
 import cz.spojenka.lwtp.LwtpSession;
 import cz.spojenka.lwtp.LwtpTLSConfig;
 import cz.spojenka.lwtp.LwtpTLSPolicy;
@@ -38,11 +35,9 @@ public class LwtClient implements Closeable {
     private LwtpSession baseSession = new LwtpSession();
     private LwdnSocketFactory socketFactory;
 
-    private final WeakHashMap<LwtpPacket, LwtCall<?>> packetToResultMap = new WeakHashMap<>();
-
-    private final List<ExecutionObserver> observers = new ArrayList<>();
-
     private final Set<CompletableFuture<?>> runningAsyncSessions = new HashSet<>();
+
+    private final List<ExecutionObserver> globalExecutionObservers = new ArrayList<>();
 
     public LwtClient(Context context, LwdnAddress address) {
         this.address = address;
@@ -77,7 +72,7 @@ public class LwtClient implements Closeable {
     public void useTLS(LwtpTLSConfig tlsConfig) {
         if (tlsConfig == null || tlsConfig.getTlsPolicy() == LwtpTLSPolicy.UNSECURED) {
             socketFactory = baseSocketFactory;
-            changeSession(new LwtpSession());
+            changeBaseSession(new LwtpSession());
         } else {
             if (tlsConfig.getTlsPolicy() == LwtpTLSPolicy.IMPLICIT) {
                 // wrap the socket factory with a TLS layer here.
@@ -87,7 +82,7 @@ public class LwtClient implements Closeable {
             } else {
                 socketFactory = baseSocketFactory;
             }
-            changeSession(new TLSLwtpSession(tlsConfig));
+            changeBaseSession(new TLSLwtpSession(tlsConfig));
         }
     }
 
@@ -95,61 +90,28 @@ public class LwtClient implements Closeable {
         useTLS(null);
     }
 
-    public synchronized void addExecutionObserver(ExecutionObserver observer) {
-        if (!observers.contains(observer)) {
-            observers.add(observer);
-        }
-    }
-
-    public synchronized void removeExecutionObserver(ExecutionObserver observer) {
-        observers.remove(observer);
-    }
-
-    public synchronized void addSessionExecutionObserver(LwtpSession.ExecutionObserver observer) {
-        baseSession.addObserver(observer);
-    }
-
-    public synchronized void removeSessionExecutionObserver(LwtpSession.ExecutionObserver observer) {
-        baseSession.removeObserver(observer);
-    }
-
-    private void changeSession(LwtpSession newSession) {
+    private void changeBaseSession(LwtpSession newSession) {
         Duration wdTimeout = baseSession.getWatchdogTimeout();
         baseSession = newSession;
         baseSession.setWatchdogTimeout(wdTimeout);
-        baseSession.addObserver(new LwtpSession.ExecutionObserver() {
-            @Override
-            public void onStartRequest(LwtpPacket request) {
-                invokeObservers(request, ExecutionObserver::onStartRequest);
-            }
-
-            @Override
-            public void onRequestSent(LwtpPacket request) {
-                invokeObservers(request, ExecutionObserver::onRequestSent);
-            }
-
-            @Override
-            public void onStartResponse(LwtpPacket request) {
-                invokeObservers(request, ExecutionObserver::onStartResponse);
-            }
-
-            @Override
-            public void onResponseReceived(LwtpPacket request, LwtpPacket response) {
-                invokeObservers(request, ExecutionObserver::onResponseReceived);
-            }
-        });
     }
 
-    private synchronized void invokeObservers(LwtpPacket key, BiConsumer<ExecutionObserver, LwtCall<?>> action) {
-        LwtCall<?> call;
-        synchronized (packetToResultMap) {
-            call = packetToResultMap.get(key);
+    public void addExecutionObserver(LwtClient.ExecutionObserver observer) {
+        if (!globalExecutionObservers.contains(observer)) {
+            globalExecutionObservers.add(observer);
         }
-        if (call != null) {
-            for (ExecutionObserver observer : observers) {
-                action.accept(observer, call);
-            }
-        }
+    }
+
+    public void removeExecutionObserver(LwtClient.ExecutionObserver observer) {
+        globalExecutionObservers.remove(observer);
+    }
+
+    public synchronized void addLwtpExecutionObserver(LwtpSession.ExecutionObserver observer) {
+        baseSession.addObserver(observer);
+    }
+
+    public synchronized void removeLwtpExecutionObserver(LwtpSession.ExecutionObserver observer) {
+        baseSession.removeObserver(observer);
     }
 
     @SuppressWarnings("unchecked")
@@ -183,7 +145,9 @@ public class LwtClient implements Closeable {
     }
 
     public LwtSession newSession() {
-        return new LwtSession(this, baseSession.cloneAsEmpty());
+        LwtSession session = new LwtSession(this, baseSession.cloneAsEmpty());
+        globalExecutionObservers.forEach(session::addExecutionObserver);
+        return session;
     }
 
     void execute(LwtpSession session) {
@@ -200,12 +164,6 @@ public class LwtClient implements Closeable {
         CompletableFuture<Void> future = session.executeAsync(socketFactory, executor);
         trackAsyncExecution(future);
         return future;
-    }
-
-    void registerPendingRequest(LwtpPacket request, LwtCall<?> result) {
-        synchronized (packetToResultMap) {
-            packetToResultMap.put(request, result);
-        }
     }
 
     void trackAsyncExecution(CompletableFuture<?> execution) {
