@@ -99,7 +99,7 @@ public class TicketInspectionDetailActivity extends BaseActivity {
             LwtTicketMetadata lwtMetadata = LwtTicketMetadata.parse(lwtInfoString);
             addInfoView(R.string.ticket_inspection_detail_linsp, lwtMetadata.getTripKey());
             if (Objects.equals(inspectionTk, lwtMetadata.getTripKey())) {
-                addInfoView(0, getString(R.string.ticket_inspection_detail_from_current_trip), R.drawable.ic_info_f_24px);
+                addInfoView(0, getString(R.string.ticket_inspection_detail_from_current_trip), R.drawable.ic_info_f_24px, R.color.ticket_inspection_status_informative);
             }
         }
     }

@@ -1,4 +1,4 @@
-package cz.spojenka.lwt.demoapp;
+package cz.spojenka.lwdn.util;
 
 import android.util.Log;
 

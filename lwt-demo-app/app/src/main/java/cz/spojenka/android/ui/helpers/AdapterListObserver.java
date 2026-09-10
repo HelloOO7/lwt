@@ -2,6 +2,8 @@ package cz.spojenka.android.ui.helpers;
 
 import java.util.List;
 
+import androidx.annotation.NonNull;
+import androidx.lifecycle.DefaultLifecycleObserver;
 import androidx.lifecycle.LifecycleOwner;
 import androidx.lifecycle.Observer;
 import cz.spojenka.android.system.livedata.LiveList;
@@ -17,7 +19,6 @@ public class AdapterListObserver<T> implements LiveList.UpdateObserver<T>, Obser
     private final ArrayListAdapter<T, ?> adapter;
 
     private LiveList<T> target;
-    private LifecycleOwner lifecycleOwner;
 
     /**
      * Creates a new AdapterListObserver that will manage the given adapter.
@@ -56,23 +57,27 @@ public class AdapterListObserver<T> implements LiveList.UpdateObserver<T>, Obser
     }
 
     private void bindUpdateObserver() {
-        if (lifecycleOwner != null) {
-            target.observeUpdates(lifecycleOwner, this);
-        } else {
-            target.observeUpdatesForever(this);
-        }
+        target.observeUpdatesForever(this);
     }
 
     public void attach(LifecycleOwner owner, LiveList<T> liveList) {
         this.target = liveList;
-        this.lifecycleOwner = owner;
-        liveList.observe(owner, this);
+        liveList.observeForever(this);
+        // bugfix: the list can be updated even in the background (such as BLE scans).
+        // in that case, we must not pause updates if the activity is in STOPPED state,
+        // as it could miss out on inserts/removals
+        owner.getLifecycle().addObserver(new DefaultLifecycleObserver() {
+            @Override
+            public void onDestroy(@NonNull LifecycleOwner owner) {
+                detach();
+                owner.getLifecycle().removeObserver(this);
+            }
+        });
         bindUpdateObserverIfUninitialized();
     }
 
     public void attach(LiveList<T> liveList) {
         this.target = liveList;
-        this.lifecycleOwner = null;
         liveList.observeForever(this);
         bindUpdateObserverIfUninitialized();
     }
@@ -88,7 +93,6 @@ public class AdapterListObserver<T> implements LiveList.UpdateObserver<T>, Obser
             target.removeObserver(this);
             target.removeUpdateObserver(this);
             target = null;
-            lifecycleOwner = null;
         }
     }
 }

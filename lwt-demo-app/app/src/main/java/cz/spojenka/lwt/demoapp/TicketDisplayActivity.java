@@ -116,8 +116,9 @@ public class TicketDisplayActivity extends BaseActivity {
             OffsetDateTime to = ticketForClock.getValidUntil();
             boolean pastValidity = false;
 
+            @ColorInt int defaultTextTint = MaterialColors.getColor(binding.tvRemainingTime, android.R.attr.textColor);
             @ColorInt int progressTint;
-            @ColorInt int progressTextTint = MaterialColors.getColor(binding.tvRemainingTime, android.R.attr.textColor);
+            @ColorInt int progressTextTint = defaultTextTint;
             if (!now.isBefore(from) && !now.isAfter(to)) {
                 binding.pbValidity.setVisibility(View.VISIBLE);
                 Duration toEndOfValidity = Duration.between(now, to);
@@ -154,12 +155,14 @@ public class TicketDisplayActivity extends BaseActivity {
                 progressTint = context.getColor(R.color.ticket_display_progress_bg);
                 progressTextTint = context.getColor(R.color.ticket_display_progress_inactive);
             }
-            binding.tvRemainingTime.setTextColor(progressTextTint);
-            binding.pbValidity.setProgressTintList(ColorStateList.valueOf(progressTint));
 
             if (ticketForClock.getValidityPeriod() == null && !pastValidity) {
                 binding.tvRemainingTime.setText(R.string.ticket_display_validity_flexible);
+                progressTextTint = defaultTextTint;
             }
+
+            binding.tvRemainingTime.setTextColor(progressTextTint);
+            binding.pbValidity.setProgressTintList(ColorStateList.valueOf(progressTint));
         }
     }
 

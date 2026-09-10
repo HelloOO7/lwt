@@ -28,6 +28,8 @@ import java.util.Set;
 import java.util.function.Predicate;
 
 import androidx.annotation.Nullable;
+import cz.spojenka.lwdn.util.DeviceSpecifics;
+import cz.spojenka.lwdn.util.XiaomiBLERestrictionKiller;
 
 public class BluetoothLwdnScanner implements LwdnScanner {
 
@@ -117,7 +119,7 @@ public class BluetoothLwdnScanner implements LwdnScanner {
         // not necessarily - it seems to work fine on a Huawei device running Pie
         // and a Samsung Galaxy S II running Q.
         // not so much on a Pie LG device and Q Xiaomi device, unfortunately.
-        return Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q;
+        return Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q || DeviceSpecifics.isXiaomi();
     }
 
     private boolean shouldUseSoftwareUUIDFiltering() {
@@ -186,7 +188,7 @@ public class BluetoothLwdnScanner implements LwdnScanner {
                     if (!softwareFilter.test(result)) {
                         return;
                     }
-                    //Log.d("BluetoothLwdnScanner", "onScanResult: " + result.getDevice().getAddress() + " rssi=" + result.getRssi());
+                    Log.d("BluetoothLwdnScanner", "onScanResult: " + result.getDevice().getAddress() + " rssi=" + result.getRssi());
                     if (scan.isFinished()) {
                         // result after timeout
                         return;
@@ -249,6 +251,7 @@ public class BluetoothLwdnScanner implements LwdnScanner {
 
         private boolean startScanImpl(ScanSettings settings, List<ScanFilter> filters) {
             try {
+                //XiaomiBLERestrictionKiller.apply();
                 long thisScanStartTime = SystemClock.elapsedRealtime();
                 BluetoothLeScannerCompat.startScan(context, scanner, filters, settings, callback);
 

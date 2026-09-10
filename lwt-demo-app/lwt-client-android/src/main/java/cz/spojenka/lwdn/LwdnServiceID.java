@@ -10,7 +10,7 @@ import java.util.List;
 
 import androidx.annotation.NonNull;
 import androidx.core.os.ParcelCompat;
-import cz.spojenka.lwt.util.BLEScanRecordUtil;
+import cz.spojenka.lwdn.util.BLEScanRecordUtil;
 
 public sealed interface LwdnServiceID extends Parcelable permits LwdnServiceID.UUID, LwdnServiceID.ServiceName, LwdnServiceID.DeviceName {
 

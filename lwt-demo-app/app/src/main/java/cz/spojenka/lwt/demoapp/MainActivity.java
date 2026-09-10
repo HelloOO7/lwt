@@ -1,5 +1,6 @@
 package cz.spojenka.lwt.demoapp;
 
+import android.content.ComponentName;
 import android.content.Intent;
 import android.net.ConnectivityManager;
 import android.net.Network;
@@ -28,6 +29,7 @@ import androidx.annotation.Nullable;
 import cz.spojenka.android.ui.activity.BaseActivity;
 import cz.spojenka.android.util.AsyncUtils;
 import cz.spojenka.android.util.ViewUtils;
+import cz.spojenka.lwdn.util.DeviceSpecifics;
 import cz.spojenka.lwt.*;
 import cz.spojenka.lwt.demoapp.databinding.ActivityMainBinding;
 

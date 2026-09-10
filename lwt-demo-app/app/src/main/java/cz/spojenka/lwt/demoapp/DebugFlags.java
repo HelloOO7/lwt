@@ -1,5 +1,7 @@
 package cz.spojenka.lwt.demoapp;
 
+import cz.spojenka.lwdn.util.SystemProperties;
+
 public class DebugFlags {
 
     public static boolean isAllowUntrustedCertificates() {

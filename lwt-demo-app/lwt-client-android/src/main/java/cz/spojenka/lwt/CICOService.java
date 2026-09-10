@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import javax.net.ssl.SSLContext;
@@ -38,6 +39,7 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import cz.spojenka.lwdn.BluetoothLeThrottling;
 import cz.spojenka.lwdn.BluetoothLwdnScanner;
+import cz.spojenka.lwdn.BluetoothLwdnSocket;
 import cz.spojenka.lwdn.LwdnAddress;
 import cz.spojenka.lwdn.LwdnScanConfig;
 import cz.spojenka.lwdn.LwdnScanException;
@@ -73,6 +75,7 @@ public class CICOService extends Service {
     private boolean restoreConnectionPending;
     private MutableLiveData<LwtDevice> currentDeviceLiveData = new MutableLiveData<>();
     private LwtAPIClient currentLwtClient;
+    private long nextAllowedSocketOpenTime;
     private SSLContext clientSSLContext;
 
     private MutableLiveData<CICOTicketFragment> currentTicketLiveData = new MutableLiveData<>();
@@ -82,6 +85,8 @@ public class CICOService extends Service {
 
     private final Runnable refreshTicketRunnable = this::refreshTicket;
     private final Runnable restartThrottledScanRunnable = this::restartLastDeviceScan;
+
+    private Consumer<BluetoothLwdnSocket> globalConnectObserver;
 
     @Override
     public void onCreate() {
@@ -97,6 +102,11 @@ public class CICOService extends Service {
         scanner = new LwtDeviceScanner(btScanner);
         isCommOnline = btScanner.isAvailable();
         registerReceiver(bluetoothStateReceiver, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
+        globalConnectObserver = socket -> {
+            // on successful connection, reset this.
+            resetHuaweiThrottling();
+        };
+        BluetoothLwdnSocket.addGlobalConnectObserver(globalConnectObserver);
         Log.d(TAG, "Service started");
     }
 
@@ -108,6 +118,7 @@ public class CICOService extends Service {
             stopAndClearDeviceScan();
             disconnectCurrentDevice();
             unregisterReceiver(bluetoothStateReceiver);
+            BluetoothLwdnSocket.removeGlobalConnectObserver(globalConnectObserver);
             Log.d(TAG, "Service terminated");
         } finally {
             releaseWakeLock(); // always release wakelock
@@ -258,15 +269,14 @@ public class CICOService extends Service {
             List<LwtDevice> lastDevices = deviceResultTarget.getValue();
             List<LwtDevice> newDevices = getCicoDevicesByProximity(scan.getResults());
             deviceResultTarget.setValue(newDevices);
-            if (restoreConnectionPending) {
-                if (!sameDevices(lastDevices, newDevices) || (SystemClock.elapsedRealtime() - restoreThrottleTime > ttlForTryRestore)) {
+            if (isRestoreConnectionPendingAndPossible()) {
+                if (!sameDevices(lastDevices, newDevices)) {
                     restoreThrottleTime = 0;
+                }
+                if (restoreThrottleTime == 0 || SystemClock.elapsedRealtime() - restoreThrottleTime > ttlForTryRestore) {
+                    restoreThrottleTime = SystemClock.elapsedRealtime();
                     Log.d(TAG, "restoreConnection on result");
                     restoreConnection();
-                } else {
-                    if (restoreThrottleTime == 0) {
-                        restoreThrottleTime = SystemClock.elapsedRealtime();
-                    }
                 }
             } else {
                 restoreThrottleTime = 0;
@@ -344,13 +354,17 @@ public class CICOService extends Service {
 
     private void startForegroundService() {
         Log.d(TAG, "Starting foreground service");
+        // update this now, which makes the foreground controller show the notification (state broadcast)
+        updateStateFlag(ServiceState.FLAG_FOREGROUND_SERVICE_ACTIVE, true);
+        // only now start the foreground service. this is to ensure that foregroundController.createNotification()
+        // returns an up-to-date notification. it is needed because sometimes, the notification from startForeground
+        // is shown out of order, and so we want to be sure that it always has the latest possible state.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ServiceCompat.startForeground(this, foregroundController.getNotificationId(), foregroundController.createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE);
         } else {
             startForeground(foregroundController.getNotificationId(), foregroundController.createNotification());
         }
         acquireWakeLock();
-        updateStateFlag(ServiceState.FLAG_FOREGROUND_SERVICE_ACTIVE, true);
     }
 
     @SuppressLint("WakelockTimeout")
@@ -436,7 +450,6 @@ public class CICOService extends Service {
                 .whenCompleteAsync((ticket, throwable) -> {
                     if (throwable != null) {
                         Log.e(TAG, "Failed to start session with device " + currentDevice.getAddress(), throwable);
-                        disconnectCurrentDevice();
                     } else {
                         Log.d(TAG, "startSession OK");
                         onGotTicket(ticket);
@@ -681,16 +694,29 @@ public class CICOService extends Service {
                     .executeAsync()
                     .whenCompleteAsync((newTicket, throwable) -> {
                         if (throwable != null) {
+                            boolean throttled = handleHuaweiThrottling(throwable);
                             Log.e(TAG, "Failed to refresh ticket with device " + currentDevice.getAddress(), throwable);
                             if (changeDeviceIfLost) {
-                                disconnectCurrentDevice();
-                                restoreConnection();
+                                if (!throttled) {
+                                    disconnectCurrentDevice();
+                                    restoreConnection();
+                                } else {
+                                    refreshTicketAfterThrottling();
+                                }
                             }
                         } else {
                             Log.d(TAG, "refreshTicket OK");
                             onGotTicket(newTicket);
                         }
                     }, getMainExecutor());
+        }
+    }
+
+    private void refreshTicketAfterThrottling() {
+        if (nextAllowedSocketOpenTime == 0) {
+            refreshTicket();
+        } else {
+            handler.postDelayed(refreshTicketRunnable, nextAllowedSocketOpenTime - System.currentTimeMillis());
         }
     }
 
@@ -702,14 +728,14 @@ public class CICOService extends Service {
         List<LwtDevice> closestDevices = devicesInProximityLiveData.getValue();
         if (closestDevices == null || closestDevices.isEmpty()) {
             Log.d(TAG, "No device to restore connection with, deferring restore");
-            restoreConnectionPending = true;
+            setRestoreConnectionPending();
             return;
         }
         CICOTicketFragment currentTicket = currentTicketLiveData.getValue();
         if (currentTicket == null) {
             throw new IllegalStateException("Can not restore connection without a ticket");
         }
-        restoreConnectionPending = false;
+        resetRestoreConnectionPending();
         List<CompletableFuture<?>> attemptFutures = new ArrayList<>();
         for (int i = 0; i < closestDevices.size(); i++) {
             attemptFutures.add(new CompletableFuture<>());
@@ -756,9 +782,43 @@ public class CICOService extends Service {
         attemptFutures.get(attemptFutures.size() - 1).whenCompleteAsync((o, throwable) -> {
             if (throwable != null) {
                 Log.e(TAG, "Failed to connect to any device", throwable);
-                restoreConnectionPending = true;
+                setRestoreConnectionPending();
+                handleHuaweiThrottling(throwable);
             }
         }, getMainExecutor());
+    }
+
+    private void resetRestoreConnectionPending() {
+        restoreConnectionPending = false;
+    }
+
+    private void setRestoreConnectionPending() {
+        restoreConnectionPending = true;
+    }
+
+    private boolean isRestoreConnectionPendingAndPossible() {
+        if (restoreConnectionPending) {
+            if (nextAllowedSocketOpenTime == 0 || System.currentTimeMillis() > nextAllowedSocketOpenTime) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void resetHuaweiThrottling() {
+        nextAllowedSocketOpenTime = 0;
+    }
+
+    private boolean handleHuaweiThrottling(Throwable throwable) {
+        if (BluetoothLeThrottling.isHuaweiConnectionThrottled(throwable)) {
+            if (nextAllowedSocketOpenTime == 0) {
+                Log.w(TAG, "Huawei background connect throttling detected, deferring connection");
+                // huawei uses currentTimeMillis
+                nextAllowedSocketOpenTime = System.currentTimeMillis() + BluetoothLeThrottling.getHuaweiConnectionThrottlePeriod();
+            }
+            return true;
+        }
+        return false;
     }
 
     private final BroadcastReceiver bluetoothStateReceiver = new BroadcastReceiver() {

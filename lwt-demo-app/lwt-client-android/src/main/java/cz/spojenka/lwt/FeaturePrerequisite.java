@@ -4,6 +4,8 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
+import android.content.ActivityNotFoundException;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -14,11 +16,14 @@ import android.provider.Settings;
 
 import java.util.Set;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import cz.spojenka.lwdn.BluetoothLwdnScanner;
 import cz.spojenka.lwdn.HybridLwdnScanner;
+import cz.spojenka.lwdn.util.DeviceSpecifics;
 import cz.spojenka.lwt.util.PermissionRequestFlow;
 
 public interface FeaturePrerequisite {
@@ -194,7 +199,7 @@ public interface FeaturePrerequisite {
             ? new AbstractPermissionPrerequisite(Manifest.permission.POST_NOTIFICATIONS)
             : new AlwaysSatisfiedPrerequisite();
 
-    public static final FeaturePrerequisite BATTERY_EXEMPTION = new AbstractSimpleFlowPrerequisite() {
+    public static final FeaturePrerequisite BATTERY_EXEMPTION = new FeaturePrerequisite() {
 
         private static final Set<String> CAPRICIOUS_MANUFACTURERS = Set.of(
                 "xiaomi",
@@ -208,6 +213,13 @@ public interface FeaturePrerequisite {
 
         @Override
         public boolean isApplicable(Context context) {
+            if (DeviceSpecifics.isLineageOs()) {
+                // lineage does not suck
+                return false;
+            }
+            if (DeviceSpecifics.isXiaomi()) {
+                return true;
+            }
             String manufacturer = Build.MANUFACTURER.toLowerCase();
             if ("samsung".equals(manufacturer)) {
                 // https://android-developers.googleblog.com/2023/05/improving-consistency-of-background-work-on-android.html
@@ -216,19 +228,54 @@ public interface FeaturePrerequisite {
             return CAPRICIOUS_MANUFACTURERS.contains(manufacturer);
         }
 
+        private Boolean xiaomiIsNoRestrict;
+
         @Override
         public boolean check(Context context) {
+            if (xiaomiIsNoRestrict != null && xiaomiIsNoRestrict) {
+                return true;
+            }
             return context.getSystemService(PowerManager.class).isIgnoringBatteryOptimizations(context.getPackageName());
         }
 
         @SuppressLint("BatteryLife")
         @Override
-        public void startRemedyActivity(Context context) {
-            if (context.checkSelfPermission(Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS) == PackageManager.PERMISSION_GRANTED) {
-                context.startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS));
-            } else {
-                context.startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
-            }
+        public PermissionRequestFlow createRemedyFlow(AppCompatActivity activity) {
+            ActivityResultLauncher<Intent> xiaomiLauncher = activity.registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                xiaomiIsNoRestrict = null;
+                if (result.getData() != null) {
+                    String selection = result.getData().getStringExtra("user_configure");
+                    if ("no_restrict".equals(selection)) {
+                        xiaomiIsNoRestrict = true;
+                    }
+                }
+            });
+            return new PermissionRequestFlow(activity, context -> {
+                if (DeviceSpecifics.isXiaomi() || DeviceSpecifics.isMiui()) {
+                    // MIUI can be installed on non-Xiaomi devices too.
+                    // we try to call this on all Xiaomis incl. custom ROMs. If it fails, we
+                    // continue with the standard method.
+                    try {
+                        startXiaomiPowerSavingDialog(context, xiaomiLauncher);
+                        return;
+                    } catch (ActivityNotFoundException ignored) {
+                        // fall through to AOSP
+                    }
+                }
+                if (context.checkSelfPermission(Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS) == PackageManager.PERMISSION_GRANTED) {
+                    context.startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS));
+                } else {
+                    context.startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+                }
+            });
+        }
+
+        private void startXiaomiPowerSavingDialog(Context context, ActivityResultLauncher<Intent> launcher) {
+            Intent intent = new Intent();
+            intent.setComponent(new ComponentName("com.miui.powerkeeper", "com.miui.powerkeeper.ui.HiddenAppsConfigActivity"));
+            intent.putExtra("package_label", context.getString(context.getApplicationInfo().labelRes));
+            intent.putExtra("package_name", context.getPackageName());
+            launcher.launch(intent);
         }
     };
 

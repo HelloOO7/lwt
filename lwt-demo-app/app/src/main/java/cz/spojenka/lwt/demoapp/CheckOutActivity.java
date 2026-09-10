@@ -45,12 +45,13 @@ public class CheckOutActivity extends CICOActivityBase {
     protected View doCreateView(Bundle savedInstanceState) {
         binding = ActivityCheckOutBinding.inflate(getLayoutInflater());
         viewModel = new ViewModelProvider(this).get(ViewModel.class);
-        bindSlideAction(binding.confirmCheckOut, () -> {
+        SlideToActController slideToAct = new SlideToActController(binding.confirmCheckOut);
+        slideToAct.setActionListener(() -> {
             if (service != null) {
                 viewModel.checkOut(service);
                 binding.confirmCheckOut.setEnabled(false);
             } else {
-                binding.confirmCheckOut.setCompleted(false, true);
+                slideToAct.reset();
             }
         });
         viewModel.getCheckOutDone().observe(this, done -> {

@@ -46,6 +46,8 @@ public class LwtpSession {
         }
     }
 
+    static int test = 0;
+
     protected LwtpPacket sendRequest(LwdnSocket socket, LwtpPacket request) throws IOException {
         invokeObservers(o -> o.onStartRequest(request));
 
@@ -55,20 +57,26 @@ public class LwtpSession {
             watchdog.start();
         }
 
-        request.write(socket.getOutputStream());
-        if (watchdog != null) {
-            watchdog.resetWatchdog();
-        }
-        invokeObservers(o -> o.onRequestSent(request));
+        try {
+            request.write(socket.getOutputStream());
+            if (watchdog != null) {
+                watchdog.resetWatchdog();
+            }
+            invokeObservers(o -> o.onRequestSent(request));
 
-        invokeObservers(o -> o.onStartResponse(request));
-        LwtpPacket response = new LwtpPacket(socket.getInputStream());
-        if (watchdog != null) {
-            watchdog.stopWatchdog();
-        }
-        invokeObservers(o -> o.onResponseReceived(request, response));
+            invokeObservers(o -> o.onStartResponse(request));
+            LwtpPacket response = new LwtpPacket(socket.getInputStream());
+            if (watchdog != null) {
+                watchdog.stopWatchdog();
+            }
+            invokeObservers(o -> o.onResponseReceived(request, response));
 
-        return response;
+            return response;
+        } finally {
+            if (watchdog != null) {
+                watchdog.stopWatchdog();
+            }
+        }
     }
 
     /**

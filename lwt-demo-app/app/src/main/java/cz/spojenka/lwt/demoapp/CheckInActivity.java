@@ -51,6 +51,7 @@ public class CheckInActivity extends CICOActivityBase {
     private ViewModel viewModel;
     private DeviceListViewModel deviceListViewModel;
     private InlineDevicePickerViewController devicePickerUIController;
+    private SlideToActController slideToAct;
 
     private boolean permissionsAsked = false;
 
@@ -107,9 +108,9 @@ public class CheckInActivity extends CICOActivityBase {
             }
         };
         devicePickerUIController.bind(this);
+        slideToAct = new SlideToActController(binding.confirmCheckin);
 
         updateControlsEnabled();
-        registerReceiver(bluetoothOnReceiver, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
 
         viewModel.getSelectedDevice().observe(this, device -> devicePickerUIController.overrideSelectedDevice(device));
 
@@ -117,7 +118,7 @@ public class CheckInActivity extends CICOActivityBase {
             updateControlsEnabled();
             if (device != null) {
                 devicePickerUIController.markDeviceAsConfirmed(true);
-                bindSlideAction(binding.confirmCheckin, () -> {
+                slideToAct.setActionListener(() -> {
                     if (service.isConnectedToDevice()) {
                         viewModel.checkIn(service);
                     } else {
@@ -125,8 +126,8 @@ public class CheckInActivity extends CICOActivityBase {
                     }
                 });
             } else {
-                bindSlideAction(binding.confirmCheckin, null);
-                binding.confirmCheckin.setCompleted(false, true);
+                slideToAct.setActionListener(null);
+                slideToAct.reset();
             }
         });
         viewModel.isCheckingInLiveData().observe(this, checkingIn -> updateControlsEnabled());
@@ -140,7 +141,7 @@ public class CheckInActivity extends CICOActivityBase {
         });
 
         viewModel.getCheckInError().handle(this, error -> {
-            binding.confirmCheckin.setCompleted(false, true);
+            slideToAct.reset();
             CommonDialogs.newInfoDialog(this, getString(R.string.check_in_error_title), error.getMessage())
                     .setPositiveButton(android.R.string.ok, (dialog, which) -> dialog.dismiss())
                     .show();
@@ -209,8 +210,14 @@ public class CheckInActivity extends CICOActivityBase {
     }
 
     @Override
-    protected void onDestroy() {
-        super.onDestroy();
+    protected void onResume() {
+        super.onResume();
+        registerReceiver(bluetoothOnReceiver, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
         unregisterReceiver(bluetoothOnReceiver);
     }
 
@@ -289,7 +296,9 @@ public class CheckInActivity extends CICOActivityBase {
             if (requestSessionFuture != null) {
                 requestSessionFuture.cancel(true);
             }
-            onDeviceLost(service);
+            if (selectedDevice.getValue() != null) {
+                onDeviceLost(service);
+            }
         }
 
         public void onDeviceLost(ICICOService service) {

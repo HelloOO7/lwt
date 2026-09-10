@@ -93,32 +93,4 @@ public abstract class CICOActivityBase extends BaseActivity {
     protected abstract View doCreateView(Bundle savedInstanceState);
 
     protected abstract void onServiceConnected();
-
-    protected void bindSlideAction(SlideToActView view, Runnable action) {
-        if (action != null) {
-            view.setOnSlideToActAnimationEventListener(new SlideToActView.OnSlideToActAnimationEventListener() {
-                @Override
-                public void onSlideCompleteAnimationStarted(@NonNull SlideToActView slideToActView, float v) {
-                    action.run();
-                }
-
-                @Override
-                public void onSlideCompleteAnimationEnded(@NonNull SlideToActView slideToActView) {
-
-                }
-
-                @Override
-                public void onSlideResetAnimationStarted(@NonNull SlideToActView slideToActView) {
-
-                }
-
-                @Override
-                public void onSlideResetAnimationEnded(@NonNull SlideToActView slideToActView) {
-
-                }
-            });
-        } else {
-            view.setOnSlideToActAnimationEventListener(null);
-        }
-    }
 }

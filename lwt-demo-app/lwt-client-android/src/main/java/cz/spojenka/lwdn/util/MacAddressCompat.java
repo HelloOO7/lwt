@@ -1,4 +1,4 @@
-package cz.spojenka.lwdn;
+package cz.spojenka.lwdn.util;
 
 import android.net.MacAddress;
 import android.os.Build;

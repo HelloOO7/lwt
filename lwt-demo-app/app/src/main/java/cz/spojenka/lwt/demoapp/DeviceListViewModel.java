@@ -1,7 +1,6 @@
 package cz.spojenka.lwt.demoapp;
 
 import android.app.Application;
-import android.os.Handler;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,7 +35,7 @@ public class DeviceListViewModel extends AndroidViewModel implements LwtScan.OnR
     private final MutableLiveData<Boolean> isLoading = new MutableLiveData<>(true);
     private final MutableLiveData<LwdnScanException> scanError = new MutableLiveData<>();
 
-    private boolean showInactiveDevies = false;
+    private boolean showInactiveDevices = false;
     private Predicate<LwtDevice> deviceFilter = dev -> true;
     private final List<LwdnAddress> hiddenAddresses = new ArrayList<>();
 
@@ -75,8 +74,8 @@ public class DeviceListViewModel extends AndroidViewModel implements LwtScan.OnR
         this.useContinuousScan = useContinuousScan;
     }
 
-    public void setShowInactiveDevies(boolean showInactiveDevies) {
-        this.showInactiveDevies = showInactiveDevies;
+    public void setShowInactiveDevices(boolean showInactiveDevices) {
+        this.showInactiveDevices = showInactiveDevices;
     }
 
     public void setDeviceFilter(Predicate<LwtDevice> deviceFilter) {
@@ -151,7 +150,7 @@ public class DeviceListViewModel extends AndroidViewModel implements LwtScan.OnR
     }
 
     private void insertResult(LwtDevice device) {
-        if (isDeviceHidden(device) || (!showInactiveDevies && isDeviceInactive(device)) || !deviceFilter.test(device)) {
+        if (isDeviceHidden(device) || (!showInactiveDevices && isDeviceInactive(device)) || !deviceFilter.test(device)) {
             removeResult(device);
             return;
         }

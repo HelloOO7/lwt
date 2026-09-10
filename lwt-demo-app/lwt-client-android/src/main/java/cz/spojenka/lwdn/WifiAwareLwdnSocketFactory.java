@@ -20,6 +20,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
 import androidx.annotation.NonNull;
+import cz.spojenka.lwdn.util.MacAddressCompat;
 
 /**
  * Usage note: NAN datapaths are often VERY unstable if there is ongoing activity on the Wi-Fi radio.

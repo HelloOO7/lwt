@@ -4,22 +4,27 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanSettings;
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.SystemClock;
 import android.provider.Settings;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
+import cz.spojenka.lwdn.util.DeviceSpecifics;
 
 public class BluetoothLeThrottling {
 
     private static final String PK_SCAN_START_TIMES = "scanStartTimes";
     private static final String PK_LAST_BOOT_COUNT = "lastBootCount";
 
+    // huawei note: when screen is off, scans are limited to 5 per *hour*
+    // this is fine because we only need to restart scans once every 30 minutes at worst,
+    // as on Android 14, we can use low power scans without restarts
     private static final int RATE_LIMIT_PERIOD = 30 * 1000;
     private static final int RATE_LIMIT_MAX_SCANS = 5;
 
@@ -152,5 +157,36 @@ public class BluetoothLeThrottling {
 
     public static int getScanModeAfterDowngrade() {
         return SCAN_DOWNGRADE_MODE;
+    }
+
+    public static boolean isHuaweiConnectionThrottled(Throwable error) {
+        if (DeviceSpecifics.isHuaweiOs() || DeviceSpecifics.isHonor()) {
+            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S) {
+                return error instanceof IOException && "Connect refused".equals(error.getMessage());
+            }
+        }
+        return false;
+    }
+
+    public static long getHuaweiConnectionThrottlePeriod() {
+        if (DeviceSpecifics.isHonor()) {
+            // Honor became independent of huawei in 2020 and kept the old code
+            // The 2-minute limit is still present on MagicOS 10
+            return 120000;
+        } else if (DeviceSpecifics.isHuaweiOs()) {
+            // EMUI 13 (and newer Android 12-based releases) has these:
+            // EXCESSIVE_CONNECTING_ALLOW_CONNECT_TIMER = 60000;
+            // EXCESSIVE_CONNECTING_EXIST_CONTROL_TIMER = 120000;
+            // EXCESSIVE_CONNECTING_NO_CONTROL_TIMER = 300000;
+            //
+            // Not sure about EMUI 16 yet, as that is currently only available on Pura 90s series
+            // and there are no public firmware files available for download as of Sep 2026.
+            //
+            // Before EMUI 13, all of those were one constant, with value 120 000.
+            // Once we get timed out, EXCESSIVE_CONNECTING_ALLOW_CONNECT_TIMER applies,
+            // so the wait time was lowered.
+            return Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? 60000 : 120000;
+        }
+        throw new IllegalStateException("Called on non-Huawei device");
     }
 }

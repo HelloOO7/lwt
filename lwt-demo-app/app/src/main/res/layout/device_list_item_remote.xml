@@ -58,7 +58,7 @@
             android:id="@+id/tvHeadsign"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textSize="20sp"
+            android:textSize="18sp"
             android:maxLines="1"
             android:ellipsize="end"
             tools:text="NOVÉ BUTOVICE" />
@@ -77,15 +77,16 @@
                 android:layout_weight="1"
                 android:maxLines="2"
                 android:ellipsize="end"
+                android:textSize="14sp"
                 tools:text="v zast. Beroun, U Černého koně" />
 
             <TextView
                 android:id="@+id/tvDelayDisplay"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/section_margin_normal"
                 android:drawablePadding="4dp"
                 android:paddingHorizontal="@dimen/item_margin_normal"
+                android:paddingVertical="@dimen/item_margin_small"
                 android:gravity="center_vertical"
                 tools:text="včas"
                 android:drawableStart="@drawable/delay_indicator" />

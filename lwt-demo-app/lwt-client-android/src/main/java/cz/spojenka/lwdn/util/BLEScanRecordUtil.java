@@ -1,4 +1,4 @@
-package cz.spojenka.lwt.util;
+package cz.spojenka.lwdn.util;
 
 import android.bluetooth.le.ScanRecord;
 

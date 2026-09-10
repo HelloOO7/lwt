@@ -137,7 +137,11 @@ public class LwdnScanConfig {
                 if (scanMode == ScanMode.LOW_LATENCY) {
                     return Duration.ofSeconds(5);
                 } else {
-                    return Duration.ofSeconds(20);
+                    // huawei on Pie sends results every 10 seconds with screen off,
+                    // but sometimes misses a beat and there is a 20-second gap.
+                    // pure 20 seconds are not enough to propagate the results to our app,
+                    // so 25 has been experimentally determined to be a reasonable value.
+                    return Duration.ofSeconds(25);
                 }
             }
             return deviceLostTimeout;
