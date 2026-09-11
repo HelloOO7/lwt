@@ -115,13 +115,28 @@ namespace lwt {
         );
     }
 
+    auto ConvertLocationState(LocationStateEnumeration locState) {
+        switch (locState) {
+        case LocationStateEnumeration::AtStop:
+            return LocationState_AtStop;
+        case LocationStateEnumeration::BeforeStop:
+            return LocationState_BeforeStop;
+        case LocationStateEnumeration::AfterStop:
+            return LocationState_AfterStop;
+        case LocationStateEnumeration::BetweenStop:
+            return LocationState_BetweenStops;
+        default:
+            return LocationState_BetweenStops;
+        }
+    }
+
     auto BuildTripStateInfo(flatbuffers::FlatBufferBuilder& fbb, const vdv301::SubscriberCIS::AllData& allData, const TripInformationStructure& tripInfo, const StopInformationStructure& curStop) {
         return CreateTripStateInfo(
             fbb,
             BuildTripInfo(fbb, allData, tripInfo, curStop),
             tripInfo.TimetableDelay ? tripInfo.TimetableDelay->Value : 0,
             BuildStopReference(fbb, curStop),
-            tripInfo.LocationState && *tripInfo.LocationState == LocationStateEnumeration::AtStop ? LocationState_AtStop : LocationState_BeforeStop
+            tripInfo.LocationState ? ConvertLocationState(*tripInfo.LocationState) : LocationState_BetweenStops
         );
     }
 

@@ -63,7 +63,8 @@ table TripInfo {
 enum LocationState : ubyte {
     AtStop,
     BeforeStop,
-    AfterStop
+    AfterStop,
+    BetweenStops
 }
 
 table TripStateInfo {
@@ -73,9 +74,12 @@ table TripStateInfo {
     delay: int;
     /// Stop at which the vehicle is currently stationed, is about to depart from or has recently departed from.
     current_departure_stop: StopReference (required);
-    /// General position of the trip in relation to current_departure_stop. Most of the time, this will be either
-    /// AtStop or BeforeStop. The exception is when the trip has ended its journey, when AfterStop is used to
-    /// signal the terminus.
+    /// General position of the trip in relation to current_departure_stop.
+    /// AtStop = the vehicle is stationed at the stop.
+    /// BeforeStop = the vehicle has entered the stop area, but has not yet stopped.
+    /// AfterStop = the vehicle has left a stop, but is still in its area. current_departure_stop already shows
+    /// the next stop at this point (in line with VDV 301).
+    /// BetweenStops = the vehicle is not in the area of any stop. current_departure_stop shows the next stop.
     location_state: LocationState;
 }
 

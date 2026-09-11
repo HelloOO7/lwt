@@ -476,6 +476,21 @@ namespace lwt {
         return reducedZones;
     }
 
+    const char* LocationStateString(LocationState state) {
+        switch (state) {
+        case LocationState_BeforeStop:
+            return ">";
+        case LocationState_AtStop:
+            return ".";
+        case LocationState_AfterStop:
+            return "<";
+        case LocationState_BetweenStops:
+            return "=";
+        default:
+            return "?";
+        }
+    }
+
     void TicketValidationService::UpdateValidationInfo()
     {
         PublishServiceState(); // do this unconditionally
@@ -543,9 +558,7 @@ namespace lwt {
             }
         }
         auto locationState = validationInfo->trip()->location_state();
-        if (locationState == LocationState_AtStop) {
-            metadataParts.push_back("AS");
-        }
+        metadataParts.emplace_back("LS:" + psram_string(LocationStateString(locationState)));
         m_CurrentValidationMetadata = str_join(metadataParts.begin(), metadataParts.end(), "|");
 
         if (newTripKey != oldTripKey) {
