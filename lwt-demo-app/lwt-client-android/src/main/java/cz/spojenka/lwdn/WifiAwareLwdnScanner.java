@@ -21,7 +21,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
@@ -53,11 +52,6 @@ public class WifiAwareLwdnScanner implements LwdnScanner {
     @Override
     public boolean isAvailable() {
         return awareManager.isAvailable();
-    }
-
-    @Override
-    public boolean isUsingExtendedAdvertising() {
-        return true;
     }
 
     @Override
@@ -103,20 +97,20 @@ public class WifiAwareLwdnScanner implements LwdnScanner {
             }
         }
 
-        private Map<LwdnServiceID.ServiceName, List<LwdnServiceID.ServiceName>> unifyServicesWithSameName(List<LwdnServiceID> services) {
-            Map<String, List<LwdnServiceID.ServiceName>> servicesByName = new HashMap<>();
+        private Map<LwdnServiceID.AwareServiceName, List<LwdnServiceID.AwareServiceName>> unifyServicesWithSameName(List<LwdnServiceID> services) {
+            Map<String, List<LwdnServiceID.AwareServiceName>> servicesByName = new HashMap<>();
             for (LwdnServiceID serviceId : services) {
-                if (serviceId instanceof LwdnServiceID.ServiceName serviceName) {
-                    servicesByName.computeIfAbsent(serviceName.name(), k -> new ArrayList<>()).add(serviceName);
+                if (serviceId instanceof LwdnServiceID.AwareServiceName awareServiceName) {
+                    servicesByName.computeIfAbsent(awareServiceName.name(), k -> new ArrayList<>()).add(awareServiceName);
                 }
             }
-            Map<LwdnServiceID.ServiceName, List<LwdnServiceID.ServiceName>> unifiedServices = new HashMap<>();
-            for (Map.Entry<String, List<LwdnServiceID.ServiceName>> entry : servicesByName.entrySet()) {
+            Map<LwdnServiceID.AwareServiceName, List<LwdnServiceID.AwareServiceName>> unifiedServices = new HashMap<>();
+            for (Map.Entry<String, List<LwdnServiceID.AwareServiceName>> entry : servicesByName.entrySet()) {
                 List<LwdnServiceID.MatchingFilterSlot> allMatchingFilters = new ArrayList<>();
-                for (LwdnServiceID.ServiceName serviceId : entry.getValue()) {
+                for (LwdnServiceID.AwareServiceName serviceId : entry.getValue()) {
                     allMatchingFilters.addAll(serviceId.matchingFilters());
                 }
-                unifiedServices.put(new LwdnServiceID.ServiceName(entry.getKey(), allMatchingFilters), entry.getValue());
+                unifiedServices.put(new LwdnServiceID.AwareServiceName(entry.getKey(), allMatchingFilters), entry.getValue());
             }
             return unifiedServices;
         }
@@ -138,7 +132,7 @@ public class WifiAwareLwdnScanner implements LwdnScanner {
                         }
                     }
                     for (var serviceCollection : unifiedNames.entrySet()) {
-                        LwdnServiceID.ServiceName serviceName = serviceCollection.getKey();
+                        LwdnServiceID.AwareServiceName serviceName = serviceCollection.getKey();
                         try {
                             session.subscribe(createSubscribeConfig(serviceName, config), new DiscoverySessionCallback() {
 
@@ -156,7 +150,7 @@ public class WifiAwareLwdnScanner implements LwdnScanner {
                                     }
                                 }
 
-                                private LwdnServiceID.ServiceName findActualServiceName(List<byte[]> matchedFilters) {
+                                private LwdnServiceID.AwareServiceName findActualServiceName(List<byte[]> matchedFilters) {
                                     for (var serviceId : serviceCollection.getValue()) {
                                         if (serviceId.checkFilterMatched(matchedFilters)) {
                                             return serviceId;
@@ -294,7 +288,7 @@ public class WifiAwareLwdnScanner implements LwdnScanner {
         }
 
         @SuppressWarnings("deprecation")
-        private SubscribeConfig createSubscribeConfig(LwdnServiceID.ServiceName serviceName, LwdnScanConfig config) {
+        private SubscribeConfig createSubscribeConfig(LwdnServiceID.AwareServiceName serviceName, LwdnScanConfig config) {
             SubscribeConfig.Builder builder = new SubscribeConfig.Builder()
                     .setServiceName(serviceName.name())
                     .setMatchFilter(serviceName.compileMatchingFilters())

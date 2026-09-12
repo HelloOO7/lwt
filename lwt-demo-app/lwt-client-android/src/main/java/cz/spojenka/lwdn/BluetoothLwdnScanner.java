@@ -37,20 +37,14 @@ public class BluetoothLwdnScanner implements LwdnScanner {
     private final Context context;
     private final BluetoothAdapter adapter;
     private final int addressPsm;
-    private final boolean isUsingExtendedAdvertising;
 
     private final Handler handler;
     private Runnable restartScanCallback;
 
     public BluetoothLwdnScanner(Context context, BluetoothAdapter adapter, int addressPsm) {
-        this(context, adapter, addressPsm, false);
-    }
-
-    public BluetoothLwdnScanner(Context context, BluetoothAdapter adapter, int addressPsm, boolean forceLegacy) {
         this.context = context;
         this.adapter = adapter;
         this.addressPsm = addressPsm;
-        isUsingExtendedAdvertising = adapter.isLeExtendedAdvertisingSupported() && !forceLegacy;
         handler = new Handler(Looper.getMainLooper());
     }
 
@@ -104,11 +98,6 @@ public class BluetoothLwdnScanner implements LwdnScanner {
         } else {
             return true;
         }
-    }
-
-    @Override
-    public boolean isUsingExtendedAdvertising() {
-        return isUsingExtendedAdvertising;
     }
 
     @Override
@@ -181,7 +170,11 @@ public class BluetoothLwdnScanner implements LwdnScanner {
         }
 
         public void startScan(List<LwdnServiceID> services, LwdnScanConfig config) {
-            Predicate<ScanResult> softwareFilter = buildSoftwareScanFilterIfNeeded(services);
+            // if extended adv is used, only extended services are scanned, otherwise, only legacy services
+            List<LwdnServiceID.BluetoothUUID> btUuids = getRelevantServiceUUIDs(services);
+            boolean isUsingExtendedAdvertising = containsExtendedService(btUuids);
+
+            Predicate<ScanResult> softwareFilter = buildSoftwareScanFilterIfNeeded(btUuids);
 
             callback = new TimeoutScanCallback() {
 
@@ -207,8 +200,11 @@ public class BluetoothLwdnScanner implements LwdnScanner {
                         if (scan.getResultCount() < config.getMaxDevices()) {
                             if (result.getScanRecord() != null) {
                                 Map<LwdnServiceID, byte[]> serviceData = new HashMap<>();
-                                for (var e : result.getScanRecord().getServiceData().entrySet()) {
-                                    serviceData.put(new LwdnServiceID.UUID(e.getKey().getUuid()), e.getValue());
+                                for (LwdnServiceID.BluetoothUUID btUuid : btUuids) {
+                                    byte[] data = result.getScanRecord().getServiceData().get(new ParcelUuid(btUuid.uuid()));
+                                    if (data != null) {
+                                        serviceData.put(btUuid, data);
+                                    }
                                 }
                                 scan.addResult(new LwdnScanResult(address, result.getRssi(), serviceData));
                             }
@@ -243,7 +239,7 @@ public class BluetoothLwdnScanner implements LwdnScanner {
                 }
             };
 
-            ScanSettings settings = buildScanSettings(config);
+            ScanSettings settings = buildScanSettings(config, isUsingExtendedAdvertising);
             List<ScanFilter> filters = buildScanFilters(services);
 
             scanStartTime = SystemClock.elapsedRealtime();
@@ -254,6 +250,37 @@ public class BluetoothLwdnScanner implements LwdnScanner {
                     callback.startTimeout(config.getTimeout());
                 }
             }
+        }
+
+        private boolean containsExtendedService(List<? extends LwdnServiceID> services) {
+            for (LwdnServiceID serviceID : services) {
+                if (serviceID instanceof LwdnServiceID.BluetoothUUID bt && bt.isExtended()) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private List<LwdnServiceID.BluetoothUUID> getRelevantServiceUUIDs(List<LwdnServiceID> services) {
+            // this must be evaluated here, because the API returns false if bluetooth is off
+            boolean canUseExtended = adapter.isLeExtendedAdvertisingSupported();
+            boolean hasAnyExtended = containsExtendedService(services);
+            List<LwdnServiceID.BluetoothUUID> out = new ArrayList<>();
+            for (LwdnServiceID serviceID : services) {
+                if (serviceID instanceof LwdnServiceID.BluetoothUUID bt) {
+                    if (canUseExtended && hasAnyExtended) {
+                        if (bt.isExtended()) {
+                            out.add(bt);
+                        }
+                    } else {
+                        if (!bt.isExtended()) {
+                            out.add(bt);
+                        }
+                    }
+                }
+            }
+
+            return out;
         }
 
         private boolean startScanImpl(ScanSettings settings, List<ScanFilter> filters) {
@@ -308,7 +335,7 @@ public class BluetoothLwdnScanner implements LwdnScanner {
             handler.postDelayed(newCallback, config.getDeviceLostTimeout().toMillis());
         }
 
-        private ScanSettings buildScanSettings(LwdnScanConfig config) {
+        private ScanSettings buildScanSettings(LwdnScanConfig config, boolean isUsingExtendedAdvertising) {
             ScanSettings.Builder settings = new ScanSettings.Builder()
                     .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
                     .setScanMode(
@@ -332,12 +359,12 @@ public class BluetoothLwdnScanner implements LwdnScanner {
             List<ScanFilter> filters = new ArrayList<>();
             for (LwdnServiceID serviceId : services) {
                 if (!shouldUseSoftwareUUIDFiltering()) {
-                    if (serviceId instanceof LwdnServiceID.UUID serviceUUID) {
+                    if (serviceId instanceof LwdnServiceID.BluetoothUUID serviceBluetoothUUID) {
                         filters.add(
                                 new ScanFilter.Builder()
                                         // data+mask is needed (even though frontend allows a null value), because otherwise
                                         // the filter is ignored further down the BT stack
-                                        .setServiceData(new ParcelUuid(serviceUUID.uuid()), new byte[0], new byte[0])
+                                        .setServiceData(new ParcelUuid(serviceBluetoothUUID.uuid()), new byte[0], new byte[0])
                                         .build()
                         );
                     }
@@ -357,7 +384,7 @@ public class BluetoothLwdnScanner implements LwdnScanner {
             return filters;
         }
 
-        private Predicate<ScanResult> buildSoftwareScanFilterIfNeeded(List<LwdnServiceID> services) {
+        private Predicate<ScanResult> buildSoftwareScanFilterIfNeeded(List<LwdnServiceID.BluetoothUUID> services) {
             if (!shouldUseSoftwareUUIDFiltering()) {
                 return result -> true;
             } else {
@@ -365,12 +392,10 @@ public class BluetoothLwdnScanner implements LwdnScanner {
             }
         }
 
-        private static Predicate<ScanResult> buildSoftwareScanFilter(List<LwdnServiceID> services) {
+        private static Predicate<ScanResult> buildSoftwareScanFilter(List<LwdnServiceID.BluetoothUUID> services) {
             Set<ParcelUuid> serviceUUIDs = new HashSet<>();
-            for (LwdnServiceID serviceId : services) {
-                if (serviceId instanceof LwdnServiceID.UUID serviceUUID) {
-                    serviceUUIDs.add(new ParcelUuid(serviceUUID.uuid()));
-                }
+            for (LwdnServiceID.BluetoothUUID serviceId : services) {
+                serviceUUIDs.add(new ParcelUuid(serviceId.uuid()));
             }
             if (serviceUUIDs.isEmpty()) {
                 return result -> true;

@@ -19,7 +19,7 @@
 #include <iostream>
 #include <climits>
 
-#define CICO_WITHOUT_MOS
+//#define CICO_WITHOUT_MOS
 
 namespace lwt {
 
@@ -91,7 +91,7 @@ namespace lwt {
             return;
         }
         auto time = SystemTime::UptimeMillis();
-        auto epochMs = SystemTime::EpochMillis();
+        auto epochSecs = SystemTime::EpochSeconds();
         m_CheckOutList.AddCheckedOutSession(*vanishedSession, time);
 
         // the server will fill in the rest of the data if it decides that the be out event is
@@ -103,7 +103,7 @@ namespace lwt {
             .SessionId = *vanishedSession,
             .AccountId = 0,
             .LocalTimestamp = time,
-            .AbsoluteTimestamp = OffsetDateTime::of_local_epoch_seconds(epochMs),
+            .AbsoluteTimestamp = OffsetDateTime::of_local_epoch_seconds(epochSecs),
             .EventType = MOSCICOEventType::BE_OUT,
             .LwtMetadata = m_TicketValidationService.GetCurrentValidationMetadata()
         };

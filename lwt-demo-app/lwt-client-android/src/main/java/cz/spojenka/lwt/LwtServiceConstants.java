@@ -8,9 +8,12 @@ public class LwtServiceConstants {
 
     public static final String BLE_DEVICE_NAME = "LWT";
 
-    public static final int BLE_SERVICE_UUID_VEHICLE = 0x4C575456; // "LWTV"
-    public static final int BLE_SERVICE_UUID_STOP = 0x4C575453; // "LWTS"
-    public static final int BLE_SERVICE_UUID_CICO_KEEPALIVE = 0xC1C0AA11;
+    private static final int BLE_SERVICE_UUID_VEHICLE_BASE = 0x4C575456; // "LWTV"
+    private static final int BLE_SERVICE_UUID_STOP_BASE = 0x4C575453; // "LWTS"
+
+    public static final LwdnServiceID.BluetoothUUID BLE_SERVICE_UUID_VEHICLE = new LwdnServiceID.BluetoothUUID(BLE_SERVICE_UUID_VEHICLE_BASE, false);
+    public static final LwdnServiceID.BluetoothUUID BLE_SERVICE_UUID_STOP = new LwdnServiceID.BluetoothUUID(BLE_SERVICE_UUID_STOP_BASE, false);
+    public static final LwdnServiceID.BluetoothUUID BLE_SERVICE_UUID_CICO_KEEPALIVE = new LwdnServiceID.BluetoothUUID(0xC1C0AA11, false);
 
     /*
     the extended constants exist so that we can scan for extended services without getting
@@ -18,8 +21,8 @@ public class LwtServiceConstants {
     Wi-Fi aware supports extended services only, BLE supports both.
      */
 
-    public static final int BLE_SERVICE_UUID_VEHICLE_EXTENDED = BLE_SERVICE_UUID_VEHICLE + 'E';
-    public static final int BLE_SERVICE_UUID_STOP_EXTENDED = BLE_SERVICE_UUID_STOP + 'E';
+    public static final LwdnServiceID.BluetoothUUID BLE_SERVICE_UUID_VEHICLE_EXTENDED = new LwdnServiceID.BluetoothUUID(BLE_SERVICE_UUID_VEHICLE_BASE + 'E', true);
+    public static final LwdnServiceID.BluetoothUUID BLE_SERVICE_UUID_STOP_EXTENDED = new LwdnServiceID.BluetoothUUID(BLE_SERVICE_UUID_STOP_BASE + 'E', true);
 
     public static final int BLE_API_PSM = 0xD7;
 
@@ -30,21 +33,21 @@ public class LwtServiceConstants {
     public static final int WIFI_API_PORT = 26001;
 
     public static LwdnServiceID serviceUUIDForDeviceType(LwtDeviceType deviceType) {
-        return new LwdnServiceID.UUID(switch (deviceType) {
+        return switch (deviceType) {
             case VEHICLE -> BLE_SERVICE_UUID_VEHICLE;
             case STOP -> BLE_SERVICE_UUID_STOP;
-        });
+        };
     }
 
     public static LwdnServiceID serviceExtendedUUIDForDeviceType(LwtDeviceType deviceType) {
-        return new LwdnServiceID.UUID(switch (deviceType) {
+        return switch (deviceType) {
             case VEHICLE -> BLE_SERVICE_UUID_VEHICLE_EXTENDED;
             case STOP -> BLE_SERVICE_UUID_STOP_EXTENDED;
-        });
+        };
     }
 
     public static LwdnServiceID serviceNameForDeviceType(LwtDeviceType deviceType) {
-        return new LwdnServiceID.ServiceName(WIFI_AWARE_SERVICE_NAME, switch (deviceType) {
+        return new LwdnServiceID.AwareServiceName(WIFI_AWARE_SERVICE_NAME, switch (deviceType) {
             case VEHICLE -> WIFI_AWARE_MATCHING_FILTERS_VEHICLE;
             case STOP -> WIFI_AWARE_MATCHING_FILTERS_STOP;
         });

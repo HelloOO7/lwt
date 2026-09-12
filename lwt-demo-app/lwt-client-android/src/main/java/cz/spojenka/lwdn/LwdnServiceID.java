@@ -12,25 +12,26 @@ import androidx.annotation.NonNull;
 import androidx.core.os.ParcelCompat;
 import cz.spojenka.lwdn.util.BLEScanRecordUtil;
 
-public sealed interface LwdnServiceID extends Parcelable permits LwdnServiceID.UUID, LwdnServiceID.ServiceName, LwdnServiceID.DeviceName {
+public sealed interface LwdnServiceID extends Parcelable permits LwdnServiceID.BluetoothUUID, LwdnServiceID.AwareServiceName, LwdnServiceID.DeviceName {
 
-    public static record UUID(java.util.UUID uuid) implements LwdnServiceID {
+    public static record BluetoothUUID(java.util.UUID uuid, boolean isExtended) implements LwdnServiceID {
 
-        public UUID(int uuid32) {
+        public BluetoothUUID(int uuid32, boolean isExtended) {
             // https://stackoverflow.com/questions/13964342/android-how-do-bluetooth-uuids-work
-            this(BLEScanRecordUtil.uuid32To128(uuid32));
+            this(BLEScanRecordUtil.uuid32To128(uuid32), isExtended);
         }
 
-        public static final Creator<UUID> CREATOR = new Creator<>() {
+        public static final Creator<BluetoothUUID> CREATOR = new Creator<>() {
             @Override
-            public UUID createFromParcel(Parcel in) {
+            public BluetoothUUID createFromParcel(Parcel in) {
                 ParcelUuid parcelUuid = ParcelCompat.readParcelable(in, ParcelUuid.class.getClassLoader(), ParcelUuid.class);
-                return new UUID(parcelUuid != null ? parcelUuid.getUuid() : null);
+                boolean isExtended = ParcelCompat.readBoolean(in);
+                return new BluetoothUUID(parcelUuid != null ? parcelUuid.getUuid() : null, isExtended);
             }
 
             @Override
-            public UUID[] newArray(int size) {
-                return new UUID[size];
+            public BluetoothUUID[] newArray(int size) {
+                return new BluetoothUUID[size];
             }
         };
 
@@ -42,6 +43,7 @@ public sealed interface LwdnServiceID extends Parcelable permits LwdnServiceID.U
         @Override
         public void writeToParcel(@NonNull Parcel dest, int flags) {
             dest.writeParcelable(new ParcelUuid(uuid()), flags);
+            ParcelCompat.writeBoolean(dest, isExtended());
         }
 
         @NonNull
@@ -53,24 +55,24 @@ public sealed interface LwdnServiceID extends Parcelable permits LwdnServiceID.U
         }
     }
 
-    public static record ServiceName(String name,
-                                     List<MatchingFilterSlot> matchingFilters) implements LwdnServiceID {
+    public static record AwareServiceName(String name,
+                                          List<MatchingFilterSlot> matchingFilters) implements LwdnServiceID {
 
-        public ServiceName(String name) {
+        public AwareServiceName(String name) {
             this(name, List.of());
         }
 
-        public static final Creator<ServiceName> CREATOR = new Creator<>() {
+        public static final Creator<AwareServiceName> CREATOR = new Creator<>() {
             @Override
-            public ServiceName createFromParcel(Parcel in) {
+            public AwareServiceName createFromParcel(Parcel in) {
                 String name = in.readString();
                 List<MatchingFilterSlot> matchingFilters = ParcelCompat.readArrayList(in, MatchingFilterSlot.class.getClassLoader(), MatchingFilterSlot.class);
-                return new ServiceName(name, matchingFilters);
+                return new AwareServiceName(name, matchingFilters);
             }
 
             @Override
-            public ServiceName[] newArray(int size) {
-                return new ServiceName[size];
+            public AwareServiceName[] newArray(int size) {
+                return new AwareServiceName[size];
             }
         };
 

@@ -72,15 +72,13 @@ public class RssiTrackerActivity extends BaseActivity {
             return;
         }
 
-        BluetoothLwdnScanner scanner = new BluetoothLwdnScanner(this, btm.getAdapter(), LwtServiceConstants.BLE_API_PSM, true);
+        BluetoothLwdnScanner scanner = new BluetoothLwdnScanner(this, btm.getAdapter(), LwtServiceConstants.BLE_API_PSM);
         LwdnScanConfig config = new LwdnScanConfig.Builder()
                 .setTimeout(null) // continuous
                 .setDeviceLostTimeout(Duration.ofSeconds(15))
                 .build();
 
-        var serviceId = new LwdnServiceID.UUID(LwtServiceConstants.BLE_SERVICE_UUID_CICO_KEEPALIVE);
-
-        activeScan = scanner.startScan(List.of(serviceId), config);
+        activeScan = scanner.startScan(List.of(LwtServiceConstants.BLE_SERVICE_UUID_CICO_KEEPALIVE), config);
         activeScan.addOnResultListener(new LwdnScan.OnResultListener() {
             @Override
             public void onResult(LwdnScan scan, LwdnScanResult result) {

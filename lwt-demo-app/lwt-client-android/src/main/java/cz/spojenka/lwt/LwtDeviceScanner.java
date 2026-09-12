@@ -80,11 +80,8 @@ public class LwtDeviceScanner {
 
         for (LwtDeviceType deviceType : deviceTypes) {
             serviceIDs.add(LwtServiceConstants.serviceNameForDeviceType(deviceType));
-            if (lwdnScanner.isUsingExtendedAdvertising()) {
-                serviceIDs.add(LwtServiceConstants.serviceExtendedUUIDForDeviceType(deviceType));
-            } else {
-                serviceIDs.add(LwtServiceConstants.serviceUUIDForDeviceType(deviceType));
-            }
+            serviceIDs.add(LwtServiceConstants.serviceExtendedUUIDForDeviceType(deviceType));
+            serviceIDs.add(LwtServiceConstants.serviceUUIDForDeviceType(deviceType));
         }
 
         LwdnScan lwdnScan = lwdnScanner.startScan(serviceIDs, config);

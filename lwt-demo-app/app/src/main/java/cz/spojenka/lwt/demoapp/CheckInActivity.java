@@ -61,7 +61,8 @@ public class CheckInActivity extends CICOActivityBase {
     private final BroadcastReceiver bluetoothOnReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR) == BluetoothAdapter.STATE_ON) {
+            int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
+            if (state == BluetoothAdapter.STATE_ON || state == BluetoothAdapter.STATE_OFF) {
                 continueSetup();
             }
         }
@@ -75,7 +76,7 @@ public class CheckInActivity extends CICOActivityBase {
         if (savedInstanceState != null) {
             permissionsAsked = savedInstanceState.getBoolean(STATE_PERMISSIONS_ASKED, false);
         }
-        if (exitIfPermissionAskedAndDenied()) {
+        if (exitIfPermissionAskedAndDenied(false)) {
             return new View(this);
         }
 
@@ -84,15 +85,17 @@ public class CheckInActivity extends CICOActivityBase {
         viewModel = vmp.get(ViewModel.class);
         deviceListViewModel = vmp.get(DeviceListViewModel.class);
 
-        ActivityResultCallback<ActivityResult> permResultCallback = result -> {
-            if (result.getResultCode() == RESULT_OK) {
-                continueSetup();
-            } else {
-                exitIfPermissionAskedAndDenied();
+        bluetoothOnLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+            if (result.getResultCode() != RESULT_OK) {
+                exitIfPermissionAskedAndDenied(true);
             }
-        };
-        bluetoothOnLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), permResultCallback);
-        permissionLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), permResultCallback);
+            // continueSetup will be invoked by onResume
+        });
+        permissionLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+            if (result.getResultCode() != RESULT_OK) {
+                exitIfPermissionAskedAndDenied(false);
+            }
+        });
 
         devicePickerUIController = new InlineDevicePickerViewController(binding.tripChoiceSubscreens, deviceListViewModel) {
 
@@ -155,8 +158,9 @@ public class CheckInActivity extends CICOActivityBase {
         continueSetup();
     }
 
-    private boolean exitIfPermissionAskedAndDenied() {
-        if (permissionsAsked && !FeaturePrerequisite.checkCICOSatisfiedExceptBTOn(this)) {
+    private boolean exitIfPermissionAskedAndDenied(boolean includeBtOnPerm) {
+        boolean satisfied = includeBtOnPerm ? FeaturePrerequisite.checkCICOSatisfied(this) : FeaturePrerequisite.checkCICOSatisfiedExceptBTOn(this);
+        if (permissionsAsked && !satisfied) {
             finish();
             return true;
         }
@@ -164,6 +168,9 @@ public class CheckInActivity extends CICOActivityBase {
     }
 
     private void continueSetup() {
+        if (isFinishing()) {
+            return;
+        }
         if (isBluetoothTurningOn()) {
             return;
         }
@@ -213,6 +220,7 @@ public class CheckInActivity extends CICOActivityBase {
     protected void onResume() {
         super.onResume();
         registerReceiver(bluetoothOnReceiver, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
+        continueSetup();
     }
 
     @Override

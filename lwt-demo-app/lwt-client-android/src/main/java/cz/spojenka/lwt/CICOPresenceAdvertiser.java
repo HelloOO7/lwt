@@ -121,7 +121,7 @@ public class CICOPresenceAdvertiser implements AutoCloseable {
     @SuppressLint("MissingPermission")
     private void advertise(byte[] data) {
         this.lastAdvData = new AdvertiseData.Builder()
-                .addServiceData(new ParcelUuid(BLEScanRecordUtil.uuid32To128(LwtServiceConstants.BLE_SERVICE_UUID_CICO_KEEPALIVE)), data)
+                .addServiceData(new ParcelUuid(LwtServiceConstants.BLE_SERVICE_UUID_CICO_KEEPALIVE.uuid()), data)
                 .build();
         if (currentAdvSet != null) {
             if (hasAdvertisePermission()) {

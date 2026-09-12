@@ -31,11 +31,6 @@ public class HybridLwdnScanner implements LwdnScanner {
         return BluetoothLwdnScanner.isSupported(context) || WifiAwareLwdnScanner.isSupported(context);
     }
 
-    @Override
-    public boolean isUsingExtendedAdvertising() {
-        return isWifiAwareScannerAvailable() || (isBluetoothScannerAvailable() && bluetoothScanner.isUsingExtendedAdvertising());
-    }
-
     public boolean isWifiAwareScannerAvailable() {
         return wifiAwareScanner != null && wifiAwareScanner.isAvailable();
     }

@@ -66,6 +66,7 @@ UUID UUID::Parse(const std::string_view& str) {
 
         uuid[bi] = ParseByte(str, i);
         i += 2;
+        bi++;
     }
 
     return uuid;

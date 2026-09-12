@@ -5,6 +5,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import java.util.Objects;
+
 import androidx.cardview.widget.CardView;
 import androidx.lifecycle.LifecycleOwner;
 import androidx.recyclerview.widget.RecyclerView;
@@ -41,6 +43,7 @@ public class InlineDevicePickerViewController {
         } else {
             devListUIController = new CustomListUIController(binding.deviceList, viewModel);
         }
+        Objects.requireNonNull(binding.deviceList.rvDeviceList.getLayoutManager()).setItemPrefetchEnabled(false);
         selectedDevUIController = new TripInfoViewController(binding.selectedDeviceView, devListUIController.getMarkupConverter());
         selectedDeviceView = binding.selectedDeviceView.getRoot();
         selectedDeviceView.setOnClickListener(v -> processDeviceSelected(null));

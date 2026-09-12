@@ -11,10 +11,14 @@ public record CICOEventPush(
         @NonNull UUID eventId,
         @Nullable UUID previousEventId,
         @NonNull UUID sessionId,
-        int accountId,
+        long accountId,
         long localTimestamp,
         OffsetDateTime absoluteTimestamp,
         @NonNull CICOEventType eventType,
         String lwtMetadata
 ) {
+
+    public CICOEventPush withAbsoluteTimestamp(@NonNull OffsetDateTime absoluteTimestamp) {
+        return new CICOEventPush(eventId, previousEventId, sessionId, accountId, localTimestamp, absoluteTimestamp, eventType, lwtMetadata);
+    }
 }

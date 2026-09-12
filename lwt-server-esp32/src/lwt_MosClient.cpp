@@ -51,16 +51,17 @@ namespace lwt {
         mbedtls_base64_encode(nullptr, 0, &encodedLen, vec.data(), vec.size());
         psram_string encoded(encodedLen, '\0');
         mbedtls_base64_encode((unsigned char*)encoded.data(), encoded.size(), &encodedLen, vec.data(), vec.size());
+        encoded.resize(encodedLen);
         return psram_json(encoded);
     }
 
     int MOSClient::ActivateTicket(uint64_t ticketId, const MOSTicketActivationParams& params, MOSTicket* pActivatedTicket) {
         psram_json request{
-            {"activateNowIfEarlier", params.ActivateNowIfEarlier},
-            {"clientIntegrityAttested", params.ClientIntegrityAttested},
-            {"zones", params.Zones},
-            {"appId", params.ClientAppID},
-            {"activationSourceMetadata", params.LwtMetadata}
+            { "activateNowIfEarlier", params.ActivateNowIfEarlier },
+            { "clientIntegrityAttested", params.ClientIntegrityAttested },
+            { "zones", params.Zones },
+            { "appId", params.ClientAppID },
+            { "activationSourceMetadata", params.LwtMetadata }
         };
         if (params.Time) {
             std::visit(
@@ -93,7 +94,7 @@ namespace lwt {
 
     int MOSClient::CICOCheckIn(const MOSCheckInRequest& request, MOSCheckInResponse* pResponse) {
         psram_json requestJson{
-            {"checkInToken", ByteVectorToJson(request.CheckInToken)}
+            { "checkInToken", ByteVectorToJson(request.CheckInToken) }
         };
         psram_json& responseJson = requestJson; // reuse
 
@@ -102,8 +103,10 @@ namespace lwt {
             return status;
         }
 
+        std::cout << responseJson << std::endl;
+
         responseJson.at("accountId").get_to(pResponse->AccountId);
-        pResponse->SessionId = UUID::Parse(responseJson.at("sessionId").get_ref<const psram_string&>());
+        pResponse->SessionId = UUID::Parse(responseJson.at("sessionId").get_ref<psram_string&>());
 
         return status;
     }
@@ -119,20 +122,25 @@ namespace lwt {
     }
 
     int MOSClient::CICOPushEvents(const MOSCICOEventBatch& eventBatch) {
-        psram_json requestJson = psram_json::array();
+        psram_json eventsArray = psram_json::array();
         for (const auto& event : eventBatch.Events) {
             psram_json eventJson{
-                {"eventId", event.EventId.ToString()},
-                {"previousEventId", event.PreviousEventId.ToString()},
-                {"sessionId", event.SessionId.ToString()},
-                {"accountId", event.AccountId},
-                {"localTimestamp", event.LocalTimestamp},
-                {"absoluteTimestamp", event.AbsoluteTimestamp.to_string()},
-                {"eventType", CICOEventTypeToString(event.EventType)},
-                {"lwtMetadata", event.LwtMetadata}
+                { "eventId", event.EventId.ToString() },
+                { "previousEventId", event.PreviousEventId.ToString() },
+                { "sessionId", event.SessionId.ToString() },
+                { "accountId", event.AccountId },
+                { "localTimestamp", event.LocalTimestamp },
+                { "absoluteTimestamp", event.AbsoluteTimestamp.to_string() },
+                { "eventType", CICOEventTypeToString(event.EventType) },
+                { "lwtMetadata", event.LwtMetadata }
             };
-            requestJson.push_back(std::move(eventJson));
+            eventsArray.push_back(std::move(eventJson));
         }
+
+        psram_json requestJson = {
+            { "events", std::move(eventsArray) },
+            { "currentLocalTimestamp", eventBatch.CurrentLocalTimestamp }
+        };
 
         psram_json& responseJson = requestJson; // reuse
 
@@ -140,7 +148,7 @@ namespace lwt {
 
         // no response for now
         (void)responseJson;
-        
+
         return status;
     }
 
@@ -226,7 +234,11 @@ namespace lwt {
         std::cout << "<--- " << status << " " << path << " ---" << std::endl;
         if (IsStatusOK(status)) {
             if (pResponseJson) {
-                *pResponseJson = psram_json::parse(responseBody);
+                if (responseBody.empty()) {
+                    *pResponseJson = psram_json::object();
+                } else {
+                    *pResponseJson = psram_json::parse(responseBody);
+                }
             }
         }
         else {

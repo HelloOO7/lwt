@@ -11,11 +11,20 @@
 #include <optional>
 #include <variant>
 #include "nlohmann/json.hpp"
+#include <map>
 
 namespace lwt {
 
-    // the actual object hierarchy is light enough to store in RAM. we want only strings to be in PSRAM.
-    using psram_json = nlohmann::basic_json<std::map, std::vector, psram_string>;
+    using psram_json = nlohmann::basic_json<
+        std::map, // these two use the AllocatorType
+        std::vector,
+        psram_string, // this one must be given explicitly
+        bool,
+        std::int64_t,
+        std::uint64_t,
+        double,
+        psram_allocator
+    >;
 
     struct MOSTicketActivationParams {
         std::optional<std::variant<OffsetDateTime, LocalDateTime>> Time;
