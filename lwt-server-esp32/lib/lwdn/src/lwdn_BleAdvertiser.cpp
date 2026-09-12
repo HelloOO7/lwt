@@ -27,7 +27,7 @@ namespace lwdn {
         m_AdvParams.primary_phy = BLE_HCI_LE_PHY_1M;
         m_AdvParams.secondary_phy = BLE_HCI_LE_PHY_2M;
         m_AdvParams.sid = instanceID;
-        m_AdvParams.tx_power = 127;
+        m_AdvParams.tx_power = -7;
 
         int rc = ble_gap_ext_adv_configure(m_InstanceID, &m_AdvParams, 0, GapEventCallback, this);
         if (rc != 0) {

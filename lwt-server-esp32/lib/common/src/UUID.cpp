@@ -4,6 +4,7 @@
 #include <sys/time.h>
 #include <stdexcept>
 #include <cctype>
+#include "SystemTime.h"
 
 using BC = BitConverter<std::endian::big>;
 
@@ -19,15 +20,9 @@ UUID UUID::V4() {
     return uuid;
 }
 
-uint64_t GetCurrentUnixTimeMillis() {
-    struct timeval tv;
-    gettimeofday(&tv, nullptr);
-    return static_cast<uint64_t>(tv.tv_sec) * 1000 + static_cast<uint64_t>(tv.tv_usec) / 1000;
-}
-
 UUID UUID::V7() {
     UUID uuid;
-    BC::FromInt64(GetCurrentUnixTimeMillis(), &uuid[0]);
+    BC::FromInt64(SystemTime::EpochMillis() << 16, &uuid[0]);
     psa_generate_random(&uuid[6], 10);
     uuid.SetVersion(7);
     uuid.SetVariant(2);
@@ -106,7 +101,7 @@ std::string UUID::ToString() const {
 }
 
 void UUID::SetVersion(uint8_t version) {
-    BC::SetBits(at(6), 1, 4, version);
+    BC::SetBits(at(6), 4, 4, version);
 }
 
 void UUID::SetVariant(uint8_t variant) {

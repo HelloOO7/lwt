@@ -12,6 +12,8 @@
 #include "lwdn_generated.h"
 #include "cico_generated.h"
 #include "esp_event.h"
+#include "PubSubTask.h"
+#include "lwt_PresenceTracker.h"
 
 namespace lwt {
 
@@ -19,9 +21,37 @@ namespace lwt {
         bool IsReady{ false };
     };
 
+    class CheckOutList {
+    private:
+        struct CheckOutRecord {
+            UUID SessionId;
+            int64_t TimestampMs;
+        };
+
+        std::mutex m_Mutex;
+        size_t m_Capacity;
+        int64_t m_MaxAgeMs;
+        psram_vector<CheckOutRecord> m_CheckedOutSessions;
+
+    public:
+        CheckOutList(size_t capacity, int64_t maxAgeMs);
+
+        void AddCheckedOutSession(const UUID& sessionId, int64_t timestampMs);
+        void RemoveIfPresent(const UUID& sessionId);
+        bool Contains(const UUID& sessionId);
+
+        void EnumerateCheckedOutSessions(std::function<void(const UUID& sessionId)> callback);
+
+    private:
+        decltype(m_CheckedOutSessions)::iterator Find(const UUID& sessionId);
+        void EraseOldEntries(int64_t currentTimeMs);
+    };
+
     class CicoService :
         Observer<TicketValidationState>,
-        public Observable<CicoState>
+        Observer<UUID>,
+        public Observable<CicoState>,
+        protected PubSubTask
     {
     private:
         struct ParsedRefreshToken {
@@ -42,17 +72,15 @@ namespace lwt {
         HMACSHA256& m_HMAC;
         TicketValidationService& m_TicketValidationService;
 
-        std::mutex m_EventsMutex;
         MOSClient& m_MOSClient;
         psram_vector<MOSCICOEvent> m_EventBuffer;
-        std::condition_variable m_HasEventsCV;
-
-        bool m_RequestClose{ false };
-        std::condition_variable m_Closed;
 
         std::mutex m_SeedDerivationMutex;
         std::string m_LastSeedTripKey;
         ByteVector m_SeedDerivationSecret;
+
+        CheckOutList m_CheckOutList;
+        PresenceTracker& m_PresenceTracker;
 
         std::mutex m_StateMutex;
         bool m_CicoTimeReady{ false };
@@ -66,6 +94,7 @@ namespace lwt {
             Certificate& trustRoot, Certificate& deviceCert, DigitalSignature& signingKey, HMACSHA256& hmac,
             TicketValidationService& ticketValidationService,
             MOSClient& mosClient,
+            PresenceTracker& presenceTracker,
             int syncTaskPriority
         );
         ~CicoService();
@@ -73,9 +102,12 @@ namespace lwt {
         void Register(ServiceRegistry& registry);
 
         virtual void OnChanged(const TicketValidationState* result) override;
+        virtual void OnChanged(const UUID* vanishedSession) override;
 
         void ObserveServiceState(Observer<CicoState>& observer);
         void RemoveObserver(Observer<CicoState>& observer);
+
+        virtual void ProcessData() override;
 
     private:
         bool IsCicoReady();

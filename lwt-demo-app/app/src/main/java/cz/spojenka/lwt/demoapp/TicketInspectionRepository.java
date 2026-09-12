@@ -17,6 +17,8 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import cz.dpp.praguepublictransport.etd.ETDUtils;
@@ -271,5 +273,11 @@ public class TicketInspectionRepository {
         Log.w(TAG, "No TOTP matched ticket value: " + totp);
 
         return false;
+    }
+
+    public boolean isCicoCheckedOut(LitackaETD etd, Set<UUID> blacklist) {
+        // this should only be called on a trusted ticket, so data absence is not checked
+        UUID uuid = UUID.fromString(new TicketETDParser(etd).getCicoSessionId());
+        return !blacklist.contains(uuid);
     }
 }

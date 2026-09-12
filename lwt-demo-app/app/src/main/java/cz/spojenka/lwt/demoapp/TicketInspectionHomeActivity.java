@@ -101,39 +101,7 @@ public class TicketInspectionHomeActivity extends BaseActivity {
                 try {
                     Instant time = Instant.now();
                     LitackaETD etd = LitackaETD.parse(result);
-                    boolean isCico = repository.isCicoTicket(etd);
-                    if (isCico && currentCicoData == null) {
-                        CommonDialogs
-                                .newInfoDialog(this, R.string.ticket_inspection_action_required_title, R.string.ticket_inspection_cico_not_connected)
-                                .show();
-                        return;
-                    }
-                    if (isCico) {
-                        Boolean keyMatch = repository.checkCicoTripKeyMatch(etd, currentTripKey);
-                        if (keyMatch != null) {
-                            if (!keyMatch) {
-                                CommonDialogs
-                                        .newInfoDialog(this, R.string.ticket_inspection_action_required_title, R.string.ticket_inspection_cico_wrong_device)
-                                        .show();
-                                return;
-                            }
-                        }
-                        // if parsing failed/attribute was not present, ticket was probably tampered,
-                        // so fall through to trust check
-                    }
-                    PublicKey forcedKey = isCico ? currentCicoData.deviceCertificate().getPublicKey() : null;
-                    byte[] forcedSecret = isCico ? currentCicoData.seedDerivationSecrets().get(0).token() : null;
-                    if (!repository.verifyTicketAuthenticity(etd, time, forcedKey, forcedSecret)) {
-                        showUntrustedTicketDialog();
-                    } else {
-                        startActivity(
-                                new Intent(this, TicketInspectionDetailActivity.class)
-                                        .putExtra(TicketInspectionDetailActivity.EXTRA_ETD, result)
-                                        .putExtra(TicketInspectionDetailActivity.EXTRA_INSPECTION_TIME, time.toEpochMilli())
-                                        .putStringArrayListExtra(TicketInspectionDetailActivity.EXTRA_INSPECTION_ZONES, currentValidationZones)
-                                        .putExtra(TicketInspectionDetailActivity.EXTRA_INSPECTION_TK, currentTripKey)
-                        );
-                    }
+                    inspectTicket(time, etd, false);
                 } catch (IllegalArgumentException ex) {
                     Log.e(TAG, "Failed to parse QR code: " + result, ex);
                     CommonDialogs.newInfoDialog(this, R.string.error, R.string.ticket_inspection_invalid_format).show();
@@ -188,6 +156,79 @@ public class TicketInspectionHomeActivity extends BaseActivity {
         });
 
         updateVehicleInfoUI();
+    }
+
+    private boolean checkNoCicoData(LitackaETD etd) {
+        if (repository.isCicoTicket(etd) && currentCicoData == null) {
+            CommonDialogs
+                    .newInfoDialog(this, R.string.ticket_inspection_action_required_title, R.string.ticket_inspection_cico_not_connected)
+                    .show();
+            return false;
+        }
+        return true;
+    }
+
+    private boolean checkNotCheckedOut(Instant time, LitackaETD etd) {
+        if (repository.isCicoTicket(etd) && repository.isCicoCheckedOut(etd, currentCicoData.sessionBlacklist())) {
+            CommonDialogs
+                    .newYesNoDialog(
+                            this,
+                            R.string.ticket_inspection_checkedout_title,
+                            R.string.ticket_inspection_checkedout_prompt,
+                            (dialog, which) -> inspectTicket(time, etd, true),
+                            null
+                    )
+                    .show();
+            return false;
+        }
+        return true;
+    }
+
+    private boolean checkCorrectCicoDevice(LitackaETD etd) {
+        if (repository.isCicoTicket(etd)) {
+            Boolean keyMatch = repository.checkCicoTripKeyMatch(etd, currentTripKey);
+            if (keyMatch != null) {
+                if (!keyMatch) {
+                    CommonDialogs
+                            .newInfoDialog(this, R.string.ticket_inspection_action_required_title, R.string.ticket_inspection_cico_wrong_device)
+                            .show();
+                    return false;
+                }
+            }
+            // if parsing failed/attribute was not present, ticket was probably tampered,
+            // so fall through to trust check
+        }
+        return true;
+    }
+
+    private void finalInspectTicket(Instant time, LitackaETD etd) {
+        boolean isCico = repository.isCicoTicket(etd);
+        PublicKey forcedKey = isCico ? currentCicoData.deviceCertificate().getPublicKey() : null;
+        byte[] forcedSecret = isCico ? currentCicoData.seedDerivationSecrets().get(0).token() : null;
+        if (!repository.verifyTicketAuthenticity(etd, time, forcedKey, forcedSecret)) {
+            showUntrustedTicketDialog();
+        } else {
+            startActivity(
+                    new Intent(this, TicketInspectionDetailActivity.class)
+                            .putExtra(TicketInspectionDetailActivity.EXTRA_ETD, etd.encode())
+                            .putExtra(TicketInspectionDetailActivity.EXTRA_INSPECTION_TIME, time.toEpochMilli())
+                            .putStringArrayListExtra(TicketInspectionDetailActivity.EXTRA_INSPECTION_ZONES, currentValidationZones)
+                            .putExtra(TicketInspectionDetailActivity.EXTRA_INSPECTION_TK, currentTripKey)
+            );
+        }
+    }
+
+    private void inspectTicket(Instant time, LitackaETD etd, boolean ignoreCheckedOut) {
+        if (!checkNoCicoData(etd)) {
+            return;
+        }
+        if (ignoreCheckedOut || !checkNotCheckedOut(time, etd)) {
+            return;
+        }
+        if (!checkCorrectCicoDevice(etd)) {
+            return;
+        }
+        finalInspectTicket(time, etd);
     }
 
     private void showUntrustedTicketDialog() {

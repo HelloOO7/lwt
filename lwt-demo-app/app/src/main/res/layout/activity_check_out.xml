@@ -7,18 +7,45 @@
     android:animateLayoutChanges="true"
     android:clipChildren="false">
 
+    <TextView
+        android:id="@+id/tvHeaderText"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_margin="@dimen/check_in_huge_margin"
+        android:layout_marginTop="@dimen/activity_vertical_margin"
+        android:text="@string/check_out_header"
+        android:textAlignment="center"
+        android:textSize="@dimen/text_title_l"
+        app:layout_constraintBottom_toTopOf="@+id/beOutNotice"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.0"
+        app:marginWindowInsets="top|horizontal" />
+
     <com.ncorti.slidetoact.SlideToActView
         android:id="@+id/confirmCheckOut"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_margin="@dimen/check_in_huge_margin"
+        app:complete_icon="@drawable/ic_inprogress_animated"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintWidth_min="wrap"
         app:marginWindowInsets="horizontal|bottom"
         app:text="@string/check_out_confirm"
-        app:text_appearance="@style/TextAppearance.LWTDemo.SlideToAct"
-        app:complete_icon="@drawable/ic_inprogress_animated" />
+        app:text_appearance="@style/TextAppearance.LWTDemo.SlideToAct" />
+
+    <cz.spojenka.lwt.demoapp.BeOutNotice
+        android:id="@+id/beOutNotice"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="@dimen/activity_horizontal_margin"
+        app:layout_constraintBottom_toTopOf="@+id/confirmCheckOut"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginVertical="@dimen/section_margin_normal"
+        app:marginWindowInsets="horizontal" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

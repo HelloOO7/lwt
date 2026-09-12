@@ -18,6 +18,7 @@ public class BluetoothLwdnSocket implements LwdnSocket {
 
     private final BluetoothSocket socket;
     private boolean connectInvoked = false;
+    private boolean connecting = false;
 
     private static final List<Consumer<BluetoothLwdnSocket>> globalConnectObservers = new ArrayList<>();
 
@@ -45,34 +46,39 @@ public class BluetoothLwdnSocket implements LwdnSocket {
 
     private void ensureConnected() throws IOException {
         if (!connectInvoked) {
-            // do not use socket.isConnected(), as it returns true for a closed socket too
-            IOException connectError = null;
-            int numRetries = 0;
-            for (int i = 0; i < 3; i++) {
-                long connectAttemptStart = SystemClock.elapsedRealtime();
-                try {
-                    socket.connect();
-                    invokeGlobalConnectObservers();
-                    Thread.sleep(50);
-                    connectError = null;
-                    numRetries = i;
-                    break;
-                } catch (IOException e) {
-                    connectError = e;
-                    if (SystemClock.elapsedRealtime() - connectAttemptStart > 1000 || BluetoothLeThrottling.isHuaweiConnectionThrottled(e)) {
-                        // at this point, it is not likely that a radio instability caused this, it is more likely to be a real timeout
+            connectInvoked = true;
+            try {
+                connecting = true;
+                // do not use socket.isConnected(), as it returns true for a closed socket too
+                IOException connectError = null;
+                int numRetries = 0;
+                for (int i = 0; i < 3; i++) {
+                    long connectAttemptStart = SystemClock.elapsedRealtime();
+                    try {
+                        socket.connect();
+                        invokeGlobalConnectObservers();
+                        Thread.sleep(50);
+                        connectError = null;
+                        numRetries = i;
+                        break;
+                    } catch (IOException e) {
+                        connectError = e;
+                        if (SystemClock.elapsedRealtime() - connectAttemptStart > 1000 || BluetoothLeThrottling.isHuaweiConnectionThrottled(e)) {
+                            // at this point, it is not likely that a radio instability caused this, it is more likely to be a real timeout
+                            break;
+                        }
+                    } catch (InterruptedException ignored) {
                         break;
                     }
-                } catch (InterruptedException ignored) {
-                    break;
                 }
-            }
-            connectInvoked = true;
-            if (connectError != null) {
-                throw connectError;
-            }
-            if (numRetries > 0) {
-                Log.w(TAG, "Needed to retry socket.connect() " + numRetries + " times for successful connection to " + socket.getRemoteDevice().getAddress());
+                if (connectError != null) {
+                    throw connectError;
+                }
+                if (numRetries > 0) {
+                    Log.w(TAG, "Needed to retry socket.connect() " + numRetries + " times for successful connection to " + socket.getRemoteDevice().getAddress());
+                }
+            } finally {
+                connecting = false;
             }
         }
     }
@@ -91,7 +97,7 @@ public class BluetoothLwdnSocket implements LwdnSocket {
 
     @Override
     public boolean isOpen() {
-        return socket.isConnected();
+        return connecting || socket.isConnected();
     }
 
     @Override

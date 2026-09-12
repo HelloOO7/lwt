@@ -88,6 +88,8 @@ public class CICOService extends Service {
 
     private Consumer<BluetoothLwdnSocket> globalConnectObserver;
 
+    private CICOPresenceAdvertiser presenceAdvertiser;
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -107,6 +109,12 @@ public class CICOService extends Service {
             resetHuaweiThrottling();
         };
         BluetoothLwdnSocket.addGlobalConnectObserver(globalConnectObserver);
+        if (CICOPresenceAdvertiser.isSupported(this)) {
+            Log.d(TAG, "Presence advertiser is supported");
+            presenceAdvertiser = new CICOPresenceAdvertiser(this);
+        } else {
+            Log.d(TAG, "Presence advertiser is not supported");
+        }
         Log.d(TAG, "Service started");
     }
 
@@ -297,7 +305,9 @@ public class CICOService extends Service {
             if (currentDevice != null && result.addressEquals(currentDevice)) {
                 Log.d(TAG, "Current device " + result.getAddress() + " was lost.");
                 disconnectCurrentDevice();
-                restoreConnection();
+                if (isSessionActive) {
+                    restoreConnection();
+                }
             }
         }
 
@@ -349,6 +359,13 @@ public class CICOService extends Service {
     private void stopDeviceScanIfExists() {
         if (currentScan != null) {
             stopDeviceScan();
+        }
+    }
+
+    private void stopPresenceAdvertiser() {
+        if (presenceAdvertiser != null) {
+            Log.d(TAG, "Stop presence advertiser");
+            presenceAdvertiser.close();
         }
     }
 
@@ -444,18 +461,27 @@ public class CICOService extends Service {
             throw new IllegalStateException("Must successfully call requestSession() before starting a session");
         }
         Log.d(TAG, "startSession()");
+        LwtDevice sessionDevice = currentDevice;
         return currentLwtClient
-                .confirmCheckIn(checkInIntermediate)
+                .confirmCheckIn(checkInIntermediate, getPresenceTrackingClient())
                 .executeAsync()
                 .whenCompleteAsync((ticket, throwable) -> {
                     if (throwable != null) {
-                        Log.e(TAG, "Failed to start session with device " + currentDevice.getAddress(), throwable);
+                        Log.e(TAG, "Failed to start session with device " + sessionDevice.getAddress(), throwable);
                     } else {
                         Log.d(TAG, "startSession OK");
                         onGotTicket(ticket);
                         // better to call after onGotTicket, so that the first time a session
                         // becomes active, there is always a valid ticket
                         onSessionStarted();
+                        if (currentDevice == null || !currentDevice.addressEquals(sessionDevice)) {
+                            // device was lost or changed while session was starting
+                            if (currentDevice == null) {
+                                restoreConnection();
+                            } else {
+                                refreshTicket();
+                            }
+                        }
                     }
                 }, getMainExecutor());
     }
@@ -465,7 +491,15 @@ public class CICOService extends Service {
         cancelPrepareSession();
         startForegroundService();
         startIdleDeviceScan();
+        startPresenceAdvertiser();
         setSessionActive(true);
+    }
+
+    private void startPresenceAdvertiser() {
+        if (presenceAdvertiser != null) {
+            Log.d(TAG, "Start presence advertiser");
+            presenceAdvertiser.start();
+        }
     }
 
     private void startIdleDeviceScan() {
@@ -529,6 +563,7 @@ public class CICOService extends Service {
         Log.d(TAG, "onSessionEnded()");
         setSessionActive(false);
         updateTicketLiveData(null);
+        stopPresenceAdvertiser();
         stopForegroundService();
         stopSelf();
     }
@@ -671,6 +706,13 @@ public class CICOService extends Service {
         handler.removeCallbacks(refreshTicketRunnable);
     }
 
+    private PresenceTrackingClient getPresenceTrackingClient() {
+        if (presenceAdvertiser != null) {
+            return presenceAdvertiser.getTrackingClient();
+        }
+        return null;
+    }
+
     private CompletableFuture<CICOTicketFragment> refreshTicket() {
         return refreshTicket(true);
     }
@@ -690,7 +732,7 @@ public class CICOService extends Service {
             return CompletableFuture.completedFuture(null);
         } else {
             return currentLwtClient
-                    .refreshCICO(currentTicket)
+                    .refreshCICO(currentTicket, getPresenceTrackingClient())
                     .executeAsync()
                     .whenCompleteAsync((newTicket, throwable) -> {
                         if (throwable != null) {
@@ -749,7 +791,7 @@ public class CICOService extends Service {
                 LwtAPIClient client = createDeviceClient(dev);
                 try {
                     client
-                            .refreshCICO(currentTicket)
+                            .refreshCICO(currentTicket, getPresenceTrackingClient())
                             .executeAsync()
                             .whenCompleteAsync((newTicket, throwable) -> {
                                 if (throwable == null) {

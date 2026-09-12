@@ -10,15 +10,16 @@
 #include <string>
 #include "PSRAMContainers.h"
 #include "PSRAMTask.h"
+#include "PubSubTask.h"
 
-class EventQueue
+class EventQueue : protected PubSubTask
 {
 public:
     using EventTag = int;
     static constexpr EventTag EVENT_TAG_NONE = -1;
     using EventCallback = std::function<void()>;
 
-    static constexpr int DEFAULT_TASK_PRIORITY = tskIDLE_PRIORITY + 1;
+    static constexpr int DEFAULT_TASK_PRIORITY = PubSubTask::DEFAULT_TASK_PRIORITY;
 
 private:
     struct EventRegistration {
@@ -30,17 +31,10 @@ private:
     };
 
 private:
-    std::string m_Name;
     size_t m_Capacity;
 
-    PSRAMTask m_Task;
-    
-    std::deque<EventRegistration> m_Queue;
-    std::mutex m_Mutex;
-    std::condition_variable m_TaskReadyCV;
-    std::condition_variable m_CloseFinishedCV;
+    std::deque<EventRegistration, psram_allocator<EventRegistration>> m_Queue;
 
-    bool m_Closed{ false };
 public:
     EventQueue(const std::string& name, size_t capacity, size_t stackSize = 4096, int priority = DEFAULT_TASK_PRIORITY);
     ~EventQueue();
@@ -54,8 +48,8 @@ public:
     bool Post(const EventCallback& event, int tag = EVENT_TAG_NONE);
     bool Post(EventCallback&& event, int tag = EVENT_TAG_NONE);
 
+    virtual void ProcessData() override;
+
 private:
-    void Run();
-    static void TaskFunc(void* param);
     bool EventByTagExists(int tag);
 };

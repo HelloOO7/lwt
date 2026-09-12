@@ -25,6 +25,8 @@ namespace lwt {
         int64_t ValidationProtectionPeriodMs;
         int64_t CicoConfirmationTokenExpiryMs;
         int64_t CicoTicketTtlMs;
+        size_t MaxCicoClients;
+        size_t BeOutVanishTimeMs;
     };
 
     class TicketPreauthRateLimiter {

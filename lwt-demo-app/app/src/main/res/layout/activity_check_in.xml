@@ -37,7 +37,8 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:paddingVertical="@dimen/section_margin_large"
-        app:layout_constraintBottom_toTopOf="@id/confirmCheckin"
+        app:layout_constraintHeight_min="160dp"
+        app:layout_constraintBottom_toTopOf="@id/beOutNotice"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/tvCheckInInstructions"
@@ -53,6 +54,17 @@
             android:layout_height="match_parent"
             layout="@layout/inline_device_picker" />
     </FrameLayout>
+
+    <cz.spojenka.lwt.demoapp.BeOutNotice
+        android:id="@+id/beOutNotice"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="@dimen/activity_horizontal_margin"
+        app:layout_constraintBottom_toTopOf="@+id/confirmCheckin"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginVertical="@dimen/section_margin_normal"
+        app:marginWindowInsets="horizontal" />
 
     <com.ncorti.slidetoact.SlideToActView
         android:id="@+id/confirmCheckin"

@@ -1,9 +1,10 @@
 #include "TimerProc.h"
 
-TimerProc::TimerProc(const Callback& callback, uint64_t periodUs, Type type) :
+TimerProc::TimerProc(const Callback& callback, uint64_t periodUs, Type type, bool isWhen) :
     m_Callback(callback),
     m_PeriodUs(periodUs),
-    m_Type(type)
+    m_Type(type),
+    m_IsWhen(isWhen)
 {
     esp_timer_create_args_t timerArgs{};
     timerArgs.callback =
@@ -19,6 +20,20 @@ TimerProc::TimerProc(const Callback& callback, uint64_t periodUs, Type type) :
     timerArgs.name = "TimerProc";
 
     ESP_ERROR_CHECK(esp_timer_create(&timerArgs, &m_TimerHandle));
+
+    if (isWhen && m_PeriodUs != 0) {
+        Start();
+    }
+}
+
+TimerProc::TimerProc(const Callback& callback, uint64_t periodUs, Type type) :
+    TimerProc(callback, periodUs, type, false)
+{
+}
+
+TimerProc::TimerProc(const Callback& callback, uint64_t whenUs) :
+    TimerProc(callback, whenUs, Type::ONESHOT, true)
+{
 }
 
 TimerProc::~TimerProc() {
@@ -29,7 +44,12 @@ TimerProc::~TimerProc() {
 bool TimerProc::Start() {
     esp_err_t err;
     if (m_Type == Type::ONESHOT) {
-        err = esp_timer_start_once(m_TimerHandle, m_PeriodUs);
+        if (m_IsWhen) {
+            err = esp_timer_start_once_at(m_TimerHandle, m_PeriodUs);
+        }
+        else {
+            err = esp_timer_start_once(m_TimerHandle, m_PeriodUs);
+        }
     }
     else {
         err = esp_timer_start_periodic(m_TimerHandle, m_PeriodUs);
@@ -50,8 +70,15 @@ void TimerProc::Stop() {
     }
 }
 
-void TimerProc::Restart() {
-    esp_err_t err = esp_timer_restart(m_TimerHandle, m_PeriodUs);
+void TimerProc::Restart(uint64_t newPeriodWhen) {
+    m_PeriodUs = newPeriodWhen != 0 ? newPeriodWhen : m_PeriodUs;
+    esp_err_t err;
+    if (m_IsWhen) {
+        err = esp_timer_restart_at(m_TimerHandle, 0, m_PeriodUs);
+    }
+    else {
+        err = esp_timer_restart(m_TimerHandle, m_PeriodUs);
+    }
     if (err == ESP_ERR_INVALID_STATE) {
         // timer was not running, start it
         Start();

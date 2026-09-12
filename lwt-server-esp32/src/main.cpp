@@ -48,12 +48,14 @@
 #include "Certificate.h"
 #include "lwt_CicoService.h"
 #include <atomic>
+#include "lwdn_BleScanner.h"
 
 static constexpr uint16_t BLE_PSM = 0xD7; // 0x80 + 'W'
 static constexpr lwdn::BleAdvertiser::UUID32 BLE_SERVICE_UUID_VEHICLE = 0x4C575456; // 'LWTV'
 static constexpr lwdn::BleAdvertiser::UUID32 BLE_SERVICE_UUID_STOP = 0x4C575453; // 'LWTS'
 static constexpr lwdn::BleAdvertiser::UUID32 BLE_SERVICE_UUID_VEHICLE_EXTENDED = BLE_SERVICE_UUID_VEHICLE + 'E';
 static constexpr lwdn::BleAdvertiser::UUID32 BLE_SERVICE_UUID_STOP_EXTENDED = BLE_SERVICE_UUID_STOP + 'E';
+static constexpr lwdn::BleAdvertiser::UUID32 BLE_SERVICE_UUID_CICO_KEEPALIVE = 0xC1C0AA11;
 
 static constexpr in_port_t WIFI_NAN_PORT = 26001;
 static const std::vector<ByteVector> WIFI_NAN_MATCHING_FILTERS_VEHICLE = { {'V'}, {'*'} };
@@ -65,7 +67,9 @@ static const lwt::TicketValidationConfig TICKETING_CONFIG = {
     .PreauthorizationGracePeriodMs = 2 * 60 * 1000, // 2 minutes
     .ValidationProtectionPeriodMs = 1 * 60 * 1000, // 1 minute
     .CicoConfirmationTokenExpiryMs = 60 * 60 * 1000, // 1 hour
-    .CicoTicketTtlMs = 5 * 60 * 1000 // 5 minutes
+    .CicoTicketTtlMs = 5 * 60 * 1000, // 5 minutes
+    .MaxCicoClients = 128,
+    .BeOutVanishTimeMs = 20 * 1000 // 25 seconds (huawei)
 };
 
 class AppMain {
@@ -79,6 +83,7 @@ private:
     lwdn::TLSConfig m_TLSConfig;
     vdv301::ServiceDiscovery m_HttpServiceDiscovery;
     vdv301::ServiceDiscovery m_UdpServiceDiscovery;
+    lwdn::BleScanner m_BLEScanner;
     vdv301::SubscriberCIS m_CISSubscriber;
     vdv301::SubscriberTVS m_TVSSubscriber;
     vdv301::PublisherRCS m_RCSPublisher;
@@ -93,6 +98,7 @@ private:
     lwt::TicketSignatureVerifier m_TicketVerifier;
     lwt::MOSClient m_MOSClient;
     lwt::TicketValidationService m_TicketService;
+    lwt::PresenceTracker m_PresenceTracker;
     lwt::CicoService m_CicoService;
 
     lwdn::BleAdvertiser m_BLETripAdvertiserLegacy;
@@ -118,6 +124,7 @@ public:
         m_TLSConfig(m_MbedTlsConfig),
         m_HttpServiceDiscovery{ vdv301::HttpServiceDiscovery(TASK_PRIORITY_BACKGROUND_SYNC) },
         m_UdpServiceDiscovery{ vdv301::UdpServiceDiscovery(TASK_PRIORITY_BACKGROUND_SYNC) },
+        m_BLEScanner(4096, TASK_PRIORITY_BACKGROUND_SYNC),
         m_CISSubscriber(
             m_HttpServiceDiscovery,
             vdv301::SubscriberCIS::Operation::AllData,
@@ -139,7 +146,8 @@ public:
         m_TicketVerifier(),
         m_MOSClient("https://ticketing.mos.ropid:8080", m_DeviceCert, { TLS_LWT_SERVER_KEY_DEBUG_START, TLS_LWT_SERVER_KEY_DEBUG_END }),
         m_TicketService(TICKETING_CONFIG, m_PreauthTokenManager, m_TicketVerifier, m_MOSClient, m_TripInfoService, &m_TVSSubscriber, &m_RCSPublisher),
-        m_CicoService(TICKETING_CONFIG, m_TrustRootCert, m_DeviceCert, m_SigningKey, m_HMAC, m_TicketService, m_MOSClient, TASK_PRIORITY_BACKGROUND_SYNC),
+        m_PresenceTracker(m_BLEScanner, BLE_SERVICE_UUID_CICO_KEEPALIVE, TICKETING_CONFIG.MaxCicoClients, TICKETING_CONFIG.BeOutVanishTimeMs),
+        m_CicoService(TICKETING_CONFIG, m_TrustRootCert, m_DeviceCert, m_SigningKey, m_HMAC, m_TicketService, m_MOSClient, m_PresenceTracker, TASK_PRIORITY_BACKGROUND_SYNC),
         m_BLETripAdvertiserLegacy(0, BLE_SERVICE_UUID_VEHICLE, lwdn::BleAdvertiser::Flags::INCLUDE_DEVICE_NAME | lwdn::BleAdvertiser::Flags::USE_LEGACY_ADVERTISING),
         m_BLETripAdvertiserExt(1, BLE_SERVICE_UUID_VEHICLE_EXTENDED, lwdn::BleAdvertiser::Flags::INCLUDE_DEVICE_NAME),
         m_BLEServer(BLE_PSM, lwtp::MAX_PACKET_SIZE),
@@ -184,6 +192,7 @@ public:
         m_BLETripAdvertiserLegacy.Start();
         m_BLETripAdvertiserExt.Start();
         m_WifiNanAdvertiser.Start();
+        m_BLEScanner.EnableScan();
     }
 
 private:

@@ -32,7 +32,7 @@ public class CICOPrerequisitesActivity extends BaseActivity {
         setContentView(ViewUtils.wrapInScrollView(binding.getRoot()));
 
         bindPrerequisite(FeaturePrerequisite.CICO_HARDWARE, R.id.permHardware, R.string.cico_prerequisites_hardware_desc, R.string.cico_prerequisites_hardware_desc);
-        bindPrerequisite(FeaturePrerequisite.BLUETOOTH_PERMISSIONS, R.id.permBluetooth, R.string.cico_prerequisites_bt_desc_none, R.string.cico_prerequisites_bt_desc_granted);
+        bindPrerequisite(FeaturePrerequisite.BLUETOOTH_PERMISSIONS_CICO, R.id.permBluetooth, R.string.cico_prerequisites_bt_desc_none, R.string.cico_prerequisites_bt_desc_granted);
         bindPrerequisite(FeaturePrerequisite.BLUETOOTH_ON, R.id.permBluetoothState, R.string.cico_prerequisites_bt_state_desc_off, R.string.cico_prerequisites_bt_state_desc_on);
         bindPrerequisite(FeaturePrerequisite.LOCATION_FOR_LE_SCAN, R.id.permLocation, R.string.cico_prerequisites_location_desc_none, R.string.cico_prerequisites_location_desc_granted);
         bindPrerequisite(FeaturePrerequisite.BACKGROUND_LOCATION_FOR_LE_SCAN, R.id.permBackgroundLocation, R.string.cico_prerequisites_bg_location_desc_none, R.string.cico_prerequisites_bg_location_desc_granted);

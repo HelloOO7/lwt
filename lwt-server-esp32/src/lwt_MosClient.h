@@ -47,6 +47,7 @@ namespace lwt {
     enum class MOSCICOEventType {
         CHECK_IN,
         CHECK_OUT,
+        BE_OUT,
         REFRESH,
     };
 

@@ -180,4 +180,9 @@
     <string name="ticket_inspection_cico_wrong_device">Instruct the passenger to validate the ticket on the correct vehicle, then scan it again.</string>
     <string name="ticket_display_valid_zones_cico">all</string>
     <string name="ticket_inspection_detail_valid_zones_cico">CI/CO ticket</string>
+    <string name="ticket_inspection_checkedout_title">Expired ticket</string>
+    <string name="ticket_inspection_checkedout_prompt">This ticket is from a checked-out session and is no longer valid. Do you with to inspect it anyway?</string>
+    <string name="beout_notice_supported">Automatic check-out is supported on your device. You can end your journey any time after leaving the network without it affecting your fare.</string>
+    <string name="beout_notice_not_supported">This device does not support automatic check-out. Make sure to check out as you leave your final vehicle, otherwise you may be charged a fare to the next stop.</string>
+    <string name="check_out_header">Are we there yet?</string>
 </resources>

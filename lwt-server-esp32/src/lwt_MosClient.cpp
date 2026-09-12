@@ -113,6 +113,7 @@ namespace lwt {
         case MOSCICOEventType::CHECK_IN: return "CHECK_IN";
         case MOSCICOEventType::CHECK_OUT: return "CHECK_OUT";
         case MOSCICOEventType::REFRESH: return "REFRESH";
+        case MOSCICOEventType::BE_OUT: return "BE_OUT";
         default: return "UNKNOWN";
         }
     }

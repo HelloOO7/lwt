@@ -16,11 +16,15 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
+import androidx.annotation.Nullable;
 import cz.spojenka.lwdn.BluetoothLwdnAddress;
 import cz.spojenka.lwdn.LwdnAddress;
 import cz.spojenka.lwdn.WifiAwareLwdnAddress;
@@ -194,11 +198,28 @@ public class LwtAPIClient extends LwtClient {
     }
 
     public LwtCall<CICOTicketFragment> confirmCheckIn(CheckInIntermediate intermediate) {
+        return confirmCheckIn(intermediate, null);
+    }
+
+    private int createPresenceTrackingConfig(FlatBufferBuilder builder, PresenceTrackingClient client) {
+        if (client == null) {
+            return 0;
+        }
+        return PresenceTrackingConfig.createPresenceTrackingConfig(
+                builder,
+                PresenceTrackingConfig.createClientIdVector(builder, client.getClientId()),
+                PresenceTrackingConfig.createTotpSecretVector(builder, client.getTotpSecret()),
+                client.getTotpPeriod().toMillis()
+        );
+    }
+
+    public LwtCall<CICOTicketFragment> confirmCheckIn(CheckInIntermediate intermediate, @Nullable PresenceTrackingClient presenceTracking) {
         FlatBufferBuilder builder = new FlatBufferBuilder();
         builder.finish(CheckInConfirmation.createCheckInConfirmation(
                 builder,
-                CheckInConfirmation.createConfirmationTokenVector(builder, intermediate.confirmationTokenAsByteBuffer()))
-        );
+                CheckInConfirmation.createConfirmationTokenVector(builder, intermediate.confirmationTokenAsByteBuffer()),
+                createPresenceTrackingConfig(builder, presenceTracking)
+        ));
         return newCall(LwtAPI::cicoCheckInConfirm, builder.dataBuffer());
     }
 
@@ -234,10 +255,15 @@ public class LwtAPIClient extends LwtClient {
     }
 
     public LwtCall<CICOTicketFragment> refreshCICO(CICOTicketFragment previousFragment) {
+        return refreshCICO(previousFragment, null);
+    }
+
+    public LwtCall<CICOTicketFragment> refreshCICO(CICOTicketFragment previousFragment, @Nullable PresenceTrackingClient presenceTracking) {
         FlatBufferBuilder builder = new FlatBufferBuilder();
         builder.finish(CICORefreshRequest.createCICORefreshRequest(
                 builder,
-                createFragmentRefreshRequest(builder, previousFragment)
+                createFragmentRefreshRequest(builder, previousFragment),
+                createPresenceTrackingConfig(builder, presenceTracking)
         ));
         return newCall(LwtAPI::cicoRefresh, builder.dataBuffer());
     }
@@ -269,8 +295,13 @@ public class LwtAPIClient extends LwtClient {
                         ByteBufferUtils.toByteArray(secret.dataAsByteBuffer())
                 ));
             }
+            ByteBuffer sessionBlacklistBuf = data.sessionBlacklistAsByteBuffer();
+            Set<UUID> sessionBlacklist = new HashSet<>();
+            while (sessionBlacklistBuf.hasRemaining()) {
+                sessionBlacklist.add(new UUID(sessionBlacklistBuf.getLong(), sessionBlacklistBuf.getLong()));
+            }
 
-            return new LocalCICOInspectionData(data.tripKey(), cert, secrets);
+            return new LocalCICOInspectionData(data.tripKey(), cert, secrets, sessionBlacklist);
         });
     }
 }

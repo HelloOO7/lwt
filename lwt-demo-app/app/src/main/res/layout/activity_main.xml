@@ -51,10 +51,20 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Open CI/CO"
-        app:layout_constraintBottom_toTopOf="@id/etNumZones"
+        app:layout_constraintBottom_toTopOf="@id/btnTrackRssi"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/btnRunTicketInspection" />
+
+    <Button
+        android:id="@+id/btnTrackRssi"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Track RSSI"
+        app:layout_constraintBottom_toTopOf="@id/etNumZones"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/btnOpenCico" />
 
     <EditText
         android:id="@+id/etNumZones"
@@ -67,7 +77,7 @@
         android:textAlignment="textEnd"
         app:layout_constraintBottom_toTopOf="@id/etValidMinutes"
         app:layout_constraintEnd_toEndOf="@+id/btnRunTicketInspection"
-        app:layout_constraintTop_toBottomOf="@+id/btnOpenCico" />
+        app:layout_constraintTop_toBottomOf="@+id/btnTrackRssi" />
 
     <TextView
         android:id="@+id/tvNumZonesLabel"

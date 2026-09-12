@@ -17,12 +17,17 @@ private:
     Callback m_Callback;
     uint64_t m_PeriodUs;
     Type m_Type;
+    bool m_IsWhen;
 
 public:
     TimerProc(const Callback& callback, uint64_t periodUs, Type type);
+    TimerProc(const Callback& callback, uint64_t whenUs);
     ~TimerProc();
+private:
+    TimerProc(const Callback& callback, uint64_t periodUs, Type type, bool isWhen);
 
+public:
     bool Start();
     void Stop();
-    void Restart();
+    void Restart(uint64_t newPeriodWhen = 0);
 };

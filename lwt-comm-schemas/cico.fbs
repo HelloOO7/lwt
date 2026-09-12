@@ -22,10 +22,22 @@ table CheckInIntermediate {
     confirmation_token: [ubyte] (required);
 }
 
+table PresenceTrackingConfig {
+    /// ID of the client, randomized for privacy. This is used to match advertising packets.
+    client_id: [ubyte] (required);
+    /// TOTP secret to prevent unauthorized cloning of packets. The TOTP
+    /// refreshes with the period specified and uses SHA256 hashes and 8-digit passwords.
+    totp_secret: [ubyte] (required);
+    /// TOTP period, in milliseconds.
+    totp_period: long;
+}
+
 table CheckInConfirmation {
     /// Token given by the device in CheckInIntermediate, that the client
     /// can send once it is ready to commit the check-in.
     confirmation_token: [ubyte] (required);
+    /// Optional configuration for presence tracking, if supported.
+    presence_config: PresenceTrackingConfig;
 }
 
 table CICOTicketFragment {
@@ -78,6 +90,8 @@ table CICOFragmentRefreshRequest {
 table CICORefreshRequest {
     /// The fragment that should be refreshed.
     fragment: CICOFragmentRefreshRequest (required);
+    /// Optional configuration for presence tracking, if supported.
+    presence_config: PresenceTrackingConfig;
 }
 
 table CheckOutRequest {
@@ -125,4 +139,8 @@ table CICOInspectionData {
     seed_derivation_secrets: [CICOSeedDerivationSecret] (required);
     /// Server timestamp for use with RTT measuring to translate local times to absolute.
     server_time: long;
+    /// Flat array of 16-byte UUIDs of sessions that have been explicitly or implicitly checked out,
+    /// and whose tickets should therefore be considered invalid regardless of what client
+    /// data indicates. A ticket refresh removes a client from this list.
+    session_blacklist: [ubyte];
 }

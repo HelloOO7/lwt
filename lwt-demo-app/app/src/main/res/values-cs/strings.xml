@@ -179,4 +179,9 @@
     <string name="ticket_inspection_cico_wrong_device">Požádejte cestujícího, aby jízdenku propojil se správným vozidlem, a zkuste to znovu.</string>
     <string name="ticket_display_valid_zones_cico">vše</string>
     <string name="ticket_inspection_detail_valid_zones_cico">Flexibilní jízdenka (CI/CO)</string>
+    <string name="ticket_inspection_checkedout_title">Jízdenka po platnosti</string>
+    <string name="ticket_inspection_checkedout_prompt">Pro tuto jízdenku byl proveden check out a již neplatí. Přejete si ji přesto zkontrolovat?</string>
+    <string name="beout_notice_supported">Vaše zařízení podporuje automatický check-out. Svou cestu můžete ukončit kdykoli po opuštění sítě bez dopadu na jízdné.</string>
+    <string name="beout_notice_not_supported">Vaše zařízení nepodporuje automatický check-out. Při výstupu z posledního spoje je doporučeno ukončit jízdu ručně, jinak je možné, že vám bude účtováno jízdné i do další zastávky.</string>
+    <string name="check_out_header">Už tam budeme?</string>
 </resources>

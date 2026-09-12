@@ -84,6 +84,8 @@ public class MainActivity extends BaseActivity {
                         .putExtra(CheckInActivity.EXTRA_CICO_TOKEN, new byte[16])
         ));
 
+        binding.btnTrackRssi.setOnClickListener(v -> startActivity(new Intent(this, RssiTrackerActivity.class)));
+
         binding.btnSetClientCert.setOnClickListener(v -> startActivity(
                 new Intent(this, ClientCertImportActivity.class)
                         .putExtra(ClientCertImportActivity.EXTRA_TARGET_ALIAS, GlobalTrustManager.APP_CLIENT_KEY_ALIAS)

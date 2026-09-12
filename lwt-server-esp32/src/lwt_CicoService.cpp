@@ -35,32 +35,33 @@ namespace lwt {
         const TicketValidationConfig& config,
         Certificate& trustRoot, Certificate& deviceCert, DigitalSignature& signingKey, HMACSHA256& hmac,
         TicketValidationService& ticketValidationService, MOSClient& mosClient,
+        PresenceTracker& presenceTracker,
         int syncTaskPriority
     ) :
+        PubSubTask("CicoSync", 4096, syncTaskPriority),
         m_Config(config),
         m_TrustRoot(trustRoot),
         m_DeviceCert(deviceCert),
         m_SigningKey(signingKey),
         m_HMAC(hmac),
         m_TicketValidationService(ticketValidationService),
-        m_MOSClient(mosClient)
+        m_MOSClient{ mosClient },
+        m_CheckOutList(m_Config.MaxCicoClients, m_Config.CicoTicketTtlMs),
+        m_PresenceTracker{ presenceTracker }
     {
-        xTaskCreateStaticPSRAM(SyncEventsTaskFunc, "CicoSync", 4096, this, syncTaskPriority, &m_SyncTask);
         m_SeedDerivationSecret.resize(SEED_DERIVATION_SECRET_SIZE);
         ESP_ERROR_CHECK(esp_event_handler_instance_register(NETIF_SNTP_EVENT, NETIF_SNTP_TIME_SYNC, [](void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
             CicoService* service = static_cast<CicoService*>(arg);
             service->OnTimeSyncDone();
             }, this, &m_TimeSyncEventInstance));
         m_TicketValidationService.ObserveServiceState(*this);
+        m_PresenceTracker.ObserveClientVanished(*this);
     }
 
     CicoService::~CicoService() {
         m_TicketValidationService.RemoveObserver(*this);
+        m_PresenceTracker.RemoveObserver(*this);
         esp_event_handler_instance_unregister(NETIF_SNTP_EVENT, NETIF_SNTP_TIME_SYNC, m_TimeSyncEventInstance);
-        std::unique_lock lock(m_EventsMutex);
-        m_RequestClose = true;
-        m_HasEventsCV.notify_all();
-        m_Closed.wait(lock, [this] { return !m_SyncTask; });
     }
 
     bool CicoService::IsCicoReady() {
@@ -85,6 +86,31 @@ namespace lwt {
         PublishServiceState();
     }
 
+    void CicoService::OnChanged(const UUID* vanishedSession) {
+        if (!vanishedSession) {
+            return;
+        }
+        auto time = SystemTime::UptimeMillis();
+        auto epochMs = SystemTime::EpochMillis();
+        m_CheckOutList.AddCheckedOutSession(*vanishedSession, time);
+
+        // the server will fill in the rest of the data if it decides that the be out event is
+        // relevant (there is no newer event from a different vehicle). If not, previous event
+        // will be linked automatically.
+        MOSCICOEvent event{
+            .EventId = UUID::V7(),
+            .PreviousEventId = UUID::Nil(),
+            .SessionId = *vanishedSession,
+            .AccountId = 0,
+            .LocalTimestamp = time,
+            .AbsoluteTimestamp = OffsetDateTime::of_local_epoch_seconds(epochMs),
+            .EventType = MOSCICOEventType::BE_OUT,
+            .LwtMetadata = m_TicketValidationService.GetCurrentValidationMetadata()
+        };
+
+        EnqueuePushEvent(std::move(event));
+    }
+
     void CicoService::PublishServiceState() {
         CicoState state;
         state.IsReady = IsCicoReadyNoLock();
@@ -99,18 +125,8 @@ namespace lwt {
         Observable<CicoState>::RemoveObserver(observer);
     }
 
-    void CicoService::SyncEventsLoop() {
-        std::unique_lock lock(m_EventsMutex);
-        while (!m_RequestClose) {
-            m_HasEventsCV.wait(lock, [this] { return !m_EventBuffer.empty() || m_RequestClose; });
-            SendEventsToServer();
-            m_EventBuffer = {};
-            if (m_RequestClose) {
-                break;
-            }
-        }
-        m_Closed.notify_all();
-        vTaskDelete(nullptr);
+    void CicoService::ProcessData() {
+        SendEventsToServer();
     }
 
     bool CicoService::SendEventsToServer() {
@@ -209,6 +225,10 @@ namespace lwt {
 
                     ProcessCicoRequest(EventStartCico(checkIn, metadata), fbb);
 
+                    if (request.presence_config()) {
+                        m_PresenceTracker.RegisterClient(*request.presence_config(), checkIn.SessionId);
+                    }
+
                     return 200;
                 }
             )
@@ -237,7 +257,7 @@ namespace lwt {
                     }
                     else {
                         // refresh is possible if any of the tokens was issued recently enough
-                        canRefresh = time < parsedToken.IssuedAt + m_Config.CicoConfirmationTokenExpiryMs;
+                        canRefresh = time < parsedToken.IssuedAt + m_Config.CicoConfirmationTokenExpiryMs && !m_CheckOutList.Contains(parsedToken.SessionId);
                     }
 
                     if (!canRefresh) {
@@ -248,6 +268,10 @@ namespace lwt {
                     psram_string metadata = m_TicketValidationService.GetCurrentValidationMetadata();
 
                     ProcessCicoRequest(EventRefreshCico(parsedToken, metadata, MOSCICOEventType::REFRESH), fbb);
+
+                    if (request.presence_config()) {
+                        m_PresenceTracker.RegisterClient(*request.presence_config(), parsedToken.SessionId);
+                    }
 
                     return 200;
                 }
@@ -269,7 +293,9 @@ namespace lwt {
 
                     fbb.Finish(CreateCheckOutResponse(fbb, CreateVector(fbb, ByteSpan(parsedToken.SessionId))));
 
+                    m_CheckOutList.AddCheckedOutSession(parsedToken.SessionId, SystemTime::UptimeMillis());
                     EnqueuePushEvent(EventRefreshCico(parsedToken, m_TicketValidationService.GetCurrentValidationMetadata(), MOSCICOEventType::CHECK_OUT));
+                    m_PresenceTracker.UnregisterClient(parsedToken.SessionId);
 
                     return 200;
                 }
@@ -282,6 +308,11 @@ namespace lwt {
                     std::lock_guard lock(m_SeedDerivationMutex);
 
                     UpdateSeedDerivationSecret();
+
+                    ByteVector blacklistUuids;
+                    m_CheckOutList.EnumerateCheckedOutSessions([&blacklistUuids](const UUID& sessionId) {
+                        blacklistUuids.insert(blacklistUuids.end(), sessionId.begin(), sessionId.end());
+                        });
 
                     fbb.Finish(CreateCICOInspectionData(
                         fbb,
@@ -297,7 +328,8 @@ namespace lwt {
                                 )
                             }
                         ),
-                        SystemTime::UptimeMillis()
+                        SystemTime::UptimeMillis(),
+                        fbb.CreateVector(std::move(blacklistUuids))
                     ));
 
                     return 200;
@@ -369,6 +401,8 @@ namespace lwt {
             m_Config.CicoTicketTtlMs
         ));
 
+        m_CheckOutList.RemoveIfPresent(event.SessionId);
+
         EnqueuePushEvent(std::move(event));
     }
 
@@ -435,9 +469,9 @@ namespace lwt {
     }
 
     void CicoService::EnqueuePushEvent(MOSCICOEvent&& event) {
-        std::unique_lock lock(m_EventsMutex);
+        std::unique_lock lock(m_PubSubMutex);
         m_EventBuffer.push_back(std::move(event));
-        m_HasEventsCV.notify_all();
+        SignalDataReady();
     }
 
     ByteVector CicoService::GenerateETD(int64_t validFromEMs, int64_t validToEMs, const UUID& sessionId, const psram_string& metadata) {
@@ -555,5 +589,66 @@ namespace lwt {
 
     bool CicoService::IsRefreshSelfCertificate(const CICOFragmentRefreshRequest& request) {
         return request.issuer_certificate()->size() == 1 && request.issuer_certificate()->Get(0) == 0x5C;
+    }
+
+    CheckOutList::CheckOutList(size_t maxSize, int64_t ttlMs) :
+        m_Capacity(maxSize),
+        m_MaxAgeMs(ttlMs)
+    {
+
+    }
+
+    void CheckOutList::AddCheckedOutSession(const UUID& sessionId, int64_t timestampMs) {
+        std::lock_guard lock(m_Mutex);
+        EraseOldEntries(timestampMs);
+        auto existing = Find(sessionId);
+        if (existing != m_CheckedOutSessions.end()) {
+            existing->TimestampMs = timestampMs;
+        }
+        else {
+            if (m_CheckedOutSessions.size() >= m_Capacity) {
+                m_CheckedOutSessions.erase(m_CheckedOutSessions.begin());
+            }
+            m_CheckedOutSessions.push_back({ sessionId, timestampMs });
+        }
+    }
+
+    void CheckOutList::EraseOldEntries(int64_t currentTimeMs) {
+        std::erase_if(
+            m_CheckedOutSessions,
+            [this, currentTimeMs](const CheckOutRecord& entry) {
+                return currentTimeMs - entry.TimestampMs > m_MaxAgeMs;
+            }
+        );
+    }
+
+    decltype(CheckOutList::m_CheckedOutSessions)::iterator CheckOutList::Find(const UUID& sessionId) {
+        return std::find_if(
+            m_CheckedOutSessions.begin(),
+            m_CheckedOutSessions.end(),
+            [&sessionId](const CheckOutRecord& entry) {
+                return entry.SessionId == sessionId;
+            }
+        );
+    }
+
+    void CheckOutList::RemoveIfPresent(const UUID& sessionId) {
+        std::lock_guard lock(m_Mutex);
+        auto it = Find(sessionId);
+        if (it != m_CheckedOutSessions.end()) {
+            m_CheckedOutSessions.erase(it);
+        }
+    }
+
+    bool CheckOutList::Contains(const UUID& sessionId) {
+        std::lock_guard lock(m_Mutex);
+        return Find(sessionId) != m_CheckedOutSessions.end();
+    }
+
+    void CheckOutList::EnumerateCheckedOutSessions(std::function<void(const UUID& sessionId)> callback) {
+        std::lock_guard lock(m_Mutex);
+        for (const auto& entry : m_CheckedOutSessions) {
+            callback(entry.SessionId);
+        }
     }
 }

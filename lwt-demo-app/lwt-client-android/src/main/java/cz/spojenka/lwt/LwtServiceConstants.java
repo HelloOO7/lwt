@@ -10,6 +10,7 @@ public class LwtServiceConstants {
 
     public static final int BLE_SERVICE_UUID_VEHICLE = 0x4C575456; // "LWTV"
     public static final int BLE_SERVICE_UUID_STOP = 0x4C575453; // "LWTS"
+    public static final int BLE_SERVICE_UUID_CICO_KEEPALIVE = 0xC1C0AA11;
 
     /*
     the extended constants exist so that we can scan for extended services without getting

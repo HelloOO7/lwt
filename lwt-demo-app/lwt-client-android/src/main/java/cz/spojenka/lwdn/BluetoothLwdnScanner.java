@@ -29,7 +29,6 @@ import java.util.function.Predicate;
 
 import androidx.annotation.Nullable;
 import cz.spojenka.lwdn.util.DeviceSpecifics;
-import cz.spojenka.lwdn.util.XiaomiBLERestrictionKiller;
 
 public class BluetoothLwdnScanner implements LwdnScanner {
 
@@ -41,12 +40,17 @@ public class BluetoothLwdnScanner implements LwdnScanner {
     private final boolean isUsingExtendedAdvertising;
 
     private final Handler handler;
+    private Runnable restartScanCallback;
 
     public BluetoothLwdnScanner(Context context, BluetoothAdapter adapter, int addressPsm) {
+        this(context, adapter, addressPsm, false);
+    }
+
+    public BluetoothLwdnScanner(Context context, BluetoothAdapter adapter, int addressPsm, boolean forceLegacy) {
         this.context = context;
         this.adapter = adapter;
         this.addressPsm = addressPsm;
-        isUsingExtendedAdvertising = adapter.isLeExtendedAdvertisingSupported();
+        isUsingExtendedAdvertising = adapter.isLeExtendedAdvertisingSupported() && !forceLegacy;
         handler = new Handler(Looper.getMainLooper());
     }
 
@@ -85,12 +89,9 @@ public class BluetoothLwdnScanner implements LwdnScanner {
                         }
                     }
                 }
-            } else {
-                // on Android 10, the background location permission does exist,
-                // but it is not needed for Bluetooth scanning, as Manifest.permission.BLUETOOTH_SCAN does not exist until
-                // Android 11
-                return false;
             }
+            // on Android 10, the background location permission does exist,
+            // and is needed to start LE scans in the background
         } catch (PackageManager.NameNotFoundException e) {
             Log.e(TAG, "Failed to get package info", e);
         }
@@ -115,11 +116,17 @@ public class BluetoothLwdnScanner implements LwdnScanner {
         return adapter.isEnabled();
     }
 
-    public static boolean isServiceUUIDFilteringBroken() {
+    private boolean isServiceUUIDFilteringBroken() {
         // not necessarily - it seems to work fine on a Huawei device running Pie
         // and a Samsung Galaxy S II running Q.
         // not so much on a Pie LG device and Q Xiaomi device, unfortunately.
-        return Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q || DeviceSpecifics.isXiaomi();
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
+            return true;
+        }
+        if (DeviceSpecifics.isXiaomi()) {
+            return !adapter.isLeExtendedAdvertisingSupported();
+        }
+        return false;
     }
 
     private boolean shouldUseSoftwareUUIDFiltering() {
@@ -259,7 +266,7 @@ public class BluetoothLwdnScanner implements LwdnScanner {
                 if (systemScanTimeout != 0) {
                     if (scanEndTime == 0 || thisScanStartTime + systemScanTimeout < scanEndTime) {
                         if (canStartInBackground()) {
-                            handler.postDelayed(() -> restartScan(settings, filters), (long) (systemScanTimeout * 0.95f));
+                            handler.postDelayed(restartScanCallback = () -> restartScan(settings, filters), (long) (systemScanTimeout * 0.95f));
                         } else {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                                 Log.e(TAG, "Background location permission not granted. Scan will be downgraded to low-power mode after 10 minutes.");
@@ -310,6 +317,10 @@ public class BluetoothLwdnScanner implements LwdnScanner {
                                     : ScanSettings.SCAN_MODE_LOW_POWER
                     )
                     .setLegacy(!isUsingExtendedAdvertising);
+
+            if (Build.VERSION.SDK_INT_FULL >= Build.VERSION_CODES_FULL.BAKLAVA_1) {
+                settings.setScanType(ScanSettings.SCAN_TYPE_PASSIVE);
+            }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA && Build.VERSION.SDK_INT_FULL >= Build.VERSION_CODES_FULL.BAKLAVA_1) {
                 settings.setRssiThreshold(config.getMinRssi());
@@ -378,6 +389,10 @@ public class BluetoothLwdnScanner implements LwdnScanner {
 
         public void stopScan() {
             stopScanImpl();
+            if (restartScanCallback != null) {
+                handler.removeCallbacks(restartScanCallback);
+                restartScanCallback = null;
+            }
             scan.markFinished();
         }
 

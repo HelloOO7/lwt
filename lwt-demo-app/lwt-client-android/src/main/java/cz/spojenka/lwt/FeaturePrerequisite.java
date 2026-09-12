@@ -114,7 +114,7 @@ public interface FeaturePrerequisite {
         }
     };
 
-    public static final FeaturePrerequisite BLUETOOTH_PERMISSIONS = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ?
+    public static final FeaturePrerequisite BLUETOOTH_PERMISSIONS_CLIENT = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ?
             new AbstractPermissionPrerequisite(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN) {
 
                 @RequiresApi(api = Build.VERSION_CODES.S)
@@ -122,6 +122,19 @@ public interface FeaturePrerequisite {
                 public boolean check(Context context) {
                     return context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
                             && context.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED;
+                }
+            }
+            : new AlwaysSatisfiedPrerequisite();
+
+    public static final FeaturePrerequisite BLUETOOTH_PERMISSIONS_CICO = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ?
+            new AbstractPermissionPrerequisite(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_ADVERTISE) {
+
+                @RequiresApi(api = Build.VERSION_CODES.S)
+                @Override
+                public boolean check(Context context) {
+                    return context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+                            && context.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+                            && context.checkSelfPermission(Manifest.permission.BLUETOOTH_ADVERTISE) == PackageManager.PERMISSION_GRANTED;
                 }
             }
             : new AlwaysSatisfiedPrerequisite();
@@ -144,7 +157,7 @@ public interface FeaturePrerequisite {
 
         @Override
         public FeaturePrerequisite[] getDependencies() {
-            return new FeaturePrerequisite[]{BLUETOOTH_PERMISSIONS};
+            return new FeaturePrerequisite[]{BLUETOOTH_PERMISSIONS_CLIENT};
         }
     };
 
@@ -281,6 +294,7 @@ public interface FeaturePrerequisite {
 
     public static FeaturePrerequisite[] LWT_OVER_BLE = {
             LWT_HARDWARE,
+            BLUETOOTH_PERMISSIONS_CLIENT,
             BLUETOOTH_ON,
             LOCATION_FOR_LE_SCAN
     };
@@ -294,6 +308,7 @@ public interface FeaturePrerequisite {
 
     public static FeaturePrerequisite[] CICO = {
             CICO_HARDWARE,
+            BLUETOOTH_PERMISSIONS_CICO,
             BLUETOOTH_ON,
             LOCATION_FOR_LE_SCAN,
             BACKGROUND_LOCATION_FOR_LE_SCAN,

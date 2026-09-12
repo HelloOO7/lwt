@@ -2,6 +2,7 @@
 
 #include "psa/crypto.h"
 #include "CryptoTypes.h"
+#include "CommonTypes.h"
 
 template<psa_algorithm_t Alg, typename THash>
 class HMAC {
@@ -75,4 +76,9 @@ public:
     }
 };
 
+
+using HMACSHA1 = HMAC<PSA_ALG_HMAC(PSA_ALG_SHA_1), SHA1Hash>;
 using HMACSHA256 = HMAC<PSA_ALG_HMAC(PSA_ALG_SHA_256), SHA256Hash>;
+using HMACSHA512 = HMAC<PSA_ALG_HMAC(PSA_ALG_SHA_512), SHA512Hash>;
+
+ByteVector HMACForDigestType(mbedtls_md_type_t digestType, const ByteSpan& key, const ByteSpan& message);

@@ -1,11 +1,17 @@
 package cz.spojenka.lwt;
 
 import android.os.Parcel;
+import android.os.ParcelUuid;
 import android.os.Parcelable;
 
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 import androidx.annotation.NonNull;
 import androidx.core.os.ParcelCompat;
@@ -13,7 +19,8 @@ import androidx.core.os.ParcelCompat;
 public record LocalCICOInspectionData(
         String tripKey,
         X509Certificate deviceCertificate,
-        List<TokenWithExpiration<byte[]>> seedDerivationSecrets
+        List<TokenWithExpiration<byte[]>> seedDerivationSecrets,
+        Set<UUID> sessionBlacklist
 ) implements Parcelable {
 
     public static final Creator<LocalCICOInspectionData> CREATOR = new Creator<>() {
@@ -26,7 +33,11 @@ public record LocalCICOInspectionData(
             for (int i = 0; i < size; i++) {
                 secrets.add(new TokenWithExpiration<>(in, in::createByteArray));
             }
-            return new LocalCICOInspectionData(tripKey, cert, secrets);
+            Set<UUID> sessionBlacklist = Arrays
+                    .stream(Objects.requireNonNull(in.createTypedArray(ParcelUuid.CREATOR)))
+                    .map(ParcelUuid::getUuid)
+                    .collect(Collectors.toSet());
+            return new LocalCICOInspectionData(tripKey, cert, secrets, sessionBlacklist);
         }
 
         @Override
@@ -48,5 +59,6 @@ public record LocalCICOInspectionData(
         for (TokenWithExpiration<byte[]> seedDerivationSecret : seedDerivationSecrets()) {
             seedDerivationSecret.writeToParcel(dest, dest::writeByteArray);
         }
+        dest.writeTypedArray(sessionBlacklist().stream().map(ParcelUuid::new).toArray(ParcelUuid[]::new), flags);
     }
 }
