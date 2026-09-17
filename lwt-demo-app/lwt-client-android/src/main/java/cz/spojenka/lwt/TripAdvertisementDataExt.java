@@ -9,6 +9,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
+import androidx.annotation.NonNull;
+
 public class TripAdvertisementDataExt extends TripAdvertisementData {
 
     private static final int DATA_MARK = 0x4544; // "ED"
@@ -26,6 +28,13 @@ public class TripAdvertisementDataExt extends TripAdvertisementData {
         currentStopName = readString(dis);
         lineName = readString(dis);
         headsign = readString(dis);
+    }
+
+    public TripAdvertisementDataExt(TripAdvertisementData base, String currentStopName, String lineName, String headsign) {
+        super(base);
+        this.currentStopName = currentStopName;
+        this.lineName = lineName;
+        this.headsign = headsign;
     }
 
     @Override
@@ -82,6 +91,7 @@ public class TripAdvertisementDataExt extends TripAdvertisementData {
         }
     }
 
+    @NonNull
     @Override
     public String toString() {
         return "TripAdvertisementDataExt{" +

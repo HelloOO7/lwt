@@ -1,0 +1,584 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<xs:schema elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="JR_XML_EXP" nillable="true" type="DAVKAJR" />
+  <xs:complexType name="DAVKAJR">
+    <xs:sequence>
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="d" type="Dopravce" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="dd" type="DruhDopravy" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="ids" type="IntegrovanySystem" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="m" type="Majo" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="z" type="Zastavka" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="p" type="Provozovna" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="l" type="Linka" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="kr" type="Kraj" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="obl" type="Oblast" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="k" type="KategorieLinkyProIdos" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="tv" type="TypVozu" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="ty" type="TypVykonu" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="ch" type="CharakterVykonu" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="r" type="Preference" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="po" type="Poznamka" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="o" type="Obeh" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="s" type="Spoj" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="g" type="Grafikon" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="t" type="Tablo" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="sj" type="SlevaJizdenky" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="oj" type="ObjektJizdenky" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="chj" type="CharakterJizdenky" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="pdj" type="PodminkaJizdenky" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="pj" type="PlatnostJizdenky" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="npj" type="NeplatnostJizdenky" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="j" type="Jizdenky" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="tr" type="Trasa" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="pnad" type="PozadavekNAD" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="objsml" type="ObjednatelSml" />
+    </xs:sequence>
+    <xs:attribute name="od" type="xs:date" use="required" />
+    <xs:attribute name="do" type="xs:date" use="required" />
+    <xs:attribute name="režim" type="xs:string" />
+    <xs:attribute name="exp" type="xs:dateTime" use="required" />
+    <xs:attribute name="ver" type="xs:string" />
+  </xs:complexType>
+  <xs:complexType name="Dopravce">
+    <xs:attribute name="c" type="xs:short" use="required" />
+    <xs:attribute name="n" type="xs:string" />
+    <xs:attribute name="kj" type="xs:string" />
+    <xs:attribute name="ncis" type="xs:string" />
+    <xs:attribute default="" name="ico" type="xs:string" />
+    <xs:attribute default="" name="dic" type="xs:string" />
+    <xs:attribute default="" name="ul" type="xs:string" />
+    <xs:attribute default="" name="me" type="xs:string" />
+    <xs:attribute default="" name="psc" type="xs:string" />
+    <xs:attribute default="" name="tel" type="xs:string" />
+    <xs:attribute default="" name="teld" type="xs:string" />
+    <xs:attribute default="" name="teli" type="xs:string" />
+    <xs:attribute default="" name="em" type="xs:string" />
+  </xs:complexType>
+  <xs:complexType name="DruhDopravy">
+    <xs:attribute name="c" type="xs:unsignedByte" use="required" />
+    <xs:attribute name="z" type="xs:string" />
+    <xs:attribute name="n" type="xs:string" />
+  </xs:complexType>
+  <xs:complexType name="IntegrovanySystem">
+    <xs:attribute name="c" type="xs:short" use="required" />
+    <xs:attribute name="z" type="xs:string" />
+    <xs:attribute name="n" type="xs:string" />
+    <xs:attribute name="tapoj" type="xs:string" />
+  </xs:complexType>
+  <xs:complexType name="Majo">
+    <xs:attribute name="c" type="xs:short" use="required" />
+    <xs:attribute name="n" type="xs:string" />
+    <xs:attribute default="" name="z" type="xs:string" />
+    <xs:attribute default="" name="t" type="xs:string" />
+    <xs:attribute default="" name="e" type="xs:string" />
+  </xs:complexType>
+  <xs:complexType name="Zastavka">
+    <xs:sequence>
+      <xs:element minOccurs="0" maxOccurs="1" name="pol" type="Polygon" />
+      <xs:element minOccurs="0" maxOccurs="1" name="polout" type="Polygon" />
+    </xs:sequence>
+    <xs:attribute name="u" type="xs:short" use="required" />
+    <xs:attribute name="z" type="xs:short" use="required" />
+    <xs:attribute name="kj" type="xs:string" />
+    <xs:attribute name="n" type="xs:string" />
+    <xs:attribute default="" name="n2" type="xs:string" />
+    <xs:attribute default="" name="n3" type="xs:string" />
+    <xs:attribute default="" name="n4" type="xs:string" />
+    <xs:attribute default="" name="n5" type="xs:string" />
+    <xs:attribute default="" name="n6" type="xs:string" />
+    <xs:attribute default="" name="n7" type="xs:string" />
+    <xs:attribute default="" name="n8" type="xs:string" />
+    <xs:attribute default="" name="pop" type="xs:string" />
+    <xs:attribute default="Prepravni" name="tu" type="TypUzlu" />
+    <xs:attribute default="0" name="cis" type="xs:int" />
+    <xs:attribute default="0" name="ois" type="xs:int" />
+    <xs:attribute default="0" name="ois2" type="xs:int" />
+    <xs:attribute default="0" name="co" type="xs:int" />
+    <xs:attribute default="" name="no" type="xs:string" />
+    <xs:attribute default="0" name="cco" type="xs:int" />
+    <xs:attribute default="" name="nco" type="xs:string" />
+    <xs:attribute default="" name="spz" type="xs:string" />
+    <xs:attribute default="" name="kr" type="xs:string" />
+    <xs:attribute default="0" name="ids" type="xs:short" />
+    <xs:attribute default="" name="tp" type="xs:string" />
+    <xs:attribute default="0" name="ids2" type="xs:short" />
+    <xs:attribute default="" name="tp2" type="xs:string" />
+    <xs:attribute default="0" name="ids3" type="xs:short" />
+    <xs:attribute default="" name="tp3" type="xs:string" />
+    <xs:attribute default="0" name="sx" type="xs:double" />
+    <xs:attribute default="0" name="sy" type="xs:double" />
+    <xs:attribute default="0" name="sz" type="xs:double" />
+    <xs:attribute default="0" name="lat" type="xs:float" />
+    <xs:attribute default="0" name="lng" type="xs:float" />
+    <xs:attribute default="" name="sta" type="xs:string" />
+    <xs:attribute default="0" name="m" type="xs:short" />
+    <xs:attribute default="0" name="kmen" type="xs:short" />
+    <xs:attribute default="true" name="ve" type="xs:boolean" />
+    <xs:attribute default="false" name="dcsn" type="xs:boolean" />
+    <xs:attribute default="false" name="bb" type="xs:boolean" />
+    <xs:attribute default="false" name="bbc" type="xs:boolean" />
+    <xs:attribute default="false" name="bbn" type="xs:boolean" />
+    <xs:attribute default="false" name="wc" type="xs:boolean" />
+    <xs:attribute default="false" name="xA" type="xs:boolean" />
+    <xs:attribute default="false" name="xB" type="xs:boolean" />
+    <xs:attribute default="false" name="xC" type="xs:boolean" />
+    <xs:attribute default="false" name="xD" type="xs:boolean" />
+    <xs:attribute default="false" name="xS" type="xs:boolean" />
+    <xs:attribute default="false" name="xTra" type="xs:boolean" />
+    <xs:attribute default="false" name="xBus" type="xs:boolean" />
+    <xs:attribute default="false" name="xTro" type="xs:boolean" />
+    <xs:attribute default="false" name="xVla" type="xs:boolean" />
+    <xs:attribute default="false" name="xLod" type="xs:boolean" />
+    <xs:attribute default="false" name="xLet" type="xs:boolean" />
+    <xs:attribute default="false" name="xLan" type="xs:boolean" />
+    <xs:attribute default="false" name="nad" type="xs:boolean" />
+    <xs:attribute default="0" name="kidos" type="xs:int" />
+    <xs:attribute default="" name="st" type="xs:string" />
+    <xs:attribute default="0" name="okruh" type="xs:int" />
+    <xs:attribute default="0" name="rdisp" type="xs:int" />
+    <xs:attribute default="false" name="neprep" type="xs:boolean" />
+  </xs:complexType>
+  <xs:complexType name="Polygon">
+    <xs:sequence>
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="bod" type="BodWGS" />
+    </xs:sequence>
+    <xs:attribute name="c" type="xs:int" use="required" />
+  </xs:complexType>
+  <xs:complexType name="BodWGS">
+    <xs:attribute name="lat" type="xs:double" use="required" />
+    <xs:attribute name="lon" type="xs:double" use="required" />
+  </xs:complexType>
+  <xs:simpleType name="TypUzlu">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Nezadany" />
+      <xs:enumeration value="Prepravni" />
+      <xs:enumeration value="Provozovna" />
+      <xs:enumeration value="ObecnyNeverejny" />
+      <xs:enumeration value="MytnaBrana" />
+      <xs:enumeration value="SvetelnaKrizovatka" />
+      <xs:enumeration value="UzelPentlogramu" />
+      <xs:enumeration value="NastupniMisto" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="Provozovna">
+    <xs:attribute name="c" type="xs:short" use="required" />
+    <xs:attribute name="kj" type="xs:string" />
+    <xs:attribute name="z" type="xs:string" />
+    <xs:attribute name="n" type="xs:string" />
+    <xs:attribute name="d" type="xs:short" use="required" />
+    <xs:attribute name="dd" type="xs:unsignedByte" use="required" />
+    <xs:attribute default="0" name="u" type="xs:short" />
+    <xs:attribute default="" name="telv" type="xs:string" />
+    <xs:attribute default="" name="telg" type="xs:string" />
+    <xs:attribute default="" name="telz" type="xs:string" />
+    <xs:attribute default="" name="mail" type="xs:string" />
+    <xs:attribute default="0" name="cis" type="xs:int" />
+  </xs:complexType>
+  <xs:complexType name="Linka">
+    <xs:attribute name="c" type="xs:int" use="required" />
+    <xs:attribute name="d" type="xs:short" use="required" />
+    <xs:attribute name="kj" type="xs:string" />
+    <xs:attribute name="lc" use="required">
+      <xs:simpleType>
+        <xs:list itemType="xs:int" />
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute default="" name="a" type="xs:string" />
+    <xs:attribute default="" name="aois" type="xs:string" />
+    <xs:attribute default="" name="tl" type="xs:string" />
+    <xs:attribute default="" name="n" type="xs:string" />
+    <xs:attribute default="0" name="kup" type="xs:short" />
+    <xs:attribute default="false" name="ids" type="xs:boolean" />
+    <xs:attribute default="false" name="sko" type="xs:boolean" />
+    <xs:attribute default="false" name="noc" type="xs:boolean" />
+    <xs:attribute default="false" name="inv" type="xs:boolean" />
+    <xs:attribute default="false" name="mtr" type="xs:boolean" />
+    <xs:attribute default="false" name="mhdmimo" type="xs:boolean" />
+    <xs:attribute default="0" name="kli" type="xs:int" />
+    <xs:attribute name="cids" use="required">
+      <xs:simpleType>
+        <xs:list itemType="xs:short" />
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute default="0" name="obl" type="xs:int" />
+  </xs:complexType>
+  <xs:complexType name="Kraj">
+    <xs:attribute default="" name="z" type="xs:string" />
+    <xs:attribute default="" name="n" type="xs:string" />
+  </xs:complexType>
+  <xs:complexType name="Oblast">
+    <xs:attribute name="id" type="xs:int" use="required" />
+    <xs:attribute name="n" type="xs:string" />
+    <xs:attribute default="" name="z" type="xs:string" />
+    <xs:attribute default="0" name="v" type="xs:int" />
+    <xs:attribute name="kj" type="xs:string" />
+  </xs:complexType>
+  <xs:complexType name="KategorieLinkyProIdos">
+    <xs:attribute name="c" type="xs:int" use="required" />
+    <xs:attribute name="n" type="xs:string" />
+  </xs:complexType>
+  <xs:complexType name="TypVozu">
+    <xs:attribute name="c" type="xs:short" use="required" />
+    <xs:attribute name="z" type="xs:string" />
+    <xs:attribute name="n" type="xs:string" />
+    <xs:attribute name="dd" type="xs:unsignedByte" use="required" />
+    <xs:attribute default="false" name="np" type="xs:boolean" />
+    <xs:attribute default="false" name="pl" type="xs:boolean" />
+    <xs:attribute default="0" name="pjk" type="xs:int" />
+  </xs:complexType>
+  <xs:complexType name="TypVykonu">
+    <xs:attribute name="c" type="xs:int" use="required" />
+    <xs:attribute name="n" type="xs:string" />
+    <xs:attribute default="false" name="li" type="xs:boolean" />
+  </xs:complexType>
+  <xs:complexType name="CharakterVykonu">
+    <xs:attribute name="c" type="xs:unsignedByte" use="required" />
+    <xs:attribute name="n" type="xs:string" />
+  </xs:complexType>
+  <xs:complexType name="Preference">
+    <xs:attribute name="c" type="xs:int" use="required" />
+    <xs:attribute name="pop" type="xs:string" />
+  </xs:complexType>
+  <xs:complexType name="Poznamka">
+    <xs:attribute name="c" type="xs:int" use="required" />
+    <xs:attribute name="t" type="xs:string" />
+    <xs:attribute default="" name="zkr1" type="xs:string" />
+    <xs:attribute default="" name="zkr2" type="xs:string" />
+    <xs:attribute default="" name="zkr3" type="xs:string" />
+    <xs:attribute default="false" name="ois" type="xs:boolean" />
+    <xs:attribute default="false" name="zjr" type="xs:boolean" />
+    <xs:attribute default="false" name="csad" type="xs:boolean" />
+    <xs:attribute default="false" name="vjr" type="xs:boolean" />
+    <xs:attribute default="false" name="ljr" type="xs:boolean" />
+    <xs:attribute default="false" name="kjr" type="xs:boolean" />
+    <xs:attribute default="false" name="jdf" type="xs:boolean" />
+    <xs:attribute default="false" name="tt" type="xs:boolean" />
+    <xs:attribute default="false" name="n" type="xs:boolean" />
+    <xs:attribute default="" name="tn" type="xs:string" />
+    <xs:attribute default="0" name="u" type="xs:short" />
+    <xs:attribute default="0" name="z" type="xs:short" />
+    <xs:attribute default="0" name="u2" type="xs:short" />
+    <xs:attribute default="0" name="z2" type="xs:short" />
+    <xs:attribute default="0" name="nl" type="xs:int" />
+    <xs:attribute default="" name="anl" type="xs:string" />
+    <xs:attribute default="0" name="cd" type="xs:int" />
+    <xs:attribute default="0" name="usm" type="xs:short" />
+    <xs:attribute default="0" name="zsm" type="xs:short" />
+    <xs:attribute name="dd" type="xs:unsignedByte" use="required" />
+    <xs:attribute default="0" name="mind" type="xs:int" />
+    <xs:attribute default="false" name="thls" type="xs:boolean" />
+    <xs:attribute default="" name="nahr" type="xs:string" />
+    <xs:attribute default="" name="tpan" type="xs:string" />
+    <xs:attribute default="0" name="kan" type="xs:int" />
+    <xs:attribute default="0" name="akce" type="xs:int" />
+  </xs:complexType>
+  <xs:complexType name="Obeh">
+    <xs:sequence>
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="ds" type="DlouhySpoj" />
+    </xs:sequence>
+    <xs:attribute name="l" type="xs:int" use="required" />
+    <xs:attribute name="p" type="xs:short" use="required" />
+    <xs:attribute name="kj" type="xs:string" />
+    <xs:attribute default="" name="prej" type="xs:string" />
+    <xs:attribute name="sp" use="required">
+      <xs:simpleType>
+        <xs:list itemType="xs:int" />
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="tv" type="xs:short" use="required" />
+    <xs:attribute name="td" type="xs:unsignedByte" use="required" />
+    <xs:attribute name="vyb" type="xs:string" />
+    <xs:attribute default="true" name="mes" type="xs:boolean" />
+    <xs:attribute default="true" name="prim" type="xs:boolean" />
+  </xs:complexType>
+  <xs:complexType name="DlouhySpoj">
+    <xs:attribute name="sp" use="required">
+      <xs:simpleType>
+        <xs:list itemType="xs:int" />
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:complexType>
+  <xs:complexType name="Spoj">
+    <xs:sequence>
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="x" type="Zastaveni" />
+      <xs:element minOccurs="0" maxOccurs="1" name="mt" type="MaticeTarifu" />
+    </xs:sequence>
+    <xs:attribute name="s" type="xs:int" use="required" />
+    <xs:attribute name="id" type="xs:int" use="required" />
+    <xs:attribute default="0" name="idNAD" type="xs:int" />
+    <xs:attribute name="zvd" type="xs:unsignedByte" use="required" />
+    <xs:attribute name="l" type="xs:int" use="required" />
+    <xs:attribute name="p" type="xs:short" use="required" />
+    <xs:attribute default="true" name="sm" type="xs:boolean" />
+    <xs:attribute name="dd" type="xs:unsignedByte" use="required" />
+    <xs:attribute name="pr" type="xs:short" use="required" />
+    <xs:attribute name="d" type="xs:short" use="required" />
+    <xs:attribute name="tv" type="xs:short" use="required" />
+    <xs:attribute name="kj" type="xs:string" />
+    <xs:attribute name="ty" type="xs:unsignedByte" use="required" />
+    <xs:attribute name="ch" type="xs:unsignedByte" use="required" />
+    <xs:attribute name="po" use="required">
+      <xs:simpleType>
+        <xs:list itemType="xs:int" />
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute default="false" name="np" type="xs:boolean" />
+    <xs:attribute default="false" name="ids" type="xs:boolean" />
+    <xs:attribute default="false" name="jk" type="xs:boolean" />
+    <xs:attribute default="false" name="vy" type="xs:boolean" />
+    <xs:attribute default="false" name="sp1" type="xs:boolean" />
+    <xs:attribute default="false" name="spN" type="xs:boolean" />
+    <xs:attribute default="false" name="doh" type="xs:boolean" />
+    <xs:attribute default="false" name="pos" type="xs:boolean" />
+    <xs:attribute default="false" name="man" type="xs:boolean" />
+    <xs:attribute default="false" name="skol" type="xs:boolean" />
+    <xs:attribute default="0" name="lc" type="xs:int" />
+    <xs:attribute name="c" type="xs:int" use="required" />
+    <xs:attribute default="0" name="cvl" type="xs:int" />
+    <xs:attribute default="false" name="neve" type="xs:boolean" />
+    <xs:attribute default="0" name="obl" type="xs:int" />
+  </xs:complexType>
+  <xs:complexType name="Zastaveni">
+    <xs:sequence>
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="v" type="Vzdalenost" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="vk" type="VzdalenostKraj" />
+    </xs:sequence>
+    <xs:attribute name="u" type="xs:short" use="required" />
+    <xs:attribute default="0" name="z" type="xs:short" />
+    <xs:attribute default="0" name="var" type="xs:short" />
+    <xs:attribute default="0" name="cis" type="xs:int" />
+    <xs:attribute default="" name="ncis" type="xs:string" />
+    <xs:attribute default="-1" name="p" type="xs:int" />
+    <xs:attribute default="-1" name="o" type="xs:int" />
+    <xs:attribute default="0" name="ppoposunu" type="xs:int" />
+    <xs:attribute default="0" name="opoposunu" type="xs:int" />
+    <xs:attribute default="Standard" name="t" type="TypZastaveni" />
+    <xs:attribute name="ty" type="xs:unsignedByte" use="required" />
+    <xs:attribute default="true" name="ces" type="xs:boolean" />
+    <xs:attribute name="po" use="required">
+      <xs:simpleType>
+        <xs:list itemType="xs:int" />
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute default="false" name="zn" type="xs:boolean" />
+    <xs:attribute default="false" name="vyst" type="xs:boolean" />
+    <xs:attribute default="false" name="nast" type="xs:boolean" />
+    <xs:attribute default="false" name="nz" type="xs:boolean" />
+    <xs:attribute default="false" name="na" type="xs:boolean" />
+    <xs:attribute default="false" name="px" type="xs:boolean" />
+    <xs:attribute default="false" name="pdisp" type="xs:boolean" />
+    <xs:attribute default="false" name="pNAD" type="xs:boolean" />
+    <xs:attribute default="0" name="kh1" type="xs:short" />
+    <xs:attribute default="0" name="kh2" type="xs:short" />
+    <xs:attribute default="false" name="poj" type="xs:boolean" />
+    <xs:attribute default="false" name="bp" type="xs:boolean" />
+    <xs:attribute default="false" name="zpl" type="xs:boolean" />
+    <xs:attribute default="false" name="kpl" type="xs:boolean" />
+    <xs:attribute default="false" name="s" type="xs:boolean" />
+    <xs:attribute default="false" name="dm" type="xs:boolean" />
+    <xs:attribute default="false" name="zsol" type="xs:boolean" />
+    <xs:attribute default="false" name="s1" type="xs:boolean" />
+    <xs:attribute default="false" name="s2" type="xs:boolean" />
+    <xs:attribute default="false" name="oc" type="xs:boolean" />
+    <xs:attribute default="false" name="xA" type="xs:boolean" />
+    <xs:attribute default="false" name="xB" type="xs:boolean" />
+    <xs:attribute default="false" name="xC" type="xs:boolean" />
+    <xs:attribute default="false" name="xD" type="xs:boolean" />
+    <xs:attribute default="false" name="xS" type="xs:boolean" />
+    <xs:attribute default="false" name="xTra" type="xs:boolean" />
+    <xs:attribute default="false" name="xBus" type="xs:boolean" />
+    <xs:attribute default="false" name="xTro" type="xs:boolean" />
+    <xs:attribute default="false" name="xVla" type="xs:boolean" />
+    <xs:attribute default="false" name="xLod" type="xs:boolean" />
+    <xs:attribute default="false" name="xLet" type="xs:boolean" />
+    <xs:attribute default="false" name="xLan" type="xs:boolean" />
+    <xs:attribute default="0" name="icls" type="xs:int" />
+    <xs:attribute default="false" name="nev" type="xs:boolean" />
+    <xs:attribute default="false" name="neozn" type="xs:boolean" />
+    <xs:attribute default="false" name="zast" type="xs:boolean" />
+    <xs:attribute default="0" name="idSml" type="xs:int" />
+  </xs:complexType>
+  <xs:complexType name="Vzdalenost">
+    <xs:attribute default="" name="p" type="xs:string" />
+    <xs:attribute default="0" name="m" type="xs:int" />
+  </xs:complexType>
+  <xs:complexType name="VzdalenostKraj">
+    <xs:attribute default="" name="kr" type="xs:string" />
+    <xs:attribute default="0" name="m" type="xs:int" />
+  </xs:complexType>
+  <xs:simpleType name="TypZastaveni">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Standard" />
+      <xs:enumeration value="Majak" />
+      <xs:enumeration value="ProvozOset" />
+      <xs:enumeration value="CIS" />
+      <xs:enumeration value="Myto" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="MaticeTarifu">
+    <xs:attribute name="r" type="xs:int" use="required" />
+    <xs:attribute name="t" use="required">
+      <xs:simpleType>
+        <xs:list itemType="xs:int" />
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:complexType>
+  <xs:complexType name="Grafikon">
+    <xs:attribute name="id" type="xs:int" use="required" />
+    <xs:attribute default="-1" name="c" type="xs:int" />
+    <xs:attribute name="kj" type="xs:string" />
+    <xs:attribute name="po" use="required">
+      <xs:simpleType>
+        <xs:list itemType="xs:int" />
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="zvd" type="xs:unsignedByte" use="required" />
+    <xs:attribute name="pd" type="xs:string" />
+  </xs:complexType>
+  <xs:complexType name="Tablo">
+    <xs:attribute name="u" type="xs:short" use="required" />
+    <xs:attribute default="0" name="z" type="xs:short" />
+    <xs:attribute name="kj" type="xs:string" />
+    <xs:attribute default="0" name="ois" type="xs:int" />
+    <xs:attribute default="0" name="cis" type="xs:int" />
+    <xs:attribute default="" name="nza" type="xs:string" />
+    <xs:attribute default="" name="ri" type="xs:string" />
+    <xs:attribute default="" name="ji" type="xs:string" />
+    <xs:attribute default="" name="vtm" type="xs:string" />
+    <xs:attribute default="" name="vtmnoc" type="xs:string" />
+    <xs:attribute default="" name="vtn" type="xs:string" />
+    <xs:attribute default="" name="vtnnoc" type="xs:string" />
+    <xs:attribute default="" name="btm" type="xs:string" />
+    <xs:attribute default="" name="btmnoc" type="xs:string" />
+    <xs:attribute default="" name="btn" type="xs:string" />
+    <xs:attribute default="" name="btnnoc" type="xs:string" />
+    <xs:attribute default="" name="bta" type="xs:string" />
+    <xs:attribute default="" name="ctm" type="xs:string" />
+    <xs:attribute default="" name="ctmnoc" type="xs:string" />
+    <xs:attribute default="" name="ctn" type="xs:string" />
+    <xs:attribute default="" name="ctnnoc" type="xs:string" />
+    <xs:attribute default="" name="cta" type="xs:string" />
+    <xs:attribute default="" name="ztm" type="xs:string" />
+    <xs:attribute default="" name="ztmnoc" type="xs:string" />
+    <xs:attribute default="" name="ztn" type="xs:string" />
+    <xs:attribute default="" name="ztnnoc" type="xs:string" />
+    <xs:attribute default="" name="lcdm" type="xs:string" />
+    <xs:attribute default="" name="lcdmnoc" type="xs:string" />
+    <xs:attribute default="" name="lcdn" type="xs:string" />
+    <xs:attribute default="" name="lcdnnoc" type="xs:string" />
+    <xs:attribute default="" name="hl" type="xs:string" />
+    <xs:attribute default="" name="n" type="xs:string" />
+    <xs:attribute default="" name="nf" type="xs:string" />
+  </xs:complexType>
+  <xs:complexType name="SlevaJizdenky">
+    <xs:attribute name="c" type="xs:int" use="required" />
+    <xs:attribute name="n" type="xs:string" />
+  </xs:complexType>
+  <xs:complexType name="ObjektJizdenky">
+    <xs:attribute name="c" type="xs:int" use="required" />
+    <xs:attribute name="n" type="xs:string" />
+  </xs:complexType>
+  <xs:complexType name="CharakterJizdenky">
+    <xs:attribute name="c" type="xs:int" use="required" />
+    <xs:attribute name="n" type="xs:string" />
+  </xs:complexType>
+  <xs:complexType name="PodminkaJizdenky">
+    <xs:attribute name="c" type="xs:int" use="required" />
+    <xs:attribute name="n" type="xs:string" />
+  </xs:complexType>
+  <xs:complexType name="PlatnostJizdenky">
+    <xs:attribute name="c" type="xs:int" use="required" />
+    <xs:attribute name="n" type="xs:string" />
+  </xs:complexType>
+  <xs:complexType name="NeplatnostJizdenky">
+    <xs:attribute name="c" type="xs:int" use="required" />
+    <xs:attribute name="n" type="xs:string" />
+  </xs:complexType>
+  <xs:complexType name="Jizdenky">
+    <xs:sequence>
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="j" type="Jizdenka" />
+    </xs:sequence>
+    <xs:attribute name="od" type="xs:dateTime" use="required" />
+  </xs:complexType>
+  <xs:complexType name="Jizdenka">
+    <xs:attribute name="c" type="xs:int" use="required" />
+    <xs:attribute default="" name="p" type="xs:string" />
+    <xs:attribute default="" name="ka" type="xs:string" />
+    <xs:attribute default="0" name="oj" type="xs:int" />
+    <xs:attribute default="0" name="sj" type="xs:int" />
+    <xs:attribute default="0" name="chj" type="xs:int" />
+    <xs:attribute default="0" name="plaj" type="xs:int" />
+    <xs:attribute default="0" name="neplaj" type="xs:int" />
+    <xs:attribute default="0" name="podmj" type="xs:int" />
+    <xs:attribute default="false" name="ptn" type="xs:boolean" />
+    <xs:attribute default="false" name="ppn" type="xs:boolean" />
+    <xs:attribute default="false" name="ppk" type="xs:boolean" />
+    <xs:attribute default="0" name="pp" type="xs:short" />
+    <xs:attribute default="" name="opp" type="xs:string" />
+    <xs:attribute default="Unknown" name="jcp" type="TimeUnit" />
+    <xs:attribute default="0" name="cp" type="xs:int" />
+    <xs:attribute default="false" name="prir" type="xs:boolean" />
+    <xs:attribute default="false" name="pren" type="xs:boolean" />
+    <xs:attribute default="0" name="kc" type="xs:double" />
+    <xs:attribute default="0" name="dph" type="xs:double" />
+  </xs:complexType>
+  <xs:simpleType name="TimeUnit">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Unknown" />
+      <xs:enumeration value="Day" />
+      <xs:enumeration value="Month" />
+      <xs:enumeration value="Hour" />
+      <xs:enumeration value="Minute" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="Trasa">
+    <xs:sequence>
+      <xs:element minOccurs="0" maxOccurs="1" name="traj" type="Trajektorie" />
+    </xs:sequence>
+    <xs:attribute name="zvd" type="xs:unsignedByte" use="required" />
+    <xs:attribute default="0" name="u1" type="xs:short" />
+    <xs:attribute default="0" name="z1" type="xs:short" />
+    <xs:attribute default="0" name="u2" type="xs:short" />
+    <xs:attribute default="0" name="z2" type="xs:short" />
+    <xs:attribute default="0" name="var" type="xs:short" />
+    <xs:attribute name="kj" type="xs:string" />
+  </xs:complexType>
+  <xs:complexType name="Trajektorie">
+    <xs:sequence>
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="bod" type="BodTrajektorie" />
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="wgs" type="BodWGS" />
+    </xs:sequence>
+    <xs:attribute name="c" type="xs:int" use="required" />
+  </xs:complexType>
+  <xs:complexType name="BodTrajektorie">
+    <xs:attribute name="X" type="xs:double" use="required" />
+    <xs:attribute name="Y" type="xs:double" use="required" />
+  </xs:complexType>
+  <xs:complexType name="PozadavekNAD">
+    <xs:attribute name="idNAD" type="xs:int" use="required" />
+    <xs:attribute name="ver" type="xs:int" use="required" />
+    <xs:attribute name="poslzm" type="xs:dateTime" use="required" />
+    <xs:attribute name="nazev" type="xs:string" />
+    <xs:attribute name="ROV" type="xs:string" />
+    <xs:attribute name="datOd" type="xs:date" use="required" />
+    <xs:attribute name="datDo" type="xs:date" use="required" />
+    <xs:attribute name="poznNAD" type="xs:string" />
+    <xs:attribute name="stav" type="xs:int" use="required" />
+    <xs:attribute name="raz" type="xs:dateTime" use="required" />
+    <xs:attribute name="poznJR" type="xs:string" />
+    <xs:attribute name="idIntVyl" type="xs:int" use="required" />
+  </xs:complexType>
+  <xs:complexType name="ObjednatelSml">
+    <xs:sequence>
+      <xs:element minOccurs="0" maxOccurs="unbounded" name="sml" type="Contract" />
+    </xs:sequence>
+    <xs:attribute name="idObj" type="xs:int" use="required" />
+    <xs:attribute name="zkr" type="xs:string" />
+    <xs:attribute name="naz" type="xs:string" />
+  </xs:complexType>
+  <xs:complexType name="Contract">
+    <xs:attribute name="idSml" type="xs:int" use="required" />
+    <xs:attribute name="zkr" type="xs:string" />
+    <xs:attribute name="naz" type="xs:string" />
+  </xs:complexType>
+</xs:schema>

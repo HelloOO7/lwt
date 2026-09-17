@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: cicomock-server
+  jackson:
+    time-zone: 'Europe/Prague'
+  web:
+    error:
+      include-message: always
+      include-binding-errors: always
+mock:
+  scan:
+    result-interval: 1000 # 1 second
+    radius: 2000 # 2 km
+    # rssi for scans reported to clients. the scan will report other devices too
+    # for rendering on the map, but the client will not see them
+    min-report-rssi: -95
+    min-comm-rssi: -100
+  presence:
+    update-interval: 3000 # 3 seconds
+    loss-interval: 8000 # 8 seconds
+    min-present-rssi: -100

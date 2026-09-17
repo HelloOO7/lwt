@@ -5,8 +5,15 @@ import java.nio.ByteBuffer;
 public class ByteBufferUtils {
 
     public static byte[] toByteArray(ByteBuffer buffer) {
+        return toByteArray(buffer, 0, buffer.remaining());
+    }
+
+    public static byte[] toByteArray(ByteBuffer buffer, int offset, int length) {
         int pos = buffer.position();
-        byte[] bytes = new byte[buffer.remaining()];
+        if (offset != 0) {
+            buffer.position(pos + offset);
+        }
+        byte[] bytes = new byte[length];
         buffer.get(bytes);
         buffer.position(pos);
         return bytes;

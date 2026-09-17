@@ -111,6 +111,7 @@ namespace lwt {
             ESP_LOGW(TAG, "Advertisement is too short (%zu bytes)", adv.m_Data.size());
             return;
         }
+        // ESP_LOGI(TAG, "Received advertisement");
 
         BitConverter<std::endian::big>::InputStream in(adv.m_Data.data());
 

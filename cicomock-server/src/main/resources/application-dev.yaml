@@ -1,0 +1,17 @@
+ticketing-server:
+  base-url: "https://ticketing.mos.ropid:8080"
+  client-cert:
+    path: "../pki/cico-mocking-device.pfx"
+    password: "mosdevcert"
+  ca-cert:
+    path: "../pki/ROPID_Root_CA_Certificate_[DEBUG].crt"
+engine:
+  natives:
+    path: "${SPOJENKA_ROOT}/spojenka-engine/SearchEngine/build/x64-release"
+mock:
+  data:
+    timetable-bundle: "data/jizdnirady-bundle-fullres-trajectories.ttz"
+    ropid-stops: "data/zastavky_vsechnyZavody_20260916_1151.xml"
+    index-directory: "data/index"
+server:
+    port: 8090

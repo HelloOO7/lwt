@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="en">
+<!-- front-end written by Copilot -->
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CICOMock</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <style>
+    :root {
+      --bg: #f4f5f7;
+      --panel: #ffffff;
+      --panel-border: #dfe3e8;
+      --fg: #1c2430;
+      --muted: #677389;
+      --accent: #1e6ef2;
+      --accent-strong: #0a4ec9;
+      --success: #2aa76f;
+      --warning: #e07d27;
+      --danger: #d64646;
+      --shadow: 0 2px 8px rgba(16, 24, 40, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--panel-border);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      position: relative;
+      z-index: 500;
+    }
+
+    .title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .status {
+      font-size: 0.9rem;
+      color: var(--muted);
+      min-height: 1.2em;
+    }
+
+    .layout {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+    }
+
+    .sidebar {
+      width: 510px; /* increased by ~50% */
+      background: var(--panel);
+      border-right: 1px solid var(--panel-border);
+      padding: 12px 14px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .section {
+      margin-bottom: 18px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--panel-border);
+    }
+
+    .section:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+    }
+
+    .section h3 {
+      margin: 0 0 10px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.76rem;
+      color: var(--muted);
+      margin-bottom: 5px;
+      font-weight: 600;
+    }
+
+    input, select, button {
+      width: 100%;
+      height: 34px;
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--fg);
+      font-size: 0.9rem;
+      padding: 0 10px;
+    }
+
+    button {
+      cursor: pointer;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      font-weight: 700;
+      transition: background 0.15s ease;
+    }
+
+    button:hover { background: var(--accent-strong); }
+
+    button.secondary {
+      background: #eef3ff;
+      color: var(--fg);
+      border: 1px solid #cfe0ff;
+    }
+
+    button.secondary:hover { background: #e5edff; }
+
+    button.danger {
+      background: var(--danger);
+    }
+
+    button.danger:hover { background: #c92f2f; }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .small {
+      font-size: 0.78rem;
+      line-height: 1.4;
+      color: var(--muted);
+    }
+
+    .map-panel {
+      flex: 1;
+      position: relative;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+      background: #dfeae6;
+    }
+
+    .map-hint {
+      position: absolute;
+      right: 18px;
+      top: 18px;
+      background: rgba(255,255,255,0.9);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 0.8rem;
+      z-index: 450;
+      box-shadow: var(--shadow);
+    }
+
+    .action-popup {
+      position: absolute;
+      right: 18px;
+      bottom: 18px;
+      background: rgba(255,255,255,0.96);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      padding: 12px;
+      z-index: 450;
+      display: none;
+      min-width: 220px;
+    }
+
+    .action-popup.visible { display: block; }
+
+    .vehicle-popup {
+      position: absolute;
+      right: 18px;
+      top: 80px;
+      background: rgba(255,255,255,0.98);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      padding: 12px;
+      z-index: 460;
+      min-width: 260px;
+      max-width: 360px;
+      display: none;
+    }
+
+    .vehicle-popup.visible { display: block; }
+
+    .vehicle-popup .close {
+      position: absolute;
+      right: 8px;
+      top: 6px;
+      border: none;
+      background: transparent;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .action-popup h4 {
+      margin: 0 0 8px;
+      font-size: 0.88rem;
+    }
+
+    .action-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .value {
+      font-weight: 700;
+      color: var(--fg);
+    }
+
+    .vehicle-label {
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      box-shadow: var(--shadow);
+      color: var(--fg);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 4px 7px;
+      white-space: nowrap;
+      pointer-events: auto; /* allow clicking the tooltip */
+      cursor: pointer;
+    }
+
+    .vehicle-marker {
+      background: transparent;
+      border: none;
+      pointer-events: auto;
+    }
+
+    .vehicle-marker-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #e07d27;
+      border: 2px solid rgba(255,255,255,0.9);
+      box-shadow: 0 0 0 2px rgba(0,0,0,0.05);
+      display: block;
+    }
+
+    .vehicle-marker-dot.active {
+      background: #2aa76f;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      background: #edf2ff;
+      color: var(--accent-strong);
+      margin-left: 6px;
+    }
+
+    @media (max-width: 860px) {
+      .layout {
+        flex-direction: column;
+      }
+
+      .sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--panel-border);
+      }
+
+      .map-panel {
+        min-height: 50vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="title">CICOMock</div>
+    <div id="status" class="status">Connecting to /server…</div>
+  </div>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="section">
+        <h3>Mock state</h3>
+        <div class="small">Location: <span id="locationText" class="value">—</span></div>
+        <div class="small" style="margin-top: 6px;">Time: <span id="timeText" class="value">—</span></div>
+        <div class="small" style="margin-top: 6px;">Mode: <span id="modeText" class="value">walking</span></div>
+      </div>
+
+      <div class="section">
+        <h3>Time control</h3>
+        <label for="timescaleInput">Timescale</label>
+        <div class="row">
+          <input id="timescaleInput" type="number" min="0" step="1" value="1" />
+          <button id="applyTimescaleBtn" class="secondary">Apply</button>
+        </div>
+        <label for="timeInput">Set time</label>
+        <div class="row">
+          <input id="timeInput" type="datetime-local" />
+          <button id="applyTimeBtn" class="secondary">Apply</button>
+        </div>
+      </div>
+
+      <!-- place finder placed at bottom -->
+      <div class="section search-section">
+        <h3>Search</h3>
+        <label for="searchInput">Find place or address</label>
+        <div class="row">
+          <input id="searchInput" type="search" placeholder="e.g. Prague Main Station" />
+        </div>
+        <div class="row">
+          <button id="searchBtn" class="secondary">Search</button>
+        </div>
+        <div id="searchResults" style="margin-top:8px; overflow:auto; font-size:0.9rem;"></div>
+      </div>
+
+    </aside>
+
+    <div class="map-panel">
+      <div id="map"></div>
+      <div id="mapHint" class="map-hint">Walking mode active. Click map to walk or warp.</div>
+      <div id="vehiclePopup" class="vehicle-popup"></div>
+      <div id="actionPopup" class="action-popup">
+        <h4>Choose destination</h4>
+        <div class="action-buttons">
+          <button id="walkHereBtn">Walk here</button>
+          <button id="warpHereBtn" class="secondary">Warp here</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <script>
+    const state = {
+      map: null,
+      ws: null,
+      serverLocation: { lon: 14.4347067, lat: 50.0841331 },
+      trackedVehicleId: null,
+      timescale: 1,
+      lastServerTimescale: 1,
+      currentTime: null,
+      nearbyDevices: [],
+      deviceScanRadiusMeters: null,
+      presenceTrackingRadiusMeters: null,
+      // presence tracking: connection id that tracks user's presence (0 = none)
+      presenceTrackingConnectionId: 0,
+      presenceLine: null,
+      walkTimer: null,
+      targetLocation: null,
+      pendingMapClick: null,
+      userMarker: null,
+      userCircle: null,
+      deviceLayers: [],
+      deviceLayerMap: {}, // connectionId -> { marker, circle, tooltip }
+      initialized: false,
+      hasCenteredInitially: false,
+      openPopupDeviceId: null,
+      // whether we're currently following a vehicle (connectionId), null = not following
+      followingVehicleId: null,
+      // click-cycling state
+      lastClickPos: null,
+      lastClickCandidates: [],
+      lastClickIndex: 0
+    };
+
+    const els = {
+      status: document.getElementById('status'),
+      locationText: document.getElementById('locationText'),
+      timeText: document.getElementById('timeText'),
+      modeText: document.getElementById('modeText'),
+      timescaleInput: document.getElementById('timescaleInput'),
+      timeInput: document.getElementById('timeInput'),
+      actionPopup: document.getElementById('actionPopup'),
+      mapHint: document.getElementById('mapHint'),
+      vehiclePopup: document.getElementById('vehiclePopup'),
+      searchInput: document.getElementById('searchInput'),
+      searchResults: document.getElementById('searchResults')
+    };
+
+    function setStatus(message, isError = false) {
+      els.status.textContent = message;
+      els.status.style.color = isError ? '#d64646' : '#677389';
+    }
+
+    function initMap() {
+      state.map = L.map('map', { zoomControl: true }).setView([50.0841331, 14.4347067], 15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(state.map);
+
+      state.userMarker = L.marker([50.0841331, 14.4347067], {
+        title: 'Mocked user',
+        interactive: false
+      }).addTo(state.map);
+      try { state.userMarker.bringToBack(); } catch (e) { }
+
+      state.userCircle = L.circle([50.0841331, 14.4347067], {
+        radius: 0,
+        color: '#4f7cff',
+        fillColor: '#4f7cff',
+        fillOpacity: 0.15,
+        weight: 1.5,
+        interactive: false
+      }).addTo(state.map);
+      try { state.userCircle.bringToBack(); } catch (e) { }
+
+      state.map.on('contextmenu', handleContextMenu);
+      state.map.on('click', (event) => {
+        els.actionPopup.classList.remove('visible');
+        // hide vehicle popup when clicking off unless currently boarded on that vehicle
+        if (state.openPopupDeviceId !== null) {
+          const openId = Number(state.openPopupDeviceId);
+          if (!(Number.isInteger(state.trackedVehicleId) && Number(state.trackedVehicleId) === openId)) {
+            closeVehiclePopup();
+          }
+        }
+      });
+      state.initialized = true;
+      renderMap();
+    }
+
+    function connectServer() {
+      const wsSchema = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const serverUrl = `${wsSchema}://${window.location.host}/server`;
+      const ws = new WebSocket(serverUrl);
+      state.ws = ws;
+
+      ws.addEventListener('open', () => {
+        setStatus('Connected to /server');
+      });
+
+      ws.addEventListener('message', (event) => {
+        const payload = JSON.parse(event.data);
+        applyMapData(payload);
+      });
+
+      ws.addEventListener('error', () => {
+        setStatus('WebSocket error', true);
+      });
+
+      ws.addEventListener('close', () => {
+        setStatus('Connection lost, retrying…', true);
+        window.setTimeout(connectServer, 2000);
+      });
+    }
+
+    function isTrackedVehicleActive() {
+      return Number.isInteger(state.trackedVehicleId) && state.trackedVehicleId > 0;
+    }
+
+    function parseZonedDateTime(value) {
+      if (!value) return null;
+      const normalized = String(value).replace(/\[[^\]]+\]$/, '');
+      const parsed = new Date(normalized);
+      return Number.isFinite(parsed.getTime()) ? parsed : null;
+    }
+
+    function applyMapData(data) {
+      if (!data) return;
+
+      if (data.location && Number.isFinite(data.location.lon) && Number.isFinite(data.location.lat)) {
+        state.serverLocation = { lon: Number(data.location.lon), lat: Number(data.location.lat) };
+        if (!state.hasCenteredInitially && state.map) {
+          try {
+            state.map.setView([state.serverLocation.lat, state.serverLocation.lon], Math.max(state.map.getZoom(), 15));
+          } catch (e) { }
+          state.hasCenteredInitially = true;
+        }
+      }
+
+      if (Number.isFinite(data.timescale)) {
+        const srv = Number(data.timescale);
+        state.timescale = srv;
+        // only update the input when the server timescale actually changed
+        if (srv !== state.lastServerTimescale && els.timescaleInput) {
+          els.timescaleInput.value = String(srv);
+          state.lastServerTimescale = srv;
+        }
+      }
+
+      // handle trackingConnectionId with "null means no change" semantics
+      const prevTracked = state.trackedVehicleId;
+      let newTracked = prevTracked;
+      if (Object.prototype.hasOwnProperty.call(data, 'trackingConnectionId')) {
+        if (data.trackingConnectionId === null) {
+          // explicit null means: do not change tracking state
+        } else {
+          const id = Number(data.trackingConnectionId);
+          newTracked = id > 0 ? id : null;
+        }
+      }
+
+      if (data.deviceScanRadiusMeters !== undefined && data.deviceScanRadiusMeters !== null && Number.isFinite(Number(data.deviceScanRadiusMeters))) {
+        state.deviceScanRadiusMeters = Number(data.deviceScanRadiusMeters);
+      }
+      if (data.presenceTrackingRadiusMeters !== undefined && data.presenceTrackingRadiusMeters !== null && Number.isFinite(Number(data.presenceTrackingRadiusMeters))) {
+        state.presenceTrackingRadiusMeters = Number(data.presenceTrackingRadiusMeters);
+      }
+
+      // presence tracking connection id (0 = none)
+      if (data.presenceTrackingConnectionId !== undefined) {
+        // server sends 0 when none; coerce to number
+        state.presenceTrackingConnectionId = Number(data.presenceTrackingConnectionId) || 0;
+      }
+
+      if (data.time) {
+        state.currentTime = parseZonedDateTime(data.time);
+      }
+
+      state.nearbyDevices = Array.isArray(data.nearbyDevices) ? data.nearbyDevices : [];
+
+      // apply tracking change and center once on boarding (do not keep re-centering on every update)
+      if (newTracked !== prevTracked) {
+        state.trackedVehicleId = newTracked;
+        if (newTracked !== null) {
+          const activeDevice = state.nearbyDevices.find(d => Number(d.connectionId) === Number(newTracked));
+          if (activeDevice && activeDevice.location && state.map) {
+            try { state.map.setView([activeDevice.location.lat, activeDevice.location.lon], Math.max(state.map.getZoom(), 15)); } catch (e) { }
+          }
+          // stop walking when boarding occurs
+          stopWalking();
+        }
+      }
+
+      // update presence visual (line from user to tracking device)
+      updatePresenceLine();
+
+      renderMap();
+      updateReadouts();
+    }
+
+    function updateReadouts() {
+      const loc = state.serverLocation;
+      els.locationText.textContent = `${loc.lat.toFixed(5)}, ${loc.lon.toFixed(5)}`;
+      els.modeText.textContent = isTrackedVehicleActive() ? 'vehicle' : 'walking';
+      els.modeText.classList.toggle('value', true);
+
+      if (state.currentTime) {
+        try {
+          const d = state.currentTime;
+          const formatted = d.toLocaleString(undefined, {
+            year: 'numeric', month: 'short', day: 'numeric',
+            hour: '2-digit', minute: '2-digit', second: '2-digit'
+          });
+          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+          els.timeText.textContent = `${formatted} ${tz}`.trim();
+        } catch (e) {
+          els.timeText.textContent = state.currentTime.toString();
+        }
+      } else {
+        els.timeText.textContent = '—';
+      }
+
+      // show/hide walking hint based on tracked vehicle state
+      const walkingActive = !isTrackedVehicleActive();
+      if (els.mapHint) {
+        els.mapHint.style.display = walkingActive ? 'block' : 'none';
+        if (walkingActive) {
+          els.mapHint.textContent = 'Walking mode active. Click map to walk or warp.';
+        } else {
+          els.mapHint.textContent = 'Vehicle mode active';
+        }
+      }
+
+      // initialize search bindings if present
+      if (els.searchInput && !els.searchInput._bound) {
+        const btn = document.getElementById('searchBtn');
+        if (btn) btn.addEventListener('click', () => doNominatimSearch(els.searchInput.value));
+        els.searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doNominatimSearch(els.searchInput.value); });
+        els.searchInput._bound = true;
+      }
+    }
+
+    function getVehicleDetails(device) {
+      const adv = device && device.advData ? device.advData : null;
+      const line = adv && adv.lineName ? adv.lineName : (device.lineName || 'Vehicle');
+      const currentStop = adv && adv.currentStopName ? adv.currentStopName : '—';
+      const headsign = adv && adv.headsign ? adv.headsign : '—';
+      const delay = adv && Number.isFinite(Number(adv.delay)) ? Number(adv.delay) : 0;
+      const stopArr = adv && adv.stopArrTime ? adv.stopArrTime : null;
+      const stopDep = adv && adv.stopDepTime ? adv.stopDepTime : null;
+      const locationState = adv && Number.isFinite(Number(adv.locationState)) ? Number(adv.locationState) : null;
+      const stateLabel = {
+        0: 'at stop',
+        1: 'between stops',
+        2: 'before stop',
+        3: 'after stop'
+      }[locationState] || 'unknown';
+
+      return {
+        line,
+        currentStop,
+        headsign,
+        delay,
+        stopArr: stopArr ? String(stopArr) : '—',
+        stopDep: stopDep ? String(stopDep) : '—',
+        stateLabel
+      };
+    }
+
+    function buildVehiclePopup(device) {
+      const details = getVehicleDetails(device);
+      // produce a stable DOM-friendly template with data-field attributes so we can update in-place
+      return `
+        <div class="vehicle-popup-content" data-connection-id="${device.connectionId}" style="min-width: 220px; font-size: 12px; line-height: 1.5;">
+          <div><strong data-field="line">${details.line}</strong></div>
+          <div>#<span data-field="conn">${device.connectionId}</span></div>
+          <hr style="margin: 6px 0; border: none; border-top: 1px solid #dfe3e8;" />
+          <div><strong>Stop:</strong> <span data-field="currentStop">${details.currentStop}</span></div>
+          <div><strong>Direction:</strong> <span data-field="headsign">${details.headsign}</span></div>
+          <div><strong>Delay:</strong> <span data-field="delay">${details.delay}</span>s</div>
+          <div><strong>State:</strong> <span data-field="stateLabel">${details.stateLabel}</span></div>
+          <div><strong>Arrive:</strong> <span data-field="stopArr">${details.stopArr}</span></div>
+          <div><strong>Depart:</strong> <span data-field="stopDep">${details.stopDep}</span></div>
+          <div style="margin-top: 10px;">
+            <button data-connection-id="${device.connectionId}" style="width: 100%; height: 30px;">Board vehicle</button>
+          </div>
+          <div style="margin-top: 8px;">
+            <button data-follow-connection-id="${device.connectionId}" class="secondary" style="width: 100%; height: 30px;">Follow vehicle</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function handleDeviceClickAt(latlng) {
+      if (!state.map) return;
+      const lng = (latlng && (latlng.lng !== undefined)) ? latlng.lng : (latlng && latlng.lon !== undefined ? latlng.lon : undefined);
+      if (latlng == null || lng === undefined) return;
+      const clickPoint = state.map.latLngToContainerPoint(L.latLng(latlng.lat, lng));
+      const candidates = state.nearbyDevices
+        .filter(d => d && d.location)
+        .map(d => {
+          const p = state.map.latLngToContainerPoint(L.latLng(d.location.lat, d.location.lon));
+          return { device: d, dist: p.distanceTo(clickPoint) };
+        })
+        .filter(x => Number.isFinite(x.dist))
+        .filter(x => x.dist <= 24) // 24px hit radius
+        .sort((a,b) => a.dist - b.dist);
+      if (!candidates || candidates.length === 0) return;
+
+      // if clicking near previous click position, cycle; otherwise reset
+      const pts = candidates.map(c => Number(c.device.connectionId));
+      if (state.lastClickPos && state.lastClickPos.distanceTo(clickPoint) <= 6 && arraysEqual(state.lastClickCandidates, pts)) {
+        state.lastClickIndex = (state.lastClickIndex + 1) % candidates.length;
+      } else {
+        state.lastClickIndex = 0;
+      }
+      state.lastClickPos = clickPoint;
+      state.lastClickCandidates = pts;
+      const sel = candidates[state.lastClickIndex].device;
+      if (sel) showVehiclePopup(sel);
+    }
+
+    function arraysEqual(a,b) {
+      if (!a || !b) return false;
+      if (a.length !== b.length) return false;
+      for (let i=0;i<a.length;i++) if (a[i] !== b[i]) return false;
+      return true;
+    }
+
+        function updatePresenceLine() {
+          if (!state.map) return;
+          const conn = Number(state.presenceTrackingConnectionId) || 0;
+          // if no presence tracker, remove any existing line
+          if (!conn) {
+            if (state.presenceLine) {
+              try { state.map.removeLayer(state.presenceLine); } catch (e) {}
+              state.presenceLine = null;
+            }
+            return;
+          }
+          // find device
+          const dev = state.nearbyDevices.find(d => Number(d.connectionId) === Number(conn));
+          if (!dev || !dev.location) {
+            if (state.presenceLine) {
+              try { state.map.removeLayer(state.presenceLine); } catch (e) {}
+              state.presenceLine = null;
+            }
+            return;
+          }
+          const userLatLng = [state.serverLocation.lat, state.serverLocation.lon];
+          const devLatLng = [dev.location.lat, dev.location.lon];
+          const latlngs = [userLatLng, devLatLng];
+          if (state.presenceLine) {
+            try { state.presenceLine.setLatLngs(latlngs); state.presenceLine.bringToBack(); } catch (e) {}
+          } else {
+            try {
+              state.presenceLine = L.polyline(latlngs, { color: '#4f7cff', weight: 2, dashArray: '6 6', interactive: false }).addTo(state.map);
+              state.presenceLine.bringToBack();
+            } catch (e) { state.presenceLine = null; }
+          }
+        }
+
+        function renderMap() {
+      if (!state.initialized) return;
+
+      const userLatLng = [state.serverLocation.lat, state.serverLocation.lon];
+      state.userMarker.setLatLng(userLatLng);
+      try { state.userMarker.bringToFront(); } catch (e) { }
+
+      // Only show presence radius if a presence tracker connection is actively tracking the user (presenceTrackingConnectionId > 0)
+      if (Number(state.presenceTrackingConnectionId) > 0 && state.presenceTrackingRadiusMeters !== null && Number.isFinite(state.presenceTrackingRadiusMeters)) {
+        state.userCircle.setLatLng(userLatLng);
+        state.userCircle.setRadius(state.presenceTrackingRadiusMeters);
+        state.userCircle.setStyle({ opacity: 1, fillOpacity: 0.15 });
+        try { state.userCircle.bringToBack(); } catch (e) { }
+      } else {
+        // hide radius when no presence tracking is active
+        state.userCircle.setStyle({ opacity: 0, fillOpacity: 0 });
+        try { state.userCircle.setRadius(0); } catch (e) { }
+      }
+
+      const currentlyOpen = state.openPopupDeviceId || null;
+      // Remove layers for devices that no longer exist and prepare map of existing IDs
+      const incomingIds = new Set(state.nearbyDevices.map(d => d?.connectionId).filter(Boolean));
+      Object.keys(state.deviceLayerMap).forEach((id) => {
+        if (!incomingIds.has(Number(id))) {
+          const entry = state.deviceLayerMap[id];
+          if (entry) {
+            if (entry.marker) state.map.removeLayer(entry.marker);
+            if (entry.circle) state.map.removeLayer(entry.circle);
+          }
+          delete state.deviceLayerMap[id];
+        }
+      });
+      state.deviceLayers = []; // keep for compatibility
+
+      state.nearbyDevices.forEach((device) => {
+        if (!device || !device.location) return;
+        const latlng = [device.location.lat, device.location.lon];
+        const isActive = Number(device.connectionId) === Number(state.trackedVehicleId);
+        const beaconRadius = Number.isFinite(state.deviceScanRadiusMeters) ? state.deviceScanRadiusMeters : null;
+        const details = getVehicleDetails(device);
+        const lineLabel = [details.line || 'Vehicle', `#${device.connectionId}`].filter(Boolean).join(' ');
+
+        const idKey = String(device.connectionId);
+        let entry = state.deviceLayerMap[idKey];
+        if (entry) {
+          // update existing entry in-place
+          if (entry.circle && beaconRadius !== null) {
+            entry.circle.setLatLng(latlng);
+            entry.circle.setRadius(beaconRadius);
+            entry.circle.setStyle({ color: isActive ? '#2aa76f' : '#e07d27', fillColor: isActive ? '#2aa76f' : '#e07d27' });
+            // ensure circle stays under the marker
+            try { entry.circle.bringToBack(); } catch (e) { }
+            if (!entry.circle._vehicleClickBound) {
+              (function(cid){
+                entry.circle.on('click', (ev) => {
+                  L.DomEvent.stopPropagation(ev);
+                  L.DomEvent.preventDefault(ev);
+                  const dev = state.nearbyDevices.find(d => Number(d.connectionId) === Number(cid));
+                  if (dev) {
+                    showVehiclePopup(dev);
+                  } else {
+                    handleDeviceClickAt(ev.latlng);
+                  }
+                });
+              })(Number(idKey));
+              entry.circle._vehicleClickBound = true;
+            }
+          }
+          if (entry.marker) {
+            entry.marker.setLatLng(latlng);
+            // update icon color
+            const el = entry.marker.getElement();
+            if (el) {
+              const dot = el.querySelector('.vehicle-marker-dot');
+              if (dot) {
+                dot.classList.toggle('active', isActive);
+              }
+            }
+            // update tooltip content
+            const tt = entry.marker.getTooltip?.();
+            if (tt) {
+              try { tt.setContent(lineLabel); } catch (e) { }
+            }
+            if (!entry.marker._clickBound) {
+              entry.marker.on('click', (ev) => {
+                L.DomEvent.stopPropagation(ev);
+                L.DomEvent.preventDefault(ev);
+                handleDeviceClickAt(ev.latlng);
+              });
+              entry.marker._clickBound = true;
+            }
+
+            // if this popup is currently visible in our custom vehiclePopup, refresh its content
+            if (state.openPopupDeviceId !== null && Number(device.connectionId) === Number(state.openPopupDeviceId)) {
+              updateVehiclePopupIfOpen(device);
+            }
+            // ensure marker is above the circle
+            try { entry.marker.bringToFront(); } catch (e) { }
+          }
+          // keep record in deviceLayers for compatibility
+          if (entry.circle) state.deviceLayers.push(entry.circle);
+          if (entry.marker) state.deviceLayers.push(entry.marker);
+
+          // if popup was open before, preserve state (do not reopen)
+          if (currentlyOpen !== null && Number(device.connectionId) === Number(currentlyOpen)) {
+            state.openPopupDeviceId = Number(device.connectionId);
+          }
+        } else {
+          // create new entry
+          let circle = null;
+          if (beaconRadius !== null) {
+            circle = L.circle(latlng, {
+              radius: beaconRadius,
+              color: isActive ? '#2aa76f' : '#e07d27',
+              fillColor: isActive ? '#2aa76f' : '#e07d27',
+              fillOpacity: isActive ? 0.11 : 0.08,
+              weight: 1.5,
+              interactive: true
+            }).addTo(state.map);
+            // bind circle click to resolve latest device by id at click-time
+            (function(cid){
+              circle.on('click', (ev) => {
+                L.DomEvent.stopPropagation(ev);
+                L.DomEvent.preventDefault(ev);
+                const dev = state.nearbyDevices.find(d => Number(d.connectionId) === Number(cid));
+                if (dev) {
+                  showVehiclePopup(dev);
+                } else {
+                  handleDeviceClickAt(ev.latlng);
+                }
+              });
+            })(Number(idKey));
+            // ensure circle is below marker
+            try { circle.bringToBack(); } catch (e) { }
+            state.deviceLayers.push(circle);
+          }
+ 
+          const markerIcon = L.divIcon({
+            className: 'vehicle-marker',
+            html: `<span class="vehicle-marker-dot ${isActive ? 'active' : ''}"></span>`,
+            iconSize: [14, 14],
+            iconAnchor: [7, 7],
+            popupAnchor: [0, -7]
+          });
+ 
+          const marker = L.marker(latlng, {
+            icon: markerIcon,
+            keyboard: false,
+            title: `${lineLabel}`
+          }).addTo(state.map);
+          try { marker.bringToFront(); } catch (e) { }
+
+          const tooltip = L.tooltip({
+            permanent: true,
+            direction: 'top',
+            offset: [0, -12],
+            opacity: 0.95,
+            sticky: false,
+            className: 'vehicle-label'
+          }).setContent(lineLabel);
+          marker.bindTooltip(tooltip);
+
+          // make tooltip clickable (open vehicle popup) and not follow cursor
+          try {
+            const ttEl = marker.getTooltip().getElement();
+            if (ttEl) {
+              ttEl.style.pointerEvents = 'auto';
+              // prefer using handleDeviceClickAt to support cycling overlapping markers
+              (function(cid){
+                ttEl.addEventListener('click', (ev) => {
+                  ev.stopPropagation();
+                  ev.preventDefault();
+                  // use marker latlng to find nearest candidates and show the proper device
+                  handleDeviceClickAt(marker.getLatLng());
+                });
+              })(Number(idKey));
+            }
+          } catch (e) { }
+
+          (function(cid){
+            marker.on('click', (event) => {
+              L.DomEvent.stopPropagation(event);
+              L.DomEvent.preventDefault(event);
+              handleDeviceClickAt(event.latlng);
+            });
+          })(Number(idKey));
+
+          marker.on('contextmenu', (event) => {
+            L.DomEvent.stopPropagation(event);
+            L.DomEvent.preventDefault(event);
+          });
+
+          state.deviceLayerMap[idKey] = { marker, circle, tooltip };
+          state.deviceLayers.push(marker);
+          if (circle) state.deviceLayers.push(circle);
+
+          // do NOT call showVehiclePopup here — if the user had it open previously, it will be preserved because we update in-place
+        }
+      });
+
+      // refresh presence connection line after markers are laid out
+      updatePresenceLine();
+
+      // if user enabled following a vehicle, pan the map to that vehicle each render;
+      // if the vehicle disappears, stop following.
+      if (state.followingVehicleId) {
+        const dev = state.nearbyDevices.find(d => Number(d.connectionId) === Number(state.followingVehicleId));
+        if (dev && dev.location && state.map) {
+          try {
+            state.map.panTo([dev.location.lat, dev.location.lon], { animate: false });
+          } catch (e) { }
+        } else {
+          // stop following if device not present anymore
+          state.followingVehicleId = null;
+        }
+      }
+
+    }
+
+    function validateTimescale(raw) {
+      const value = Number(raw);
+      if (!Number.isFinite(value)) return null;
+      // allow 0 to pause time, or any numeric value >= 1 (do not round) — input step remains 1 for convenience
+      if (value === 0) return 0;
+      if (value >= 1) return value;
+      return null;
+    }
+
+    function sendMapChange(payload) {
+      if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
+        setStatus('Server websocket is not ready', true);
+        return;
+      }
+
+      state.ws.send(JSON.stringify(payload));
+    }
+
+    function applyTimescale() {
+      const value = validateTimescale(document.getElementById('timescaleInput').value);
+      if (value === null) {
+        setStatus('Timescale must be 0 or at least 1.', true);
+        return;
+      }
+      sendMapChange({ newTimescale: value });
+      setStatus(`Timescale set to ${value}`);
+    }
+
+    function applyTime() {
+      const value = document.getElementById('timeInput').value;
+      if (!value) {
+        setStatus('Select a time first', true);
+        return;
+      }
+      const localDate = new Date(value + ':00');
+      const iso = new Date(localDate.getTime() - localDate.getTimezoneOffset() * 60000).toISOString().slice(0, 19) + getTimezoneOffsetString();
+      sendMapChange({ newTime: iso });
+      setStatus(`Time set to ${iso}`);
+    }
+
+    function getTimezoneOffsetString() {
+      const offsetMinutes = new Date().getTimezoneOffset();
+      const sign = offsetMinutes <= 0 ? '+' : '-';
+      const abs = Math.abs(offsetMinutes);
+      const hh = String(Math.floor(abs / 60)).padStart(2, '0');
+      const mm = String(abs % 60).padStart(2, '0');
+      return `${sign}${hh}:${mm}`;
+    }
+
+    function boardVehicleFromPopup(connectionId) {
+      if (!Number.isFinite(connectionId) || connectionId <= 0) {
+        setStatus('Vehicle selection is invalid', true);
+        return;
+      }
+      // send board request and update UI optimistically
+      sendMapChange({ newTrackingConnection: connectionId });
+      state.trackedVehicleId = connectionId;
+      setStatus(`Boarded vehicle #${connectionId}`);
+      // update popup buttons if open — pass full device object if available
+      const devToUpdate = state.nearbyDevices.find(d => Number(d.connectionId) === Number(connectionId));
+      if (devToUpdate) updateVehiclePopupIfOpen(devToUpdate);
+    }
+
+    function disembarkVehicle() {
+      // send disembark request and update UI optimistically
+      state.trackedVehicleId = null;
+      renderMap();
+      updateReadouts();
+      sendMapChange({ newTrackingConnection: 0 });
+      setStatus('Disembarked');
+      stopWalking();
+      // update popup button state — only refresh if we have the full device info
+      const devOpen = state.nearbyDevices.find(d => Number(d.connectionId) === Number(state.openPopupDeviceId));
+      if (devOpen) updateVehiclePopupIfOpen(devOpen);
+    }
+
+    function handleContextMenu(event) {
+      if (isTrackedVehicleActive()) {
+        setStatus('Disembark first to move on foot', true);
+        return;
+      }
+
+      state.pendingMapClick = { lat: event.latlng.lat, lon: event.latlng.lng };
+      // position action popup near cursor
+      const mapRect = state.map.getContainer().getBoundingClientRect();
+      const x = event.originalEvent.clientX - mapRect.left;
+      const y = event.originalEvent.clientY - mapRect.top;
+      els.actionPopup.style.left = `${x + 10}px`;
+      els.actionPopup.style.top = `${y + 10}px`;
+      els.actionPopup.style.right = 'auto';
+      els.actionPopup.style.bottom = 'auto';
+      els.actionPopup.classList.add('visible');
+      setStatus('Choose walk or warp target');
+    }
+
+    function walkToTarget() {
+      if (!state.pendingMapClick) return;
+      const target = state.pendingMapClick;
+      stopWalking();
+      state.targetLocation = target;
+      els.actionPopup.classList.remove('visible');
+      startWalkingLoop();
+    }
+
+    function showVehiclePopup(device) {
+      if (!device) return;
+      // if we were following a different vehicle, stop following when a new selection occurs
+      if (state.followingVehicleId && Number(state.followingVehicleId) !== Number(device.connectionId)) {
+        state.followingVehicleId = null;
+      }
+      const content = buildVehiclePopup(device);
+      els.vehiclePopup.innerHTML = `<button class="close" aria-label="Close">✕</button>${content}`;
+      els.vehiclePopup.classList.add('visible');
+      state.openPopupDeviceId = Number(device.connectionId);
+
+      const closeBtn = els.vehiclePopup.querySelector('.close');
+      closeBtn?.addEventListener('click', closeVehiclePopup);
+
+      const btn = els.vehiclePopup.querySelector('button[data-connection-id]');
+      if (btn) {
+        const conn = Number(btn.dataset.connectionId);
+        // set label and handler directly on the existing button to avoid unnecessary DOM churn
+        btn.textContent = (Number(state.trackedVehicleId) === conn) ? 'Disembark' : 'Board vehicle';
+        btn.disabled = false;
+        btn.addEventListener('click', () => {
+          if (Number(state.trackedVehicleId) === conn) {
+            disembarkVehicle();
+          } else {
+            boardVehicleFromPopup(conn);
+          }
+        });
+      }
+
+      // follow toggle button
+      const followBtn = els.vehiclePopup.querySelector('button[data-follow-connection-id]');
+      if (followBtn) {
+        const conn = Number(followBtn.dataset.followConnectionId);
+        const isFollowing = Number(state.followingVehicleId) === conn;
+        followBtn.textContent = isFollowing ? 'Stop following' : 'Follow vehicle';
+        followBtn.disabled = false;
+        followBtn.addEventListener('click', () => {
+          if (Number(state.followingVehicleId) === conn) {
+            state.followingVehicleId = null;
+            followBtn.textContent = 'Follow vehicle';
+            setStatus('Stopped following vehicle');
+          } else {
+            state.followingVehicleId = conn;
+            followBtn.textContent = 'Stop following';
+            setStatus(`Following vehicle #${conn}`);
+            // center immediately on the vehicle if we have its location
+            const dev = state.nearbyDevices.find(d => Number(d.connectionId) === conn);
+            if (dev && dev.location && state.map) {
+              try { state.map.panTo([dev.location.lat, dev.location.lon], { animate: true }); } catch (e) {}
+            }
+          }
+        });
+      }
+    }
+
+    function closeVehiclePopup() {
+      els.vehiclePopup.classList.remove('visible');
+      els.vehiclePopup.innerHTML = '';
+      state.openPopupDeviceId = null;
+      // stop following when the popup is dismissed
+      if (state.followingVehicleId) state.followingVehicleId = null;
+    }
+
+    function doNominatimSearch(query) {
+      if (!query || !query.trim()) return;
+      const q = encodeURIComponent(query.trim());
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=8&q=${q}`;
+      els.searchResults.innerHTML = '<div style="color:#677389">Searching…</div>';
+      fetch(url, { headers: { 'Accept': 'application/json' } })
+        .then(r => r.json())
+        .then(json => {
+          renderSearchResults(Array.isArray(json) ? json : []);
+        }).catch(err => {
+          els.searchResults.innerHTML = `<div style="color:#d64646">Search failed</div>`;
+        });
+    }
+
+    function renderSearchResults(items) {
+      els.searchResults.innerHTML = '';
+      if (!items || items.length === 0) {
+        els.searchResults.innerHTML = '<div class="small">No results</div>';
+        return;
+      }
+      items.forEach(it => {
+        const el = document.createElement('div');
+        el.style.padding = '6px 6px';
+        el.style.borderBottom = '1px solid #f1f3f6';
+        el.style.cursor = 'pointer';
+        el.title = it.display_name;
+        el.style.display = 'flex';
+        el.style.alignItems = 'center';
+        el.style.justifyContent = 'space-between';
+
+        const label = document.createElement('div');
+        label.textContent = it.display_name;
+        label.style.fontSize = '0.9rem';
+        label.style.flex = '1';
+        label.style.marginRight = '8px';
+
+        const actions = document.createElement('div');
+        actions.style.display = 'flex';
+        actions.style.gap = '8px';
+
+        const goBtn = document.createElement('button');
+        goBtn.textContent = 'Go';
+        goBtn.className = 'secondary';
+        goBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          const lat = Number(it.lat); const lon = Number(it.lon);
+          try { state.map.setView([lat, lon], Math.max(state.map.getZoom(), 15)); } catch (e) {}
+        });
+
+        actions.appendChild(goBtn);
+
+        el.appendChild(label);
+        el.appendChild(actions);
+
+        el.addEventListener('click', () => {
+          const lat = Number(it.lat); const lon = Number(it.lon);
+          try { state.map.setView([lat, lon], Math.max(state.map.getZoom(), 15)); } catch (e) {}
+        });
+        els.searchResults.appendChild(el);
+      });
+    }
+
+    function updateVehiclePopupIfOpen(device) {
+      if (!state.openPopupDeviceId) return;
+      if (!device || Number(device.connectionId) !== Number(state.openPopupDeviceId)) return;
+      // update only the data fields inside the existing popup to avoid DOM churn/flicker
+      const details = getVehicleDetails(device);
+      const fields = ['line','conn','currentStop','headsign','delay','stateLabel','stopArr','stopDep'];
+      fields.forEach(f => {
+        const el = els.vehiclePopup.querySelector(`[data-field="${f}"]`);
+        if (!el) return;
+        const val = details[f];
+        if (val !== undefined && val !== null) {
+          el.textContent = String(val);
+        }
+      });
+
+      // update button label without replacing the node
+      const btn = els.vehiclePopup.querySelector('button[data-connection-id]');
+      if (btn) {
+        const conn = Number(btn.dataset.connectionId);
+        btn.textContent = (Number(state.trackedVehicleId) === conn) ? 'Disembark' : 'Board vehicle';
+        btn.disabled = false;
+      }
+
+      // update follow button label if present
+      const fbtn = els.vehiclePopup.querySelector('button[data-follow-connection-id]');
+      if (fbtn) {
+        const fconn = Number(fbtn.dataset.followConnectionId);
+        fbtn.textContent = (Number(state.followingVehicleId) === fconn) ? 'Unfollow vehicle' : 'Follow vehicle';
+        fbtn.disabled = false;
+      }
+    }
+
+    function warpToTarget() {
+      if (!state.pendingMapClick) return;
+      const next = state.pendingMapClick;
+      els.actionPopup.classList.remove('visible');
+      state.targetLocation = null;
+      stopWalking();
+      sendMapChange({ newLocation: { lon: next.lon, lat: next.lat } });
+      state.serverLocation = { lon: next.lon, lat: next.lat };
+      setStatus('Warped to map target');
+      renderMap();
+      updateReadouts();
+      state.pendingMapClick = null;
+    }
+
+    function stopWalking() {
+      if (state.walkTimer) {
+        window.clearInterval(state.walkTimer);
+        state.walkTimer = null;
+      }
+      state.targetLocation = null;
+      els.mapHint.textContent = 'Walking mode active. Click map to walk or warp.';
+    }
+
+    function haversineMeters(a, b) {
+      const R = 6371000;
+      const toRad = (deg) => deg * Math.PI / 180;
+      const dLat = toRad(b.lat - a.lat);
+      const dLon = toRad(b.lon - a.lon);
+      const lat1 = toRad(a.lat);
+      const lat2 = toRad(b.lat);
+      const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+      return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+    }
+
+    function moveTowardsLocation(from, to, distanceMeters) {
+      const totalDistance = haversineMeters(from, to);
+      if (totalDistance <= 0.1) return to;
+      const stepRatio = Math.min(1, distanceMeters / totalDistance);
+      const lat = from.lat + (to.lat - from.lat) * stepRatio;
+      const lon = from.lon + (to.lon - from.lon) * stepRatio;
+      return { lat, lon };
+    }
+
+    const WALKING_SPEED_KMH = 4;
+
+    function startWalkingLoop() {
+      if (!state.pendingMapClick) return;
+      const target = state.pendingMapClick;
+      if (state.targetLocation === null) {
+        state.targetLocation = target;
+      }
+
+      // do not start walking if vehicle tracking is active
+      if (isTrackedVehicleActive()) {
+        setStatus('Cannot walk while a vehicle is boarded', true);
+        state.targetLocation = null;
+        return;
+      }
+
+      els.mapHint.textContent = 'Walking to selected map point…';
+
+      // ensure any existing walk timer is cleared before starting a new one
+      if (state.walkTimer) {
+        window.clearInterval(state.walkTimer);
+        state.walkTimer = null;
+      }
+
+      state.walkTimer = window.setInterval(() => {
+        // if tracking becomes active while walking (race), stop walking immediately
+        if (isTrackedVehicleActive()) {
+          stopWalking();
+          setStatus('Walking canceled because vehicle tracking became active', true);
+          return;
+        }
+
+        // recompute effective speed each tick so timescale changes apply immediately
+        const effectiveSpeedKmh = WALKING_SPEED_KMH * (state.timescale === 0 ? 0 : state.timescale);
+        const effectiveSpeedMps = (effectiveSpeedKmh * 1000) / 3600;
+
+        const current = { lat: state.serverLocation.lat, lon: state.serverLocation.lon };
+        const next = moveTowardsLocation(current, state.targetLocation, effectiveSpeedMps * 1.0);
+        const movedDistance = haversineMeters(current, next);
+        const finalTarget = state.targetLocation;
+
+        if (movedDistance < 0.5) {
+          state.serverLocation = { lon: finalTarget.lon, lat: finalTarget.lat };
+          sendMapChange({ newLocation: { lon: finalTarget.lon, lat: finalTarget.lat } });
+          stopWalking();
+          setStatus('Reached destination');
+          state.pendingMapClick = null;
+          renderMap();
+          updateReadouts();
+          return;
+        }
+
+        // if timescale is zero, effectiveSpeedMps will be 0 — pause movement but keep UI updated
+        if (effectiveSpeedMps === 0) {
+          updateReadouts();
+          return;
+        }
+
+        state.serverLocation = { lon: next.lon, lat: next.lat };
+        sendMapChange({ newLocation: { lon: next.lon, lat: next.lat } });
+        renderMap();
+        updateReadouts();
+      }, 1000);
+    }
+
+    function warpCurrentCenter() {
+      const center = state.map.getCenter();
+      sendMapChange({ newLocation: { lon: center.lng, lat: center.lat } });
+      state.serverLocation = { lon: center.lng, lat: center.lat };
+      renderMap();
+      updateReadouts();
+      setStatus('Updated mock location to current map center');
+    }
+
+    const applyTimescaleBtn = document.getElementById('applyTimescaleBtn');
+    if (applyTimescaleBtn) applyTimescaleBtn.addEventListener('click', applyTimescale);
+    // ensure timescale input ticks work and not clamped by mousewheel precision issues
+    if (els.timescaleInput) {
+      els.timescaleInput.addEventListener('wheel', (ev) => ev.preventDefault(), { passive: false });
+    }
+    const applyTimeBtn = document.getElementById('applyTimeBtn');
+    if (applyTimeBtn) applyTimeBtn.addEventListener('click', applyTime);
+    // disembark button moved into vehicle popup; global disembark button removed
+    const walkHereBtn = document.getElementById('walkHereBtn');
+    if (walkHereBtn) walkHereBtn.addEventListener('click', walkToTarget);
+    const warpHereBtn = document.getElementById('warpHereBtn');
+    if (warpHereBtn) warpHereBtn.addEventListener('click', warpToTarget);
+    const warpCurrentBtn = document.getElementById('warpCurrentBtn');
+    if (warpCurrentBtn) warpCurrentBtn.addEventListener('click', warpCurrentCenter);
+
+    // timescale input: handle Enter and avoid server overwrites while focused
+    if (els.timescaleInput) {
+      // allow Enter to apply; do not install focus/blur handlers — input updates are controlled by server-value tracking
+      els.timescaleInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') applyTimescale();
+      });
+    }
+
+    const now = new Date();
+    function toLocalDatetimeLocalValue(d) {
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+    document.getElementById('timeInput').value = toLocalDatetimeLocalValue(now);
+
+    initMap();
+    connectServer();
+  </script>
+</body>
+</html>

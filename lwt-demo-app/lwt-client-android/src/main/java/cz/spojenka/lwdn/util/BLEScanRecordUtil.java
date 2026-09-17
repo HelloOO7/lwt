@@ -46,6 +46,13 @@ public class BLEScanRecordUtil {
         return ((serviceData[3] & 0xFF) << 24) | ((serviceData[2] & 0xFF) << 16) | ((serviceData[1] & 0xFF) << 8) | (serviceData[0] & 0xFF);
     }
 
+    public static UUID getServiceUUID128(byte[] serviceData) {
+        if (serviceData.length < 16) {
+            throw new IllegalArgumentException("Service data too short to contain a 128-bit UUID");
+        }
+        return parseUUID128(serviceData);
+    }
+
     public static UUID uuid16To128(int uuid16) {
         return uuid32To128(uuid16 & 0xFFFF);
     }
@@ -55,12 +62,12 @@ public class BLEScanRecordUtil {
         return new UUID((Integer.toUnsignedLong(uuid32) << 32) | 0x1000, 0x800000805f9b34fbL);
     }
 
-    public static UUID getServiceUUID128(byte[] serviceData) {
-        if (serviceData.length < 16) {
-            throw new IllegalArgumentException("Service data too short to contain a 128-bit UUID");
-        }
+    public static UUID parseUUID128(byte[] bytes) {
+        return parseUUID128(ByteBuffer.wrap(bytes, 0, 16));
+    }
+
+    public static UUID parseUUID128(ByteBuffer buf) {
         // https://cs.android.com/android/platform/superproject/+/android-latest-release:packages/modules/Bluetooth/framework/java/android/bluetooth/BluetoothUuid.java
-        ByteBuffer buf = ByteBuffer.wrap(serviceData, 0, 16);
         long mostSigBits = buf.getLong();
         long leastSigBits = buf.getLong();
         return new UUID(mostSigBits, leastSigBits);
@@ -73,5 +80,12 @@ public class BLEScanRecordUtil {
         byte[] payload = new byte[serviceData.length - uuidLength];
         System.arraycopy(serviceData, uuidLength, payload, 0, payload.length);
         return payload;
+    }
+
+    public static byte[] uuidToBytes(UUID uuid) {
+        ByteBuffer bb = ByteBuffer.allocate(16);
+        bb.putLong(uuid.getMostSignificantBits());
+        bb.putLong(uuid.getLeastSignificantBits());
+        return bb.array();
     }
 }

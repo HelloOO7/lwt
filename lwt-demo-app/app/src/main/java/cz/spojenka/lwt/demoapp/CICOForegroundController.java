@@ -256,7 +256,7 @@ public class CICOForegroundController implements CICOService.ForegroundControlle
                         advData.getStopCisNumber(),
                         advData.getDirectionCisNumber(),
                         advData.getDelay(),
-                        advData.isAtStop()
+                        advData.getLocationState()
                 );
                 if (advData instanceof TripAdvertisementDataExt ext) {
                     parts = new ArrayList<>(parts);
@@ -296,6 +296,8 @@ public class CICOForegroundController implements CICOService.ForegroundControlle
                 lineNumBgRes = R.drawable.line_number_background_no_padding;
             }
             views.setImageViewResource(R.id.ivLineNumberBackground, lineNumBgRes);
+            // background is used for elevation
+            views.setInt(R.id.ivLineNumberBackground, "setBackgroundResource", lineNumBgRes);
             if (lineNumBgRes != ResourcesCompat.ID_NULL) {
                 ColorStateList tintList = src.tvLineNumber.getBackgroundTintList();
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !TEST_LEGACY_TINT) {

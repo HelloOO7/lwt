@@ -15,6 +15,8 @@ public interface LwdnSocketFactory extends Closeable {
             return new BluetoothLwdnSocketFactory(bt);
         } else if (address instanceof WifiAwareLwdnAddress wifi) {
             return new WifiAwareLwdnSocketFactory(context.getSystemService(ConnectivityManager.class), wifi);
+        } else if (address instanceof MockLwdnAddress) {
+            throw new IllegalArgumentException("Attempt to open socket to a mock device");
         } else {
             throw new IllegalArgumentException("Unsupported LWDN address type: " + address.getClass().getName());
         }

@@ -15,9 +15,14 @@ public class TripAdvertisementData {
 
     public static final int BYTES = 20;
 
-    private static final int FLAG_IS_AT_STOP = 1;
-    private static final int FLAG_CAN_USE_TICKETING = 2;
-    private static final int FLAG_CAN_USE_CICO = 4;
+    public static final int FLAG_IS_AT_STOP = 1;
+    public static final int FLAG_CAN_USE_TICKETING = 2;
+    public static final int FLAG_CAN_USE_CICO = 4;
+
+    public static final int LOCATION_STATE_AT_STOP = 0;
+    public static final int LOCATION_STATE_BETWEEN_STOPS = 1;
+    public static final int LOCATION_STATE_BEFORE_STOP = 2;
+    public static final int LOCATION_STATE_AFTER_STOP = 3;
 
     private final int lineType;
     private final int lineLicenseNumber;
@@ -25,6 +30,7 @@ public class TripAdvertisementData {
     private final int directionCisNumber;
 
     private final int stopCisNumber;
+    private final int locationState;
     private final LocalTime stopArrTime;
     private final LocalTime stopDepTime;
     private final int delay;
@@ -36,7 +42,9 @@ public class TripAdvertisementData {
         lineLicenseNumber = readInt24(dis); // +0x1
         tripNumber = readInt24(dis); // +0x4
         directionCisNumber = dis.readInt(); // +0x7
-        stopCisNumber = dis.readInt(); // +0xB
+        int stopUnion = dis.readInt(); // +0xB
+        stopCisNumber = stopUnion & 0xFFFFFFF;
+        locationState = (stopUnion >> 28) & 0xF;
         int timeUnion = dis.readInt(); // +0xF
         stopArrTime = convertTime(timeUnion);
         stopDepTime = convertTime(timeUnion >> 11);
@@ -45,13 +53,41 @@ public class TripAdvertisementData {
         // total 0x14 = 20 bytes
     }
 
+    public TripAdvertisementData(
+            int lineType,
+            int lineLicenseNumber,
+            int tripNumber,
+            int directionCisNumber,
+            int stopCisNumber,
+            int locationState,
+            LocalTime stopArrTime,
+            LocalTime stopDepTime,
+            int delay,
+            int flags
+    ) {
+        this.lineType = lineType;
+        this.lineLicenseNumber = lineLicenseNumber;
+        this.tripNumber = tripNumber;
+        this.directionCisNumber = directionCisNumber;
+        this.stopCisNumber = stopCisNumber;
+        this.locationState = locationState;
+        this.stopArrTime = stopArrTime;
+        this.stopDepTime = stopDepTime;
+        this.delay = delay;
+        this.flags = flags;
+    }
+
+    public TripAdvertisementData(TripAdvertisementData copy) {
+        this(copy.lineType, copy.lineLicenseNumber, copy.tripNumber, copy.directionCisNumber, copy.stopCisNumber, copy.locationState, copy.stopArrTime, copy.stopDepTime, copy.delay, copy.flags);
+    }
+
     public void write(OutputStream out) throws IOException {
         DataOutputStream dos = new DataOutputStream(out);
         dos.writeByte(lineType);
         writeInt24(dos, lineLicenseNumber);
         writeInt24(dos, tripNumber);
         dos.writeInt(directionCisNumber);
-        dos.writeInt(stopCisNumber);
+        dos.writeInt(stopCisNumber | (locationState << 28));
         int timeUnion = (delay << 22) | (convertTime(stopDepTime) << 11) | convertTime(stopArrTime);
         dos.writeInt(timeUnion);
         dos.writeByte(flags);
@@ -99,6 +135,18 @@ public class TripAdvertisementData {
         }
     }
 
+    public static int makeTrainLineNumber(String trainTypeCode, int lineNumber) {
+        int out = 0;
+        for (int i = 0; i < Math.min(trainTypeCode.length(), 2); i++) {
+            char ch = trainTypeCode.charAt(i);
+            if (ch > 0x7F) {
+                throw new IllegalArgumentException("Train type code must be ASCII");
+            }
+            out = (out << 7) | ch;
+        }
+        return (out << 10) | (lineNumber & 0x3FF);
+    }
+
     public int getTripNumber() {
         return tripNumber;
     }
@@ -109,6 +157,10 @@ public class TripAdvertisementData {
 
     public int getStopCisNumber() {
         return stopCisNumber;
+    }
+
+    public int getLocationState() {
+        return locationState;
     }
 
     public LocalTime getStopArrTime() {

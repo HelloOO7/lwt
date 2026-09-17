@@ -69,7 +69,7 @@ static const lwt::TicketValidationConfig TICKETING_CONFIG = {
     .CicoConfirmationTokenExpiryMs = 60 * 60 * 1000, // 1 hour
     .CicoTicketTtlMs = 5 * 60 * 1000, // 5 minutes
     .MaxCicoClients = 128,
-    .BeOutVanishTimeMs = 20 * 1000 // 25 seconds (huawei)
+    .BeOutVanishTimeMs = 8 * 1000 // 8 seconds - enough even for Huawei (we set the ESP to a very low latency scan)
 };
 
 class AppMain {

@@ -6,6 +6,7 @@
     <string name="delay_minutes_format">%1$d min</string>
     <string name="vehicle_at_stop_prefix">"at "</string>
     <string name="vehicle_next_stop_prefix">"next stop "</string>
+    <string name="vehicle_approaching_stop_prefix">"approaching "</string>
     <string name="zone_selection_confirm">Confirm selection</string>
     <string name="zone_selection_not_applicable">Not applicable</string>
     <string name="warning">Warning</string>

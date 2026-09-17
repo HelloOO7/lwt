@@ -183,8 +183,8 @@ public class CICOPresenceAdvertiser implements AutoCloseable {
     private AdvertisingSetParameters buildAdvertiseSettings() {
         AdvertisingSetParameters.Builder params = new AdvertisingSetParameters.Builder()
                 .setLegacyMode(true)
-                .setTxPowerLevel(-2) // higher than server's power of -7
-                .setInterval(AdvertisingSetParameters.INTERVAL_HIGH)
+                .setTxPowerLevel(1) // higher than server's power of -7
+                .setInterval(AdvertisingSetParameters.INTERVAL_HIGH / 2) // every 500 ms (ensures swift detection on huawei)
                 .setConnectable(false)
                 .setScannable(false);
 

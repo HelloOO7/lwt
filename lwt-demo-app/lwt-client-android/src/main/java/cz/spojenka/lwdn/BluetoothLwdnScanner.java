@@ -158,7 +158,7 @@ public class BluetoothLwdnScanner implements LwdnScanner {
         private TimeoutScanCallback callback;
         private final LwdnScan scan;
 
-        private final Map<BluetoothLwdnAddress, Runnable> deviceLostTimeoutCallbacks = new HashMap<>();
+        private DeviceLostTimeoutManager lostTimeoutManager;
 
         private long scanStartTime;
         private long scanEndTime;
@@ -166,6 +166,7 @@ public class BluetoothLwdnScanner implements LwdnScanner {
         public ScanController(BluetoothLeScanner scanner, LwdnScan scan) {
             this.scanner = scanner;
             this.scan = scan;
+            this.lostTimeoutManager = new DeviceLostTimeoutManager(handler, scan);
             scan.setCancellationHandler(this::stopScan);
         }
 
@@ -208,7 +209,7 @@ public class BluetoothLwdnScanner implements LwdnScanner {
                                 }
                                 scan.addResult(new LwdnScanResult(address, result.getRssi(), serviceData));
                             }
-                            updateDeviceLostTimeout(address, config);
+                            lostTimeoutManager.updateDeviceLostTimeout(address, config.getDeviceLostTimeout());
                         }
                         if (scan.getResultCount() >= config.getMaxDevices()) {
                             stopScan();
@@ -319,22 +320,6 @@ public class BluetoothLwdnScanner implements LwdnScanner {
             }
         }
 
-        private void updateDeviceLostTimeout(BluetoothLwdnAddress deviceAddress, LwdnScanConfig config) {
-            if (config.getDeviceLostTimeout() == null) {
-                return;
-            }
-            Runnable currentCallback = deviceLostTimeoutCallbacks.get(deviceAddress);
-            if (currentCallback != null) {
-                handler.removeCallbacks(currentCallback);
-            }
-            Runnable newCallback = () -> {
-                scan.removeResult(new LwdnScanResult(deviceAddress, 0, Map.of()));
-                deviceLostTimeoutCallbacks.remove(deviceAddress);
-            };
-            deviceLostTimeoutCallbacks.put(deviceAddress, newCallback);
-            handler.postDelayed(newCallback, config.getDeviceLostTimeout().toMillis());
-        }
-
         private ScanSettings buildScanSettings(LwdnScanConfig config, boolean isUsingExtendedAdvertising) {
             ScanSettings.Builder settings = new ScanSettings.Builder()
                     .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
@@ -418,6 +403,7 @@ public class BluetoothLwdnScanner implements LwdnScanner {
                 handler.removeCallbacks(restartScanCallback);
                 restartScanCallback = null;
             }
+            lostTimeoutManager.cancelPendingTimeouts();
             scan.markFinished();
         }
 

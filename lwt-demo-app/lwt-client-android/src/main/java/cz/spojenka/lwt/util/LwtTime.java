@@ -27,8 +27,16 @@ public class LwtTime {
 
     public static int createLocalDateTime(FlatBufferBuilder builder, LocalDateTime localDateTime) {
         if (localDateTime == null) {
-            return -1;
+            return 0;
         }
         return LwtLocalDateTime.createLwtLocalDateTime(builder, localDateTime.toEpochSecond(ZoneOffset.UTC));
+    }
+
+    public static int createOffsetDateTime(FlatBufferBuilder builder, OffsetDateTime offsetDateTime) {
+        if (offsetDateTime == null) {
+            return 0;
+        }
+        OffsetDateTime localInstant = OffsetDateTime.of(offsetDateTime.toLocalDateTime(), ZoneOffset.UTC);
+        return LwtOffsetDateTime.createLwtOffsetDateTime(builder, localInstant.toEpochSecond(), offsetDateTime.getOffset().getTotalSeconds());
     }
 }

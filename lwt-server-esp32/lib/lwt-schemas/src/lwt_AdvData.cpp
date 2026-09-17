@@ -27,7 +27,7 @@ namespace lwt {
         out.WriteUInt24(line_license_number);
         out.WriteUInt24(trip_number);
         out.WriteUInt32(direction_cis_number);
-        out.WriteUInt32(stop_cis_number);
+        out.WriteUInt32(stop_cis_number | (location_state << 28));
         constexpr uint16_t timeMask = 0x7FF; // 11 bits for time
         out.WriteUInt32((stop_arrival_time & timeMask) | ((stop_departure_time & timeMask) << 11) | (delay << 22));
         out.WriteUInt8(flags);

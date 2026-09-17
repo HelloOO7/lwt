@@ -4,7 +4,7 @@ import android.os.Parcelable;
 
 import androidx.annotation.Nullable;
 
-public sealed interface LwdnAddress extends Parcelable permits BluetoothLwdnAddress, WifiAwareLwdnAddress {
+public sealed interface LwdnAddress extends Parcelable permits BluetoothLwdnAddress, WifiAwareLwdnAddress, MockLwdnAddress {
 
     @Nullable
     public byte[] getRawLinkAddress();

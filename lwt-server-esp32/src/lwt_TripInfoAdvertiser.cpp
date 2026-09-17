@@ -10,6 +10,7 @@
 #include "lwdn_BleAdvertiser.h"
 #include "lwdn_Link.h"
 #include "host/ble_hs_id.h"
+#include "trip_information_generated.h"
 
 namespace lwt {
 
@@ -99,6 +100,22 @@ namespace lwt {
         return advertiser->GetMaxAdvDataSize() >= m_ExtDataBuffer.size();
     }
 
+    uint8_t ConvertLocationState(const LocationStateEnumeration& state)
+    {
+        switch (state) {
+        case LocationStateEnumeration::AtStop:
+            return AdvDataBasic::LOCATION_STATE_AT_STOP;
+        case LocationStateEnumeration::BeforeStop:
+            return AdvDataBasic::LOCATION_STATE_BEFORE_STOP;
+        case LocationStateEnumeration::AfterStop:
+            return AdvDataBasic::LOCATION_STATE_AFTER_STOP;
+        case LocationStateEnumeration::BetweenStop:
+            return AdvDataBasic::LOCATION_STATE_BETWEEN_STOPS;
+        default:
+            return AdvDataBasic::LOCATION_STATE_AT_STOP;
+        }
+    }
+
     AdvDataBasic TripInfoAdvertiser::CreateBasicAdvData(const SubscriberCIS::AllData& result)
     {
         AdvDataBasic legacyData;
@@ -133,6 +150,7 @@ namespace lwt {
                     if (*tripInfo->LocationState == LocationStateEnumeration::AtStop) {
                         legacyData.set_flag(AdvDataBasic::FLAG_IS_AT_STOP, true);
                     }
+                    legacyData.location_state = ConvertLocationState(*tripInfo->LocationState);
                 }
 
                 if (stop->ArrivalScheduled) {

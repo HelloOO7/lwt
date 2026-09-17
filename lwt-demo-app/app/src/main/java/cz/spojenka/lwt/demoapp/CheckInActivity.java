@@ -137,9 +137,10 @@ public class CheckInActivity extends CICOActivityBase {
         viewModel.isCheckedInLiveData().observe(this, checkedIn -> {
             updateControlsEnabled();
             if (checkedIn) {
-                binding.confirmCheckin.setCompleteIcon(com.ncorti.slidetoact.R.drawable.slidetoact_animated_ic_check);
-                binding.confirmCheckin.setCompleted(true, false);
-                binding.confirmCheckin.postDelayed(this::finish, 500);
+                slideToAct.runOnAnimationDone(() -> {
+                    slideToAct.changeCompleteIcon(com.ncorti.slidetoact.R.drawable.slidetoact_animated_ic_check);
+                    binding.confirmCheckin.postDelayed(this::finish, 500);
+                });
             }
         });
 

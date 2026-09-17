@@ -41,12 +41,12 @@ import cz.spojenka.lwdn.BluetoothLeThrottling;
 import cz.spojenka.lwdn.BluetoothLwdnScanner;
 import cz.spojenka.lwdn.BluetoothLwdnSocket;
 import cz.spojenka.lwdn.LwdnAddress;
+import cz.spojenka.lwdn.LwdnMockClient;
 import cz.spojenka.lwdn.LwdnScanConfig;
 import cz.spojenka.lwdn.LwdnScanException;
 import cz.spojenka.lwdn.ScanErrorCode;
+import cz.spojenka.lwdn.util.SystemProperties;
 import cz.spojenka.lwt.util.LwtTime;
-import cz.spojenka.lwtp.LwtpTLSConfig;
-import cz.spojenka.lwtp.LwtpTLSPolicy;
 
 public class CICOService extends Service {
 
@@ -61,6 +61,10 @@ public class CICOService extends Service {
 
     private CICOPersistence persistence;
 
+    private ICICONetworkProvider networkProvider;
+    private LwdnMockClient.Observer mockingObserver;
+    private float timescale = 1.0f;
+
     private LwtDeviceScanner scanner;
     private MutableLiveData<List<LwtDevice>> devicesInProximityLiveData = new MutableLiveData<>();
     private MutableLiveData<List<LwtDevice>> deviceResultTarget = devicesInProximityLiveData;
@@ -74,7 +78,7 @@ public class CICOService extends Service {
     private boolean isCommOnline = true;
     private boolean restoreConnectionPending;
     private MutableLiveData<LwtDevice> currentDeviceLiveData = new MutableLiveData<>();
-    private LwtAPIClient currentLwtClient;
+    private ICICODeviceClient currentLwtClient;
     private long nextAllowedSocketOpenTime;
     private SSLContext clientSSLContext;
 
@@ -96,13 +100,31 @@ public class CICOService extends Service {
         Log.d(TAG, "Starting CICO service");
         handler = new Handler(getMainLooper());
         persistence = CICOPersistence.getInstance(this);
-        wakeLock = getSystemService(PowerManager.class).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "CICOService:WakeLock");
-        BluetoothLwdnScanner btScanner = LwtDeviceScanner.createBluetoothScanner(this);
-        if (btScanner == null) {
-            throw new UnsupportedOperationException("Bluetooth scanning is not supported on this device (use isSupported() to check before starting the service)");
+        networkProvider = createNetworkProvider();
+        if (networkProvider instanceof CICOMockNetworkProvider mock) {
+            mockingObserver = new LwdnMockClient.Observer() {
+                @Override
+                public void onTimescaleChanged(float newTimescale) {
+                    if (newTimescale != timescale) {
+                        Log.d(TAG, "Mock timescale changed to: " + newTimescale);
+                        CICOService.this.timescale = newTimescale;
+                        if (isSessionActive) {
+                            if (timescale > 0) {
+                                if (currentDevice != null) {
+                                    refreshTicket();
+                                }
+                            } else {
+                                disconnectCurrentDevice();
+                            }
+                        }
+                    }
+                }
+            };
+            mock.getMockClient().addObserver(mockingObserver);
         }
-        scanner = new LwtDeviceScanner(btScanner);
-        isCommOnline = btScanner.isAvailable();
+        wakeLock = getSystemService(PowerManager.class).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "CICOService:WakeLock");
+        scanner = new LwtDeviceScanner(networkProvider.createLwdnScanner());
+        isCommOnline = scanner.isAvailable();
         registerReceiver(bluetoothStateReceiver, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
         globalConnectObserver = socket -> {
             // on successful connection, reset this.
@@ -118,6 +140,15 @@ public class CICOService extends Service {
         Log.d(TAG, "Service started");
     }
 
+    private ICICONetworkProvider createNetworkProvider() {
+        String mockingServer = SystemProperties.read("debug.cz.spojenka.lwt.cico.mocking_server");
+        if (mockingServer.isEmpty()) {
+            return new CICORealNetworkProvider(this);
+        } else {
+            return new CICOMockNetworkProvider(new LwdnMockClient(mockingServer));
+        }
+    }
+
     @Override
     public void onDestroy() {
         super.onDestroy();
@@ -127,6 +158,7 @@ public class CICOService extends Service {
             disconnectCurrentDevice();
             unregisterReceiver(bluetoothStateReceiver);
             BluetoothLwdnSocket.removeGlobalConnectObserver(globalConnectObserver);
+            networkProvider.close();
             Log.d(TAG, "Service terminated");
         } finally {
             releaseWakeLock(); // always release wakelock
@@ -414,7 +446,7 @@ public class CICOService extends Service {
         }
     }
 
-    private LwtCall<CheckInIntermediate> requestSessionCall = null;
+    private CompletableFuture<CheckInIntermediate> requestSessionCall = null;
 
     private CompletableFuture<CheckInIntermediate> requestSession(LwtDevice device, byte[] cicoToken) {
         Log.d(TAG, "requestSession(" + device.getAddress() + ", XXXXXXX)");
@@ -423,7 +455,6 @@ public class CICOService extends Service {
         connectDevice(device);
         requestSessionCall = currentLwtClient.startCheckIn(cicoToken);
         return requestSessionCall
-                .executeAsync()
                 .whenCompleteAsync((intermediate, throwable) -> {
                     if (throwable instanceof CancellationException) {
                         return; // cancelled
@@ -442,7 +473,7 @@ public class CICOService extends Service {
         Log.d(TAG, "cancelRequestSession()");
         assertSessionNotActive();
         if (requestSessionCall != null) {
-            requestSessionCall.cancel();
+            requestSessionCall.cancel(true);
             requestSessionCall = null;
         }
         disconnectCurrentDevice();
@@ -464,7 +495,6 @@ public class CICOService extends Service {
         LwtDevice sessionDevice = currentDevice;
         return currentLwtClient
                 .confirmCheckIn(checkInIntermediate, getPresenceTrackingClient())
-                .executeAsync()
                 .whenCompleteAsync((ticket, throwable) -> {
                     if (throwable != null) {
                         Log.e(TAG, "Failed to start session with device " + sessionDevice.getAddress(), throwable);
@@ -519,7 +549,6 @@ public class CICOService extends Service {
                 Log.d(TAG, "endSession has ticket, run check-out");
                 return currentLwtClient
                         .checkOut(currentTicket)
-                        .executeAsync()
                         .whenCompleteAsync((resp, throwable) -> {
                             if (throwable != null) {
                                 Log.e(TAG, "Failed to check out with device " + currentDevice.getAddress(), throwable);
@@ -609,7 +638,7 @@ public class CICOService extends Service {
     private void discardPreviousDevice() {
         if (!deviceStack.isEmpty()) {
             DeviceStackEntry entry = deviceStack.pop();
-            LwtAPIClient client = entry.client();
+            ICICODeviceClient client = entry.client();
             if (client != null) {
                 client.close();
             }
@@ -623,28 +652,30 @@ public class CICOService extends Service {
                 .collect(Collectors.toList());
     }
 
-    private LwtAPIClient createDeviceClient(LwtDevice device) {
-        LwtAPIClient client = new LwtAPIClient(this, device.getAddress());
-
-        if (clientSSLContext != null) {
-            client.useTLS(
-                    new LwtpTLSConfig.Builder(device.getAddress())
-                            .setTLSPolicy(LwtpTLSPolicy.EXPLICIT_REQUIRED)
-                            .setSSLContext(clientSSLContext)
-                            .build()
-            );
-        } else {
+    private ICICODeviceClient createDeviceClient(LwtDevice device) {
+        if (clientSSLContext == null) {
             Log.w(TAG, "TLS is not configured, communication will be insecure");
         }
 
-        return client;
+        return networkProvider.createDeviceClient(device, clientSSLContext);
+    }
+
+    private boolean isDeviceStillInRange(LwtDevice device) {
+        if (currentScan != null) {
+            for (LwtDevice dev : currentScan.getResults()) {
+                if (dev.addressEquals(device)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private void connectDevice(LwtDevice device) {
         connectDevice(device, createDeviceClient(device));
     }
 
-    private void connectDevice(LwtDevice device, LwtAPIClient client) {
+    private void connectDevice(LwtDevice device, ICICODeviceClient client) {
         Log.d(TAG, "connectDevice(" + device.getAddress() + ")");
         currentLwtClient = client;
         updateCurrentDevice(device);
@@ -731,10 +762,14 @@ public class CICOService extends Service {
             restoreConnection();
             return CompletableFuture.completedFuture(null);
         } else {
+            LwtDevice refreshDevice = currentDevice;
             return currentLwtClient
-                    .refreshCICO(currentTicket, getPresenceTrackingClient())
-                    .executeAsync()
+                    .refreshTicket(currentTicket, getPresenceTrackingClient())
                     .whenCompleteAsync((newTicket, throwable) -> {
+                        if (currentDevice == null || !currentDevice.addressEquals(refreshDevice)) {
+                            Log.w(TAG, "Device was lost or changed during ticket refresh, discarding result");
+                            return;
+                        }
                         if (throwable != null) {
                             boolean throttled = handleHuaweiThrottling(throwable);
                             Log.e(TAG, "Failed to refresh ticket with device " + currentDevice.getAddress(), throwable);
@@ -788,17 +823,23 @@ public class CICOService extends Service {
             int devIndex = i;
             Runnable tryNextRunnable = () -> {
                 Log.d(TAG, "Attempting connection to " + dev.getAddress());
-                LwtAPIClient client = createDeviceClient(dev);
+                ICICODeviceClient client = createDeviceClient(dev);
                 try {
                     client
-                            .refreshCICO(currentTicket, getPresenceTrackingClient())
-                            .executeAsync()
+                            .refreshTicket(currentTicket, getPresenceTrackingClient())
                             .whenCompleteAsync((newTicket, throwable) -> {
                                 if (throwable == null) {
-                                    Log.i(TAG, "Successfully restored connection, now using device " + dev.getAddress());
-                                    connectDevice(dev, client);
-                                    onGotTicket(newTicket);
-                                    attemptFutures.get(devIndex).complete(null);
+                                    if (isDeviceStillInRange(dev)) {
+                                        Log.i(TAG, "Successfully restored connection, now using device " + dev.getAddress());
+                                        connectDevice(dev, client);
+                                        onGotTicket(newTicket);
+                                        attemptFutures.get(devIndex).complete(null);
+                                    } else {
+                                        // device moved out while the connection was running
+                                        Log.w(TAG, "Device moved out of range during connection");
+                                        client.close();
+                                        attemptFutures.get(devIndex).completeExceptionally(new IllegalStateException("Device moved out of range"));
+                                    }
                                 } else {
                                     Log.e(TAG, "Attempt to restore connection using device " + dev.getAddress() + " failed", throwable);
                                     client.close();
@@ -982,7 +1023,7 @@ public class CICOService extends Service {
         return new LocalBinder(this);
     }
 
-    private static record DeviceStackEntry(LwtDevice device, LwtAPIClient client) {
+    private static record DeviceStackEntry(LwtDevice device, ICICODeviceClient client) {
 
     }
 

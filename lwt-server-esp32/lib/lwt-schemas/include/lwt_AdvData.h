@@ -14,6 +14,11 @@ namespace lwt {
         static constexpr uint8_t FLAG_CAN_USE_TICKETING = (1 << 1);
         static constexpr uint8_t FLAG_CAN_USE_CICO = (1 << 2);
 
+        static constexpr uint8_t LOCATION_STATE_AT_STOP = 0;
+        static constexpr uint8_t LOCATION_STATE_BETWEEN_STOPS = 1;
+        static constexpr uint8_t LOCATION_STATE_BEFORE_STOP = 2;
+        static constexpr uint8_t LOCATION_STATE_AFTER_STOP = 3;
+
         LineType line_type;
         uint32_t line_license_number;
         uint32_t trip_number;
@@ -21,6 +26,7 @@ namespace lwt {
         uint32_t direction_cis_number;
 
         uint32_t stop_cis_number;
+        uint8_t location_state;
         uint16_t stop_arrival_time;
         uint16_t stop_departure_time;
 

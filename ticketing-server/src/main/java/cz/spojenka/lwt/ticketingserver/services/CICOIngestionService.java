@@ -31,7 +31,14 @@ public class CICOIngestionService {
         }
         sortedEvents.sort(Comparator.comparing(CICOEventPush::absoluteTimestamp));
 
-        insertAllEvents(sortedEvents.stream().map(this::newEventFromPush).toList());
+        List<CICOEvent> newEvents = new ArrayList<>(sortedEvents.size());
+        CICOEvent lastEvent = null;
+        for (CICOEventPush event : sortedEvents) {
+            lastEvent = newEventFromPush(event, lastEvent);
+            newEvents.add(lastEvent);
+        }
+
+        insertAllEvents(newEvents);
     }
 
     @Transactional
@@ -39,15 +46,18 @@ public class CICOIngestionService {
         repository.saveAll(events);
     }
 
-    private CICOEvent newEventFromPush(CICOEventPush push) {
+    private CICOEvent newEventFromPush(CICOEventPush push, CICOEvent localChronologicalAncestor) {
         CICOEvent previousEvent;
         if (isNilUUID(push.previousEventId())) {
             if (push.eventType() == CICOEventType.CHECK_IN) {
                 previousEvent = null;
             } else {
                 previousEvent = repository.findNewestEventInSession(push.sessionId());
+                if (previousEvent == null || (localChronologicalAncestor != null && localChronologicalAncestor.getEventTime().isAfter(previousEvent.getEventTime()))) {
+                    previousEvent = localChronologicalAncestor;
+                }
                 if (previousEvent == null) {
-                    throw new IllegalArgumentException("Event of type " + push.eventType() + " can not be the first event in a session.");
+                    throw new IllegalArgumentException("Event of type " + push.eventType() + " can not be the first event in session " + push.sessionId());
                 }
             }
         } else {

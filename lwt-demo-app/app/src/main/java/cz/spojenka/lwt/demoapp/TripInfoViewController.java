@@ -50,14 +50,25 @@ public class TripInfoViewController {
             showHeadsign(String.valueOf(d.getDirectionCisNumber()));
             stopName = String.valueOf(d.getStopCisNumber());
         }
-        showNextStop(stopName, d.isAtStop());
+        showNextStop(stopName, d.getLocationState());
         setDelayDisplay(d.getDelay());
+    }
+
+    private int flatbufferToAdvLocationState(int locationState) {
+        return switch (locationState) {
+            case LocationState.AtStop -> TripAdvertisementData.LOCATION_STATE_AT_STOP;
+            case LocationState.BetweenStops -> TripAdvertisementData.LOCATION_STATE_BETWEEN_STOPS;
+            case LocationState.BeforeStop -> TripAdvertisementData.LOCATION_STATE_BEFORE_STOP;
+            case LocationState.AfterStop -> TripAdvertisementData.LOCATION_STATE_AFTER_STOP;
+            default ->
+                    throw new IllegalArgumentException("Unknown location state: " + locationState);
+        };
     }
 
     public void bind(TripStateInfo tripInfo) {
         showLineNumber(tripInfo.trip().line().name());
         showNormalizedHeadsign(tripInfo.trip().line().headsign().name());
-        showNextStop(normalizeStopName(tripInfo.currentDepartureStop().name()), tripInfo.locationState() == LocationState.AtStop);
+        showNextStop(normalizeStopName(tripInfo.currentDepartureStop().name()), flatbufferToAdvLocationState(tripInfo.locationState()));
         setDelayDisplay(tripInfo.delay());
     }
 
@@ -94,12 +105,14 @@ public class TripInfoViewController {
         binding.tvHeadsign.setText(parseHtml(headsignHtml));
     }
 
-    private void showNextStop(String stopNameHtml, boolean isAtStop) {
+    private void showNextStop(String stopNameHtml, int locationState) {
         Spanned stopName = parseHtml(stopNameHtml);
-        if (isAtStop) {
-            binding.tvNextStop.setText(TextUtils.concat(getContext().getString(R.string.vehicle_at_stop_prefix), stopName));
-        } else {
+        if (locationState == TripAdvertisementData.LOCATION_STATE_BETWEEN_STOPS || locationState == TripAdvertisementData.LOCATION_STATE_AFTER_STOP) {
             binding.tvNextStop.setText(TextUtils.concat(getContext().getString(R.string.vehicle_next_stop_prefix), stopName));
+        } else if (locationState == TripAdvertisementData.LOCATION_STATE_BEFORE_STOP) {
+            binding.tvNextStop.setText(TextUtils.concat(getContext().getString(R.string.vehicle_approaching_stop_prefix), stopName));
+        } else {
+            binding.tvNextStop.setText(TextUtils.concat(getContext().getString(R.string.vehicle_at_stop_prefix), stopName));
         }
     }
 
