@@ -1,5 +1,6 @@
 package cz.spojenka.lwt.ticketingserver.model;
 
+import cz.spojenka.lwt.ticketing.api.CICOEventType;
 import jakarta.annotation.Nullable;
 import jakarta.persistence.*;
 import org.hibernate.annotations.TimeZoneStorage;
@@ -24,7 +25,8 @@ public class CICOEvent {
     private CICOEvent predecessor;
 
     private UUID sessionId;
-    private long accountId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    private Account account;
 
     @TimeZoneStorage(TimeZoneStorageType.AUTO)
     private OffsetDateTime eventTime;
@@ -35,11 +37,11 @@ public class CICOEvent {
 
     }
 
-    public CICOEvent(UUID id, @Nullable CICOEvent predecessor, UUID sessionId, long accountId, OffsetDateTime eventTime, CICOEventType eventType, String lwtMetadata) {
+    public CICOEvent(UUID id, @Nullable CICOEvent predecessor, UUID sessionId, Account account, OffsetDateTime eventTime, CICOEventType eventType, String lwtMetadata) {
         this.id = id;
         this.predecessor = predecessor;
         this.sessionId = sessionId;
-        this.accountId = accountId;
+        this.account = account;
         this.eventTime = eventTime;
         this.eventType = eventType;
         this.lwtMetadata = lwtMetadata;
@@ -58,8 +60,8 @@ public class CICOEvent {
         return sessionId;
     }
 
-    public long getAccountId() {
-        return accountId;
+    public Account getAccount() {
+        return account;
     }
 
     public OffsetDateTime getEventTime() {

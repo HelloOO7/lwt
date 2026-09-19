@@ -2,10 +2,12 @@ package cz.spojenka.lwt.ticketingserver.controllers;
 
 import com.fasterxml.uuid.Generators;
 import com.fasterxml.uuid.impl.TimeBasedEpochRandomGenerator;
-import cz.spojenka.lwt.ticketingserver.api.CICOEventBatch;
-import cz.spojenka.lwt.ticketingserver.api.CICOEventPush;
-import cz.spojenka.lwt.ticketingserver.api.CheckInRequest;
-import cz.spojenka.lwt.ticketingserver.api.CheckInResponse;
+import cz.spojenka.lwt.ticketing.api.CICOEventBatch;
+import cz.spojenka.lwt.ticketing.api.CICOEventPush;
+import cz.spojenka.lwt.ticketing.api.CheckInRequest;
+import cz.spojenka.lwt.ticketing.api.CheckInResponse;
+import cz.spojenka.lwt.ticketingserver.model.Account;
+import cz.spojenka.lwt.ticketingserver.services.AccountService;
 import cz.spojenka.lwt.ticketingserver.services.CICOIngestionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -22,10 +24,12 @@ import java.util.List;
 @RestController
 public class CICOController {
 
+    private final AccountService accountService;
     private final CICOIngestionService ingestionService;
     private final TimeBasedEpochRandomGenerator sessionIdGenerator = Generators.timeBasedEpochRandomGenerator();
 
-    public CICOController(CICOIngestionService ingestionService) {
+    public CICOController(AccountService accountService, CICOIngestionService ingestionService) {
+        this.accountService = accountService;
         this.ingestionService = ingestionService;
     }
 
@@ -37,8 +41,8 @@ public class CICOController {
             security = {@SecurityRequirement(name = "certificate", scopes = {"LWT_DEVICE"})}
     )
     public CheckInResponse checkIn(@RequestBody CheckInRequest checkInRequest) {
-        // currently accounts are not implemented, so let everything pass
-        return new CheckInResponse(1, sessionIdGenerator.generate());
+        Account cicoAccount = accountService.getAccountByCicoToken(checkInRequest.checkInToken());
+        return new CheckInResponse(cicoAccount.getId(), sessionIdGenerator.generate());
     }
 
     @PostMapping("/cico/events")

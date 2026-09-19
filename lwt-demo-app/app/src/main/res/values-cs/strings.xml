@@ -185,4 +185,5 @@
     <string name="beout_notice_supported">Vaše zařízení podporuje automatický check-out. Svou cestu můžete ukončit kdykoli po opuštění sítě bez dopadu na jízdné.</string>
     <string name="beout_notice_not_supported">Vaše zařízení nepodporuje automatický check-out. Při výstupu z posledního spoje je doporučeno ukončit jízdu ručně, jinak je možné, že vám bude účtováno jízdné i do další zastávky.</string>
     <string name="check_out_header">Už tam budeme?</string>
+    <string name="error_cico_no_account">Chcete-li používat funkci flexibilního odbavení, musíte být přihlášeni a mít k účtu připojenu platební metodu.</string>
 </resources>

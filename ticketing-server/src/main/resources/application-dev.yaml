@@ -10,6 +10,11 @@ spring:
     url: jdbc:mariadb://localhost:3306/mos_ticketing
     username: devel
     password: '-(-DONrS16RVCh-m'
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://iam.mos.ropid:8180/realms/mos
 
 tickets:
   signing-key-path:

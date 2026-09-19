@@ -1,17 +1,15 @@
 package cz.spojenka.lwt.ticketingserver.controllers;
 
-import cz.spojenka.lwt.ticketingserver.api.InspectionSecretResponse;
+import cz.spojenka.lwt.ticketing.api.InspectionSecretResponse;
 import cz.spojenka.lwt.ticketingserver.services.SeedDerivationService;
 import cz.spojenka.lwt.ticketingserver.services.TicketSigningService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.annotation.security.RolesAllowed;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemWriter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.annotation.Secured;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 

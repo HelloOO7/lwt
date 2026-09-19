@@ -2,5 +2,6 @@
 <network-security-config xmlns:android="http://schemas.android.com/apk/res/android">
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">cicomock.mos.ropid</domain>
+        <domain includeSubdomains="false">iam.mos.ropid</domain>
     </domain-config>
 </network-security-config>

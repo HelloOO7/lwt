@@ -1,16 +1,13 @@
 package cz.spojenka.lwt.ticketingserver.model;
 
+import cz.spojenka.lwt.ticketingserver.services.RandomGenerator;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 
-import java.security.SecureRandom;
-
 @Entity
 public class SeedDerivationSecret {
-
-    private static final SecureRandom VALUE_RANDOM = new SecureRandom();
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -30,9 +27,7 @@ public class SeedDerivationSecret {
     }
 
     public static SeedDerivationSecret random(long validFrom, long validTo) {
-        byte[] data = new byte[32];
-        VALUE_RANDOM.nextBytes(data);
-        return new SeedDerivationSecret(validFrom, validTo, data);
+        return new SeedDerivationSecret(validFrom, validTo, RandomGenerator.bytes(32));
     }
 
     public long getId() {

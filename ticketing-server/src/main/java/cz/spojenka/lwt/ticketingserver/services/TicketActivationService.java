@@ -1,15 +1,13 @@
 package cz.spojenka.lwt.ticketingserver.services;
 
 import cz.dpp.praguepublictransport.etd.LitackaETD;
-import cz.spojenka.lwt.ticketingserver.api.AccessDeniedException;
-import cz.spojenka.lwt.ticketingserver.api.TicketActivationParams;
+import cz.spojenka.lwt.ticketing.api.TicketActivationParams;
 import cz.spojenka.lwt.ticketingserver.model.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Objects;
@@ -20,8 +18,6 @@ public class TicketActivationService {
     private static final short ACTIVATION_TOKEN_VERSION = 1;
 
     public static final int ACTIVATION_FLAG_DISALLOW_PREAUTH = 1;
-
-    private final SecureRandom activationTokenRng = new SecureRandom();
 
     @Value("${tickets.issuer}")
     private String issuer;
@@ -39,26 +35,16 @@ public class TicketActivationService {
     }
 
     public TicketActivationToken generateActivationToken(Ticket ticket, int flags) {
-        byte[] salt = new byte[32];
-        activationTokenRng.nextBytes(salt);
+        byte[] salt = RandomGenerator.bytes(16);
 
-        byte[] token = ByteBuffer.allocate(Short.BYTES + Long.BYTES + salt.length + Integer.BYTES)
+        byte[] token = ByteBuffer.allocate(Short.BYTES + Long.BYTES + Integer.BYTES + salt.length)
                         .putShort(ACTIVATION_TOKEN_VERSION)
                         .putLong(ticket.getId())
                         .putInt(flags)
                         .put(salt)
-                        .putInt(0) // keyID
                         .array();
 
-        byte[] signature = signingService.signActivationToken(token);
-
-        byte[] signedToken = ByteBuffer.allocate(token.length + signature.length + Short.BYTES)
-                .put(token)
-                .put(signature)
-                .putShort((short) signature.length) //will be read from end
-                .array();
-
-        return new TicketActivationToken(signedToken);
+        return new TicketActivationToken(SecureToken.create(token, 0, signingService::signActivationToken));
     }
 
     public Ticket activateTicket(Ticket ticket, TicketActivationParams params, boolean isPrivileged, TicketActivationSource source) {

@@ -13,7 +13,8 @@ public class Ticket {
     private long id;
 
     private int productId;
-    private long holderAccountId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    private Account holderAccount;
 
     @Embedded
     private TicketActivationToken activationToken;
@@ -37,9 +38,9 @@ public class Ticket {
 
     }
 
-    public Ticket(int productId, long holderAccountId) {
+    public Ticket(int productId, Account holderAccount) {
         this.productId = productId;
-        this.holderAccountId = holderAccountId;
+        this.holderAccount = holderAccount;
     }
 
     public long getId() {
@@ -50,8 +51,8 @@ public class Ticket {
         return productId;
     }
 
-    public long getHolderAccountId() {
-        return holderAccountId;
+    public Account getHolderAccount() {
+        return holderAccount;
     }
 
     @Nullable

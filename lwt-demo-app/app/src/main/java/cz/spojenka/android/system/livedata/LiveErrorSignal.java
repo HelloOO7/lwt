@@ -75,7 +75,15 @@ public class LiveErrorSignal extends AdapterLiveData<Throwable> {
             logTag = "ErrorSignal";
         }
         Log.e(logTag, "Error in future", throwable);
-        setValue(throwable);
+        super.setValue(throwable);
+    }
+
+    @Override
+    public void setValue(Throwable value) {
+        if (value != null) {
+            Log.e("ErrorSignal", "Set externally", value);
+        }
+        super.setValue(value);
     }
 
     public void handle(LifecycleOwner owner, ErrorHandler onError) {

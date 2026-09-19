@@ -1,4 +1,4 @@
-package cz.spojenka.lwt.cicomock.api.ticketing;
+package cz.spojenka.lwt.ticketing.api;
 
 public enum CICOEventType {
     CHECK_IN,

@@ -26,8 +26,9 @@ import cz.dpp.praguepublictransport.etd.LitackaETD;
 import cz.spojenka.android.settings.SharedPrefsHelper;
 import cz.spojenka.android.util.AsyncUtils;
 import cz.spojenka.lwt.LwtTicketMetadata;
-import cz.spojenka.lwt.inspectionapi.InspectionAPI;
-import cz.spojenka.lwt.inspectionapi.InspectionSecretResponse;
+import cz.spojenka.lwt.ticketing.api.InspectionSecretResponse;
+import cz.spojenka.lwt.ticketing.client.InspectionAPI;
+import cz.spojenka.lwt.ticketing.client.TicketingClient;
 import cz.spojenka.lwt.util.PIDTicketTOTP;
 import retrofit2.Call;
 import retrofit2.HttpException;
@@ -52,7 +53,7 @@ public class TicketInspectionRepository {
 
     public TicketInspectionRepository(Application appContext) {
         prefs = appContext.getSharedPreferences("ticket_inspection", Application.MODE_PRIVATE);
-        remote = InspectionAPI.create("https://ticketing.mos.ropid:8080", GlobalTrustManager.getInstance(appContext));
+        remote = new TicketingClient(BuildConfig.TICKETING_SERVER_URL, GlobalTrustManager.createMosNetworkClient(appContext)).getInspectionAPI();
     }
 
     public static TicketInspectionRepository getInstance(Application appContext) {
@@ -178,8 +179,8 @@ public class TicketInspectionRepository {
 
     private byte[] getInspectionSecretForTime(Instant time) {
         for (InspectionSecretResponse secret : getInspectionSecrets()) {
-            if (!secret.validFrom.isAfter(time) && time.isBefore(secret.validTo)) {
-                return secret.data;
+            if (!secret.validFrom().isAfter(time) && time.isBefore(secret.validTo())) {
+                return secret.data();
             }
         }
         return null;

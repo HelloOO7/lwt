@@ -7,8 +7,10 @@ import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.X509TrustManager;
 
 import cz.spojenka.lwt.util.TLSTrustManager;
+import okhttp3.OkHttpClient;
 
 public class GlobalTrustManager {
 
@@ -60,6 +62,20 @@ public class GlobalTrustManager {
         try {
             KeyStore keyStore = getAndroidKeyStore();
             return keyStore.containsAlias(APP_CLIENT_KEY_ALIAS);
+        } catch (GeneralSecurityException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static OkHttpClient createMosNetworkClient(Application app) {
+        try {
+            TLSTrustManager trustManager = getInstance(app);
+            SSLContext sslContext = trustManager.createSSLContext();
+            X509TrustManager x509TrustManager = trustManager.getX509TrustManager();
+
+            return new OkHttpClient.Builder()
+                    .sslSocketFactory(sslContext.getSocketFactory(), x509TrustManager)
+                    .build();
         } catch (GeneralSecurityException e) {
             throw new RuntimeException(e);
         }

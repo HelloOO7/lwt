@@ -1,5 +1,6 @@
 [versions]
 agp = "9.3.1"
+appauth = "0.11.1"
 connectorLitacka = "1.0-SNAPSHOT"
 jackson = "2.22.2"
 junit = "4.13.2"
@@ -12,6 +13,7 @@ okhttp = "5.5.0"
 restrictionbypass = "2.2"
 retrofit = "3.0.0"
 slidetoact = "0.11.0"
+ticketingClient = "1.0-SNAPSHOT"
 tlsChannel = "1.0.0"
 swipeRefreshLayout = "1.2.0"
 flexboxLayout = "3.0.0"
@@ -21,6 +23,7 @@ openapiGenerator = "7.24.0"
 camerax = "1.6.1"
 
 [libraries]
+appauth = { module = "net.openid:appauth", version.ref = "appauth" }
 connector-litacka = { module = "cz.spojenka.connectors:connector-litacka", version.ref = "connectorLitacka" }
 jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
 jackson-datatype-jsr310 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310", version.ref = "jackson" }
@@ -35,6 +38,7 @@ restrictionbypass = { module = "com.github.ChickenHook:RestrictionBypass", versi
 retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
 retrofit-converter-jackson = { module = "com.squareup.retrofit2:converter-jackson", version.ref = "retrofit" }
 slidetoact = { module = "com.ncorti:slidetoact", version.ref = "slidetoact" }
+ticketingClient = { module = "cz.spojenka.lwt:ticketing-client", version.ref = "ticketingClient" }
 tlsChannel = { group = "com.github.marianobarrios", name = "tls-channel", version.ref = "tlsChannel" }
 swipeRefreshLayout = { group = "androidx.swiperefreshlayout", name = "swiperefreshlayout", version.ref = "swipeRefreshLayout" }
 flexboxLayout = { group = "com.google.android.flexbox", name = "flexbox", version.ref = "flexboxLayout" }

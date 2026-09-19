@@ -3,6 +3,10 @@ plugins {
     alias(libs.plugins.openapi.generator)
 }
 
+configurations.configureEach {
+    resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
+}
+
 android {
     namespace = 'cz.spojenka.lwt.demoapp'
     compileSdk = 37
@@ -15,6 +19,13 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField "String", "TICKETING_SERVER_URL", "\"https://ticketing.mos.ropid:8080\""
+        buildConfigField "String", "OAUTH_CLIENT_ID", "\"lwt-android-app\""
+
+        manifestPlaceholders = [
+            'appAuthRedirectScheme': 'lwtapp'
+        ]
     }
 
     buildTypes {
@@ -45,6 +56,8 @@ dependencies {
     implementation libs.zxing
     implementation libs.slidetoact
     implementation libs.restrictionbypass
+    implementation libs.ticketingClient
+    implementation libs.appauth
 
     implementation libs.okhttp
     implementation libs.retrofit

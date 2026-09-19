@@ -27,6 +27,7 @@ import java.util.concurrent.CompletableFuture;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import cz.spojenka.android.ui.activity.BaseActivity;
+import cz.spojenka.android.ui.dialog.CommonDialogs;
 import cz.spojenka.android.util.AsyncUtils;
 import cz.spojenka.android.util.ViewUtils;
 import cz.spojenka.lwdn.util.DeviceSpecifics;
@@ -79,10 +80,21 @@ public class MainActivity extends BaseActivity {
 
         binding.btnRunTicketInspection.setOnClickListener(v -> startActivity(new Intent(this, TicketInspectionHomeActivity.class)));
 
-        binding.btnOpenCico.setOnClickListener(v -> startActivity(
-                new Intent(this, CheckInActivity.class)
-                        .putExtra(CheckInActivity.EXTRA_CICO_TOKEN, new byte[16])
-        ));
+        binding.btnOpenCico.setOnClickListener(v -> {
+            byte[] cicoToken = null;
+            var acc = AccountRepository.getInstance(this).getAccountData();
+            if (acc != null) {
+                cicoToken = acc.cicoToken();
+            }
+            if (cicoToken == null) {
+                CommonDialogs.newInfoDialog(this, R.string.error, R.string.error_cico_no_account);
+                return;
+            }
+            startActivity(
+                    new Intent(this, CheckInActivity.class)
+                            .putExtra(CheckInActivity.EXTRA_CICO_TOKEN, cicoToken)
+            );
+        });
 
         binding.btnTrackRssi.setOnClickListener(v -> startActivity(new Intent(this, RssiTrackerActivity.class)));
 
@@ -92,6 +104,8 @@ public class MainActivity extends BaseActivity {
         ));
 
         Log.d(TAG, "Client key present: " + GlobalTrustManager.isClientKeyPresent());
+
+        //startActivity(new Intent(this, LoginActivity.class));
     }
 
     private void testNanDatapath() {

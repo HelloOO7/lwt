@@ -126,4 +126,24 @@ public class TicketSigningService {
     public List<PublicKey> getAllVerificationKeys() {
         return List.of(getVerificationKey());
     }
+
+    private boolean verifySignature(byte[] data, byte[] signature, PublicKey key) {
+        try {
+            Signature sig = Signature.getInstance("SHA256with" + key.getAlgorithm());
+            sig.initVerify(key);
+            sig.update(data);
+            return sig.verify(signature);
+        } catch (NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public boolean verifySignature(byte[] data, byte[] signature) {
+        for (PublicKey key : getAllVerificationKeys()) {
+            if (verifySignature(data, signature, key)) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

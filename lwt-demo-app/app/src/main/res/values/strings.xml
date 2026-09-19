@@ -186,4 +186,5 @@
     <string name="beout_notice_supported">Automatic check-out is supported on your device. You can end your journey any time after leaving the network without it affecting your fare.</string>
     <string name="beout_notice_not_supported">This device does not support automatic check-out. Make sure to check out as you leave your final vehicle, otherwise you may be charged a fare to the next stop.</string>
     <string name="check_out_header">Are we there yet?</string>
+    <string name="error_cico_no_account">In order to use CI/CO ticketing, you must be logged in and have a valid payment method bound to your account.</string>
 </resources>
