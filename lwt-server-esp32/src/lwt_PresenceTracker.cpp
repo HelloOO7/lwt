@@ -94,7 +94,10 @@ namespace lwt {
         }
 
         clientIt->m_SessionId = sessionId;
+        UpdateClientLastSeen(*clientIt, SystemTime::UptimeMillis(), SystemTime::EpochMillis());
+
         ESP_LOGI(TAG, "Refreshed session client: %s", sessionId.ToString().c_str());
+        
         return true;
     }
 
