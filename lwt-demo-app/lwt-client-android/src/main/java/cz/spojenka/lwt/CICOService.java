@@ -492,6 +492,7 @@ public class CICOService extends Service {
             throw new IllegalStateException("Must successfully call requestSession() before starting a session");
         }
         Log.d(TAG, "startSession()");
+        resetPresenceTrackingClientId();
         LwtDevice sessionDevice = currentDevice;
         return currentLwtClient
                 .confirmCheckIn(checkInIntermediate, getPresenceTrackingClient())
@@ -737,6 +738,13 @@ public class CICOService extends Service {
         handler.removeCallbacks(refreshTicketRunnable);
     }
 
+    private void resetPresenceTrackingClientId() {
+        if (presenceAdvertiser != null) {
+            Log.d(TAG, "resetPresenceTrackingClientId()");
+            presenceAdvertiser.resetTrackingClientId();
+        }
+    }
+
     private PresenceTrackingClient getPresenceTrackingClient() {
         if (presenceAdvertiser != null) {
             return presenceAdvertiser.getTrackingClient();
@@ -818,6 +826,8 @@ public class CICOService extends Service {
             attemptFutures.add(new CompletableFuture<>());
         }
         Log.d(TAG, closestDevices.size() + " candidates for new connection");
+        // reset when changing vehicles. when using restoreConnection, the ID stays the same
+        resetPresenceTrackingClientId();
         for (int i = 0; i < closestDevices.size(); i++) {
             LwtDevice dev = closestDevices.get(i);
             int devIndex = i;

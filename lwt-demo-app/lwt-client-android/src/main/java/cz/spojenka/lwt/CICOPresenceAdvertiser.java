@@ -102,6 +102,11 @@ public class CICOPresenceAdvertiser implements AutoCloseable {
         return trackingClient;
     }
 
+    public void resetTrackingClientId() {
+        trackingClient.resetClientId();
+        updateAdvertisements();
+    }
+
     private void updateAdvertisements() {
         advertise(buildAdvData());
         handler.postDelayed(updateAdvertisementsRunnable, trackingClient.getTotpPeriod().toMillis());

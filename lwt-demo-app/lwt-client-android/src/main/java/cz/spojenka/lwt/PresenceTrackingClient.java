@@ -13,12 +13,13 @@ public class PresenceTrackingClient {
 
     private static final Duration TOTP_PERIOD = Duration.ofMinutes(1);
 
+    private final SecureRandom random = new SecureRandom();
+
     private final byte[] clientId;
     private final byte[] totpSecret;
     private final TicketTOTP totp;
 
     public PresenceTrackingClient() {
-        SecureRandom random = new SecureRandom();
         clientId = new byte[8];
         random.nextBytes(clientId);
         totpSecret = new byte[32];
@@ -28,6 +29,10 @@ public class PresenceTrackingClient {
 
     public byte[] getClientId() {
         return clientId;
+    }
+
+    public void resetClientId() {
+        random.nextBytes(clientId);
     }
 
     public byte[] getTotpSecret() {
