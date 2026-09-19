@@ -124,7 +124,7 @@ public:
         m_TLSConfig(m_MbedTlsConfig),
         m_HttpServiceDiscovery{ vdv301::HttpServiceDiscovery(TASK_PRIORITY_BACKGROUND_SYNC) },
         m_UdpServiceDiscovery{ vdv301::UdpServiceDiscovery(TASK_PRIORITY_BACKGROUND_SYNC) },
-        m_BLEScanner(4096, TASK_PRIORITY_BACKGROUND_SYNC),
+        m_BLEScanner(4096, TASK_PRIORITY_TIME_CRITICAL), // we use BLE adv for presence tracking, so we do not want preemption to cause artificial timeouts
         m_CISSubscriber(
             m_HttpServiceDiscovery,
             vdv301::SubscriberCIS::Operation::AllData,
