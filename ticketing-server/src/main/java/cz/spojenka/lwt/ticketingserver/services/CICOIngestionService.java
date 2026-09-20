@@ -1,5 +1,7 @@
 package cz.spojenka.lwt.ticketingserver.services;
 
+import com.fasterxml.uuid.Generators;
+import com.fasterxml.uuid.impl.TimeBasedEpochRandomGenerator;
 import cz.spojenka.lwt.ticketing.api.CICOEventPush;
 import cz.spojenka.lwt.ticketing.api.CICOEventType;
 import cz.spojenka.lwt.ticketingserver.model.Account;
@@ -8,6 +10,7 @@ import cz.spojenka.lwt.ticketingserver.model.CICORepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
+import java.time.OffsetDateTime;
 import java.util.*;
 
 @Service
@@ -15,10 +18,19 @@ public class CICOIngestionService {
 
     private final CICORepository repository;
     private final AccountService accountService;
+    private final TimeBasedEpochRandomGenerator eventIdGenerator = Generators.timeBasedEpochRandomGenerator();
 
     public CICOIngestionService(CICORepository repository, AccountService accountService) {
         this.repository = repository;
         this.accountService = accountService;
+    }
+
+    public UUID generateEventUUID() {
+        return eventIdGenerator.generate();
+    }
+
+    public UUID generateSessionUUID() {
+        return eventIdGenerator.generate();
     }
 
     public void ingestEvents(List<CICOEventPush> events) {
@@ -42,6 +54,11 @@ public class CICOIngestionService {
         }
 
         insertAllEvents(newEvents);
+    }
+
+    public void ingestSelfCheckout(Account account, UUID sessionId, CICOEvent predecessor) {
+        CICOEvent event = new CICOEvent(generateEventUUID(), predecessor, sessionId, account, OffsetDateTime.now(), CICOEventType.CHECK_OUT, "CO:SELF");
+        repository.save(event);
     }
 
     @Transactional
