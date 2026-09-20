@@ -187,4 +187,10 @@
     <string name="beout_notice_not_supported">This device does not support automatic check-out. Make sure to check out as you leave your final vehicle, otherwise you may be charged a fare to the next stop.</string>
     <string name="check_out_header">Are we there yet?</string>
     <string name="error_cico_no_account">In order to use CI/CO ticketing, you must be logged in and have a valid payment method bound to your account.</string>
+    <string name="login_retry">Try again</string>
+    <string name="login_state_oidc">Downloading configuration</string>
+    <string name="login_state_user_auth">Starting login flow</string>
+    <string name="login_state_get_tokens">Obtaining credentials</string>
+    <string name="login_state_get_account">Loading account information</string>
+    <string name="login_state_done">Done</string>
 </resources>

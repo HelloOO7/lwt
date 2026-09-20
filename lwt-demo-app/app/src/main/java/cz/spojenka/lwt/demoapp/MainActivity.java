@@ -87,13 +87,13 @@ public class MainActivity extends BaseActivity {
                 cicoToken = acc.cicoToken();
             }
             if (cicoToken == null) {
-                CommonDialogs.newInfoDialog(this, R.string.error, R.string.error_cico_no_account);
-                return;
+                startActivity(new Intent(this, LoginActivity.class));
+            } else {
+                startActivity(
+                        new Intent(this, CheckInActivity.class)
+                                .putExtra(CheckInActivity.EXTRA_CICO_TOKEN, cicoToken)
+                );
             }
-            startActivity(
-                    new Intent(this, CheckInActivity.class)
-                            .putExtra(CheckInActivity.EXTRA_CICO_TOKEN, cicoToken)
-            );
         });
 
         binding.btnTrackRssi.setOnClickListener(v -> startActivity(new Intent(this, RssiTrackerActivity.class)));
@@ -105,7 +105,7 @@ public class MainActivity extends BaseActivity {
 
         Log.d(TAG, "Client key present: " + GlobalTrustManager.isClientKeyPresent());
 
-        //startActivity(new Intent(this, LoginActivity.class));
+        startActivity(new Intent(this, LoginActivity.class));
     }
 
     private void testNanDatapath() {

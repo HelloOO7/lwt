@@ -11,6 +11,7 @@ import javax.net.ssl.X509TrustManager;
 
 import cz.spojenka.lwt.util.TLSTrustManager;
 import okhttp3.OkHttpClient;
+import okhttp3.logging.HttpLoggingInterceptor;
 
 public class GlobalTrustManager {
 
@@ -73,9 +74,16 @@ public class GlobalTrustManager {
             SSLContext sslContext = trustManager.createSSLContext();
             X509TrustManager x509TrustManager = trustManager.getX509TrustManager();
 
-            return new OkHttpClient.Builder()
-                    .sslSocketFactory(sslContext.getSocketFactory(), x509TrustManager)
-                    .build();
+            OkHttpClient.Builder builder = new OkHttpClient.Builder()
+                    .sslSocketFactory(sslContext.getSocketFactory(), x509TrustManager);
+
+            if (BuildConfig.DEBUG) {
+                HttpLoggingInterceptor logging = new HttpLoggingInterceptor();
+                logging.setLevel(HttpLoggingInterceptor.Level.BODY);
+                builder.addNetworkInterceptor(logging);
+            }
+
+            return builder.build();
         } catch (GeneralSecurityException e) {
             throw new RuntimeException(e);
         }

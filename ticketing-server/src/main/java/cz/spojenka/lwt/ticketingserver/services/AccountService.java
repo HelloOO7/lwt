@@ -3,9 +3,11 @@ package cz.spojenka.lwt.ticketingserver.services;
 import cz.spojenka.lwt.ticketingserver.api.AccessDeniedException;
 import cz.spojenka.lwt.ticketingserver.api.NotFoundException;
 import cz.spojenka.lwt.ticketingserver.model.Account;
+import cz.spojenka.lwt.ticketingserver.model.AccountPrincipal;
 import cz.spojenka.lwt.ticketingserver.model.AccountRepository;
 import cz.spojenka.lwt.ticketingserver.model.SecureToken;
 import jakarta.transaction.Transactional;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 
@@ -82,5 +84,13 @@ public class AccountService {
 
     public Account findByIdOrThrow(long accountId) {
         return repository.findById(accountId).orElseThrow(() -> new NotFoundException("Account not found for ID " + accountId));
+    }
+
+    public static boolean checkAccess(Authentication authentication, long expectedUserId) {
+        if (authentication != null && authentication.getPrincipal() instanceof AccountPrincipal account) {
+            return account.requireAccount().getId() == expectedUserId;
+        } else {
+            return false;
+        }
     }
 }

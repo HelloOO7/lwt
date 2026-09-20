@@ -186,4 +186,10 @@
     <string name="beout_notice_not_supported">Vaše zařízení nepodporuje automatický check-out. Při výstupu z posledního spoje je doporučeno ukončit jízdu ručně, jinak je možné, že vám bude účtováno jízdné i do další zastávky.</string>
     <string name="check_out_header">Už tam budeme?</string>
     <string name="error_cico_no_account">Chcete-li používat funkci flexibilního odbavení, musíte být přihlášeni a mít k účtu připojenu platební metodu.</string>
+    <string name="login_retry">Zkusit znovu</string>
+    <string name="login_state_user_auth">Otevírání přihlašovacího rozhraní</string>
+    <string name="login_state_get_tokens">Navazuji přihlášení</string>
+    <string name="login_state_get_account">Načítání uživatelských údajů</string>
+    <string name="login_state_done">Hotovo</string>
+    <string name="login_state_oidc">Stahování konfigurace</string>
 </resources>

@@ -3,10 +3,7 @@ package cz.spojenka.lwt.ticketingserver.controllers;
 import cz.spojenka.lwt.ticketing.api.*;
 import cz.spojenka.lwt.ticketingserver.api.AccessDeniedException;
 import cz.spojenka.lwt.ticketingserver.api.NotFoundException;
-import cz.spojenka.lwt.ticketingserver.model.Account;
-import cz.spojenka.lwt.ticketingserver.model.AccountPrincipal;
-import cz.spojenka.lwt.ticketingserver.model.CICOEvent;
-import cz.spojenka.lwt.ticketingserver.model.CICORepository;
+import cz.spojenka.lwt.ticketingserver.model.*;
 import cz.spojenka.lwt.ticketingserver.services.AccountService;
 import cz.spojenka.lwt.ticketingserver.services.CICOIngestionService;
 import cz.spojenka.lwt.ticketingserver.services.CertificateAuthService;
@@ -41,11 +38,11 @@ public class CICOController {
     }
 
     @PostMapping("/cico/check-in")
-    @Secured("LWT_DEVICE")
+    @Secured(Privileges.LWT_DEVICE)
     @Operation(
             summary = "Validate and get parameters for check-in",
             description = "Verify that a check-in token is legitimate and return account and session information.",
-            security = {@SecurityRequirement(name = "certificate", scopes = {"LWT_DEVICE"})}
+            security = {@SecurityRequirement(name = "certificate", scopes = {Privileges.LWT_DEVICE})}
     )
     public CheckInResponse checkIn(@RequestBody CheckInRequest checkInRequest) {
         Account cicoAccount = accountService.getAccountByCicoToken(checkInRequest.checkInToken());
@@ -66,7 +63,7 @@ public class CICOController {
         if (!allowSelfCheckout) {
             throw new AccessDeniedException("Self check-out is disabled");
         }
-        boolean privileged = CertificateAuthService.hasRole(authentication, "LWT_DEVICE");
+        boolean privileged = CertificateAuthService.hasRole(authentication, Privileges.LWT_DEVICE);
         Account account = accountService.getAccountByCicoToken(checkOutRequest.checkInToken());
         if (!privileged) {
             if (authentication.getPrincipal() instanceof AccountPrincipal loggedAccount) {
@@ -88,12 +85,12 @@ public class CICOController {
     }
 
     @PostMapping("/cico/events")
-    @Secured("LWT_DEVICE")
+    @Secured(Privileges.LWT_DEVICE)
     @Operation(
             summary = "CICO event ingestion endpoint",
             description = "Authorized devices use this endpoint to upload CICO events when they have "
                     + "available resources and an internet connection. It requires a certificate with the role LWT_DEVICE.",
-            security = {@SecurityRequirement(name = "certificate", scopes = {"LWT_DEVICE"})}
+            security = {@SecurityRequirement(name = "certificate", scopes = {Privileges.LWT_DEVICE})}
     )
     public void pushEvents(@RequestBody CICOEventBatch events) {
         ZonedDateTime clientTime = ZonedDateTime.now();

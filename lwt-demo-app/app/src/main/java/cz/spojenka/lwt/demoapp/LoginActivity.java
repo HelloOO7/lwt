@@ -4,6 +4,7 @@ import android.app.Application;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.View;
 
 import net.openid.appauth.AuthState;
 import net.openid.appauth.AuthorizationException;
@@ -14,6 +15,7 @@ import net.openid.appauth.AuthorizationServiceConfiguration;
 import net.openid.appauth.ResponseTypeValues;
 import net.openid.appauth.TokenResponse;
 
+import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
@@ -22,15 +24,18 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.browser.customtabs.CustomTabsIntent;
+import androidx.core.content.res.ResourcesCompat;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModelProvider;
 import cz.spojenka.android.system.livedata.LiveErrorSignal;
 import cz.spojenka.android.ui.activity.BaseActivity;
+import cz.spojenka.lwt.demoapp.databinding.ActivityLoginBinding;
 import cz.spojenka.lwt.ticketing.api.AccountResponse;
 import cz.spojenka.lwt.ticketing.api.ClientOAuthConfig;
 import cz.spojenka.lwt.ticketing.client.AccountsAPI;
+import cz.spojenka.lwt.ticketing.client.TicketingAuthenticator;
 import cz.spojenka.lwt.ticketing.client.TicketingClient;
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -38,6 +43,8 @@ import retrofit2.HttpException;
 import retrofit2.Response;
 
 public class LoginActivity extends BaseActivity {
+
+    private ActivityLoginBinding binding;
 
     private AuthorizationService authService;
     private ViewModel viewModel;
@@ -48,6 +55,8 @@ public class LoginActivity extends BaseActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        binding = ActivityLoginBinding.inflate(getLayoutInflater());
+        setContentView(binding.getRoot());
         authService = AccountRepository.getInstance(this).getAuthService();
         viewModel = new ViewModelProvider(this).get(ViewModel.class);
         customTabsIntent = authService.createCustomTabsIntentBuilder().build();
@@ -60,13 +69,44 @@ public class LoginActivity extends BaseActivity {
         viewModel.handleAuthorizationResponse(getIntent());
 
         viewModel.getLoadingState().observe(this, loading -> {
-            if (loading == LoadingState.NONE && viewModel.canUseOidc() && !viewModel.isAuthorized()) {
+            boolean loadingVisible = loading != LoadingState.ERROR;
+            binding.pbLoginProgress.setVisibility(loadingVisible ? View.VISIBLE : View.GONE);
+            if (loadingVisible) {
+                updateTextByLoginState();
+            }
+            if (loading == LoadingState.USER_AUTH) {
                 callOidc();
+            } else if (loading == LoadingState.ALL_DONE) {
+                finish();
             }
         });
 
         viewModel.getErrorSignal().observe(this, err -> {
+            if (err != null) {
+                binding.tvLoginState.setText(err.getMessage());
+                binding.btnRetryLogin.setVisibility(View.VISIBLE);
+                binding.ivLoginErrorIcon.setVisibility(View.VISIBLE);
+            } else {
+                binding.btnRetryLogin.setVisibility(View.GONE);
+                binding.ivLoginErrorIcon.setVisibility(View.GONE);
+                updateTextByLoginState();
+            }
+        }, true);
 
+        binding.btnRetryLogin.setOnClickListener(v -> {
+            viewModel.getErrorSignal().ack();
+            viewModel.retryLogin();
+        });
+    }
+
+    private void updateTextByLoginState() {
+        binding.tvLoginState.setText(switch (Objects.requireNonNull(viewModel.getLoadingState().getValue())) {
+            case OIDC -> R.string.login_state_oidc;
+            case USER_AUTH -> R.string.login_state_user_auth;
+            case GET_TOKENS -> R.string.login_state_get_tokens;
+            case ACCOUNT_DATA -> R.string.login_state_get_account;
+            case ALL_DONE -> R.string.login_state_done;
+            case ERROR -> R.string.error;
         });
     }
 
@@ -94,7 +134,21 @@ public class LoginActivity extends BaseActivity {
             accountsAPI = new TicketingClient(
                     BuildConfig.TICKETING_SERVER_URL,
                     GlobalTrustManager.createMosNetworkClient(application),
-                    accountRepository.createAuthenticator()
+                    new TicketingAuthenticator() {
+
+                        private final TicketingAuthenticator baseAuth = accountRepository.createAuthenticator();
+
+                        @Override
+                        public String getAccessToken() throws IOException {
+                            if (authState != null) {
+                                return baseAuth.getAccessToken();
+                            } else {
+                                // before we authenticate, act as if there is no access token
+                                // (which forces oidc configuration to be loaded without attempting refresh)
+                                return null;
+                            }
+                        }
+                    }
             ).getAccountsAPI();
             continueFetchConfigs();
         }
@@ -113,16 +167,14 @@ public class LoginActivity extends BaseActivity {
                         if (response.isSuccessful()) {
                             clientConfig.complete(response.body());
                         } else {
-                            clientConfig.completeExceptionally(new HttpException(response));
-                            loadingState.setValue(LoadingState.NONE);
+                            onFailure(call, new HttpException(response));
                         }
                     }
 
                     @Override
                     public void onFailure(@NonNull Call<ClientOAuthConfig> call, @NonNull Throwable t) {
-                        loadingState.setValue(LoadingState.NONE);
+                        setError(t);
                         clientConfig.completeExceptionally(t);
-                        errorSignal.setValue(t);
                     }
                 });
             }
@@ -135,16 +187,28 @@ public class LoginActivity extends BaseActivity {
                         @Override
                         public void onFetchConfigurationCompleted(@Nullable AuthorizationServiceConfiguration serviceConfiguration, @Nullable AuthorizationException ex) {
                             if (ex != null) {
+                                setError(ex);
                                 authConfig.completeExceptionally(ex);
-                                errorSignal.setValue(ex);
                             } else {
                                 authState = new AuthState(Objects.requireNonNull(serviceConfiguration));
                                 authConfig.complete(serviceConfiguration);
+                                loadingState.setValue(LoadingState.USER_AUTH);
                             }
-                            loadingState.setValue(LoadingState.NONE);
                         }
                     }, AccountRepository.createInsecureConnectionBuilder());
                 });
+            }
+        }
+
+        public void retryLogin() {
+            if (!canUseOidc()) {
+                continueFetchConfigs();
+            } else {
+                if (authState.isAuthorized()) {
+                    loadAccountData();
+                } else {
+                    loadingState.setValue(LoadingState.USER_AUTH);
+                }
             }
         }
 
@@ -176,19 +240,17 @@ public class LoginActivity extends BaseActivity {
             }
             AuthorizationException exception = AuthorizationException.fromIntent(intent);
             if (exception != null) {
-                errorSignal.setValue(exception);
-                loadingState.setValue(LoadingState.NONE);
+                setError(exception);
             } else {
                 AuthorizationResponse resp = AuthorizationResponse.fromIntent(intent);
                 if (resp != null) {
                     authState.update(resp, exception);
-                    loadingState.setValue(LoadingState.AUTH);
+                    loadingState.setValue(LoadingState.GET_TOKENS);
                     accountRepository.getAuthService().performTokenRequest(resp.createTokenExchangeRequest(), new AuthorizationService.TokenResponseCallback() {
                         @Override
                         public void onTokenRequestCompleted(@Nullable TokenResponse tokenResp, @Nullable AuthorizationException tokenEx) {
                             if (tokenEx != null) {
-                                errorSignal.setValue(tokenEx);
-                                loadingState.setValue(LoadingState.NONE);
+                                setError(tokenEx);
                             } else {
                                 authState.update(tokenResp, tokenEx);
                                 accountRepository.setAuthState(authState);
@@ -196,8 +258,6 @@ public class LoginActivity extends BaseActivity {
                             }
                         }
                     });
-                } else {
-                    loadingState.setValue(LoadingState.NONE);
                 }
             }
         }
@@ -211,16 +271,20 @@ public class LoginActivity extends BaseActivity {
                         accountRepository.setAccountData(response.body());
                         loadingState.setValue(LoadingState.ALL_DONE);
                     } else {
-                        errorSignal.setValue(new HttpException(response));
-                        loadingState.setValue(LoadingState.NONE);
+                        setError(new HttpException(response));
                     }
                 }
 
                 @Override
                 public void onFailure(@NonNull Call<AccountResponse> call, @NonNull Throwable t) {
-                    errorSignal.setValue(t);
+                    setError(t);
                 }
             });
+        }
+
+        private void setError(Throwable t) {
+            errorSignal.setValue(t);
+            loadingState.setValue(LoadingState.ERROR);
         }
 
         public LiveData<LoadingState> getLoadingState() {
@@ -233,10 +297,11 @@ public class LoginActivity extends BaseActivity {
     }
 
     public static enum LoadingState {
-        NONE,
         OIDC,
-        AUTH,
+        USER_AUTH,
+        GET_TOKENS,
         ACCOUNT_DATA,
-        ALL_DONE
+        ALL_DONE,
+        ERROR
     }
 }

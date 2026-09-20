@@ -1,6 +1,7 @@
 package cz.spojenka.lwt.ticketingserver.controllers;
 
 import cz.spojenka.lwt.ticketing.api.InspectionSecretResponse;
+import cz.spojenka.lwt.ticketingserver.model.Privileges;
 import cz.spojenka.lwt.ticketingserver.services.SeedDerivationService;
 import cz.spojenka.lwt.ticketingserver.services.TicketSigningService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -73,7 +74,7 @@ public class InspectionController {
     }
 
     @GetMapping("/inspection/secrets")
-    @Secured("TICKET_INSPECTOR")
+    @Secured(Privileges.TICKET_INSPECTOR)
     @Operation(
             summary = "Get secrets for inspection TOTP checks",
             description = "Get a list of cryptographic secrets necessary for TOTP validation during ticket inspection. The data " +

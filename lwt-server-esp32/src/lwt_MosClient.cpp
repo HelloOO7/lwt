@@ -86,8 +86,8 @@ namespace lwt {
         pActivatedTicket->ValidSince = DateTimeFromJson(response.at("validSince"));
         pActivatedTicket->ValidUntil = DateTimeFromJson(response.at("validUntil"));
         response.at("validZones").get_to(pActivatedTicket->ValidZones);
-        response.at("activationRecord").at("appId").get_to(pActivatedTicket->ActivatedAppID);
-        pActivatedTicket->ActivationTime = DateTimeFromJson(response.at("activationRecord").at("activationTime"));
+        response.at("activationAppId").get_to(pActivatedTicket->ActivatedAppID);
+        pActivatedTicket->ActivationTime = DateTimeFromJson(response.at("activationTime"));
 
         return status;
     }

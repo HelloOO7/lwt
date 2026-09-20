@@ -14,13 +14,29 @@ import cz.spojenka.android.util.AsyncUtils;
 
 public class LiveErrorSignal extends AdapterLiveData<Throwable> {
 
+    public LiveErrorSignal() {
+        super(null);
+    }
+
     @Override
     protected Observer<? super Throwable> adaptObserver(Observer<? super Throwable> observer) {
         return err -> {
-            if (err != null) {
+            if (err != null || observer instanceof ObserverWithAck) {
                 observer.onChanged(err);
             }
         };
+    }
+
+    public void observe(LifecycleOwner lifecycleOwner, Observer<? super Throwable> observer, boolean notifyAcked) {
+        if (notifyAcked) {
+            observe(lifecycleOwner, new ObserverWithAck(observer));
+        } else {
+            observe(lifecycleOwner, observer);
+        }
+    }
+
+    public boolean hasError() {
+        return getValue() != null;
     }
 
     public void ack() {
@@ -101,5 +117,19 @@ public class LiveErrorSignal extends AdapterLiveData<Throwable> {
     public static interface ErrorHandler {
 
         public void handle(Throwable error, Runnable ack);
+    }
+
+    private static class ObserverWithAck implements Observer<Throwable> {
+
+        private final Observer<? super Throwable> base;
+
+        public ObserverWithAck(Observer<? super Throwable> base) {
+            this.base = base;
+        }
+
+        @Override
+        public void onChanged(Throwable throwable) {
+            base.onChanged(throwable);
+        }
     }
 }
