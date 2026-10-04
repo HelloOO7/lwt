@@ -5,13 +5,16 @@ ticketing-server:
     password: "mosdevcert"
   ca-cert:
     path: "../pki/ROPID_Root_CA_Certificate_[DEBUG].crt"
-engine:
-  natives:
-    path: "${SPOJENKA_ROOT}/spojenka-engine/SearchEngine/build/x64-release"
 mock:
   data:
     timetable-bundle: "data/jizdnirady-bundle-fullres-trajectories.ttz"
     ropid-stops: "data/zastavky_vsechnyZavody_20260916_1151.xml"
-    index-directory: "data/index"
+ttz:
+  required-contents:
+    - "TIMETABLES"
+  working-directory: "data/index"
+  engine:
+    natives:
+      path: "${SPOJENKA_ROOT}/spojenka-engine/SearchEngine/build/x64-release"
 server:
     port: 8090

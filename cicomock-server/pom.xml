@@ -29,6 +29,12 @@
 	<properties>
 		<java.version>21</java.version>
 	</properties>
+	<repositories>
+		<repository>
+			<id>spojenka-repo-snapshots</id>
+			<url>https://lab.d3s.mff.cuni.cz:27091/snapshots</url>
+		</repository>
+	</repositories>
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -40,28 +46,13 @@
 		</dependency>
 		<dependency>
 			<groupId>cz.spojenka</groupId>
-			<artifactId>datasources.model</artifactId>
-			<version>1.0-SNAPSHOT</version>
-		</dependency>
-		<dependency>
-			<groupId>cz.spojenka</groupId>
-			<artifactId>engine-jni</artifactId>
-			<version>1.0-SNAPSHOT</version>
-		</dependency>
-		<dependency>
-			<groupId>cz.spojenka</groupId>
-			<artifactId>backend-core</artifactId>
+			<artifactId>spring-ttz-repository</artifactId>
 			<version>1.0-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>cz.spojenka.lwt</groupId>
 			<artifactId>ticketing-client</artifactId>
 			<version>1.0-SNAPSHOT</version>
-		</dependency>
-		<dependency>
-			<groupId>commons-io</groupId>
-			<artifactId>commons-io</artifactId>
-			<version>2.18.0</version>
 		</dependency>
 		<dependency>
 			<groupId>jakarta.xml.bind</groupId>
