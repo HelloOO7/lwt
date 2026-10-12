@@ -21,3 +21,4 @@ tickets:
   activation-protection: 60
   max-validity-backlog: "P3D" # DPP 3 day prague ticket
   allow-self-checkout: true
+  permitted-tariffs: ['PID']

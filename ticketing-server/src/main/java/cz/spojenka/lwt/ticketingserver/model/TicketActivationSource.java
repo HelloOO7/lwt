@@ -2,5 +2,6 @@ package cz.spojenka.lwt.ticketingserver.model;
 
 public enum TicketActivationSource {
     USER,
-    LWT_VALIDATOR
+    LWT_VALIDATOR,
+    CICO_CLEARING
 }

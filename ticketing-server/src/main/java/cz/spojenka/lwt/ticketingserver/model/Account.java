@@ -21,6 +21,12 @@ public class Account {
 
     private byte[] cicoToken;
 
+    @OneToMany(
+            mappedBy = "holderAccount",
+            cascade = CascadeType.ALL
+    )
+    private List<Pass> passes = new ArrayList<>();
+
     public Account() {
 
     }
@@ -41,5 +47,9 @@ public class Account {
 
     public void setCicoToken(byte[] cicoToken) {
         this.cicoToken = cicoToken;
+    }
+
+    public List<Pass> getPasses() {
+        return passes;
     }
 }

@@ -153,6 +153,8 @@ CONFIG_SOC_BITSCRAMBLER_SUPPORTED=y
 # default:
 CONFIG_SOC_SPI_EXTERNAL_NOR_FLASH_SUPPORTED=y
 # default:
+CONFIG_SOC_RISCV_TRACE_SUPPORTED=y
+# default:
 CONFIG_SOC_XTAL_SUPPORT_40M=y
 # default:
 CONFIG_SOC_XTAL_SUPPORT_48M=y
@@ -209,6 +211,10 @@ CONFIG_SOC_CACHE_WRITEBACK_SUPPORTED=y
 # default:
 CONFIG_SOC_CACHE_FREEZE_SUPPORTED=y
 # default:
+CONFIG_SOC_CACHE_CNT_SUPPORTED=y
+# default:
+CONFIG_SOC_CACHE_CNT_UNITS_NUM=2
+# default:
 CONFIG_SOC_CPU_CORES_NUM=1
 # default:
 CONFIG_SOC_CPU_INTR_NUM=32
@@ -260,8 +266,6 @@ CONFIG_SOC_GDMA_SUPPORT_ETM=y
 CONFIG_SOC_GDMA_SUPPORT_SLEEP_RETENTION=y
 # default:
 CONFIG_SOC_GDMA_SUPPORT_WEIGHTED_ARBITRATION=y
-# default:
-CONFIG_SOC_GDMA_EXT_MEM_ENC_ALIGNMENT=16
 # default:
 CONFIG_SOC_GPIO_PORT=1
 # default:
@@ -455,6 +459,8 @@ CONFIG_SOC_SHA_SUPPORT_SHA512_256=y
 # default:
 CONFIG_SOC_SHA_SUPPORT_SHA512_T=y
 # default:
+CONFIG_SOC_SHA_SUPPORT_SM3=y
+# default:
 CONFIG_SOC_ECC_CONSTANT_TIME_POINT_MUL=y
 # default:
 CONFIG_SOC_ECC_SUPPORT_CURVE_P384=y
@@ -462,6 +468,8 @@ CONFIG_SOC_ECC_SUPPORT_CURVE_P384=y
 CONFIG_SOC_ECDSA_SUPPORT_EXPORT_PUBKEY=y
 # default:
 CONFIG_SOC_ECDSA_SUPPORT_DETERMINISTIC_MODE=y
+# default:
+CONFIG_SOC_ECDSA_USES_MPI=y
 # default:
 CONFIG_SOC_ECDSA_SUPPORT_HW_DETERMINISTIC_LOOP=y
 # default:
@@ -540,6 +548,8 @@ CONFIG_SOC_EFUSE_DIS_DIRECT_BOOT=y
 CONFIG_SOC_EFUSE_SOFT_DIS_JTAG=y
 # default:
 CONFIG_SOC_EFUSE_DIS_ICACHE=y
+# default:
+CONFIG_SOC_EFUSE_DIS_DOWNLOAD_MSPI=y
 # default:
 CONFIG_SOC_EFUSE_ECDSA_KEY=y
 # default:
@@ -689,6 +699,8 @@ CONFIG_SOC_PM_SUPPORT_REGDMA_TRIGGERED_PHY=y
 # default:
 CONFIG_SOC_PM_SUPPORT_PMU_MODEM_STATE=y
 # default:
+CONFIG_SOC_PM_REGDMA_MODEM_LINK_PROTECT=y
+# default:
 CONFIG_SOC_PM_SUPPORT_PMU_CLK_ICG=y
 # default:
 CONFIG_SOC_PM_SUPPORT_MODEM_CLOCK_DOMAIN_ICG=y
@@ -712,8 +724,6 @@ CONFIG_SOC_PM_PAU_REGDMA_MODEM_WIFIMAC_WORKAROUND=y
 CONFIG_SOC_PM_PAU_REGDMA_LINK_IDX_PHY=4
 # default:
 CONFIG_SOC_PM_PMU_MIN_SLP_SLOW_CLK_CYCLE_FIXED=y
-# default:
-CONFIG_SOC_PM_RETENTION_MODULE_NUM=40
 # default:
 CONFIG_SOC_PM_FLASH_KEEP_POWER_IN_LSLP=y
 # default:
@@ -809,6 +819,18 @@ CONFIG_SOC_LP_CORE_HW_AUTO_CLRWAKEUPCAUSE=y
 # default:
 CONFIG_SOC_LP_CORE_LP_UART_WAKEUP_KEEP_TRIGGERED=y
 # default:
+CONFIG_SOC_RISCV_TRACE_PACKET_FORMAT_VER=200
+# default:
+CONFIG_SOC_RISCV_TRACE_HAS_CONFIG_REG=y
+# default:
+CONFIG_SOC_RISCV_TRACE_AHB_CONFIGURABLE=y
+# default:
+CONFIG_SOC_RISCV_TRACE_FILTER_SUPPORTED=y
+# default:
+CONFIG_SOC_RISCV_TRACE_PRIV_WIDTH=1
+# default:
+CONFIG_SOC_RISCV_TRACE_ECAUSE_WIDTH=6
+# default:
 CONFIG_IDF_CMAKE=y
 # default:
 CONFIG_IDF_TOOLCHAIN="gcc"
@@ -876,7 +898,10 @@ CONFIG_BOOTLOADER_PROJECT_VER=1
 # Application Rollback
 #
 # default:
-# CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE is not set
+CONFIG_BOOTLOADER_APP_ROLLBACK=y
+# default:
+CONFIG_BOOTLOADER_APP_ROLLBACK_CONFIRM_ON_STARTUP=y
+# CONFIG_BOOTLOADER_APP_ROLLBACK_CONFIRM_BY_APP is not set
 # end of Application Rollback
 
 #
@@ -1048,6 +1073,8 @@ CONFIG_ESP_ROM_HAS_SPI_FLASH_MMAP=y
 CONFIG_ESP_ROM_HAS_NEWLIB=y
 # default:
 CONFIG_ESP_ROM_HAS_NEWLIB_NANO_FORMAT=y
+# default:
+CONFIG_ESP_ROM_HAS_LIBGCC=y
 # default:
 CONFIG_ESP_ROM_WDT_INIT_PATCH=y
 # default:
@@ -1367,6 +1394,8 @@ CONFIG_COMPILER_RT_LIB_NAME="gcc"
 # default:
 # CONFIG_COMPILER_LTO_LINKTIME is not set
 # default:
+# CONFIG_COMPILER_USE_LLD is not set
+# default:
 CONFIG_COMPILER_ORPHAN_SECTIONS_ERROR=y
 # default:
 # CONFIG_COMPILER_ORPHAN_SECTIONS_WARNING is not set
@@ -1380,6 +1409,8 @@ CONFIG_COMPILER_CXX_GLIBCXX_CONSTEXPR_NO_CHANGE=y
 # CONFIG_COMPILER_CXX_GLIBCXX_CONSTEXPR_COLD_CONSTEXPR is not set
 # default:
 # CONFIG_COMPILER_CXX_GLIBCXX_CONSTEXPR_COLD is not set
+# default:
+# CONFIG_COMPILER_CXX_ATOMIC_LOCK_POLICY is not set
 # end of Compiler options
 
 #
@@ -1410,7 +1441,7 @@ CONFIG_BT_ALARM_MAX_NUM=50
 # OSAL (OS abstraction layer)
 #
 # default:
-CONFIG_BT_OSAL_USE_ESP_TIMER=y
+# CONFIG_BT_OSAL_ENABLED is not set
 # end of OSAL (OS abstraction layer)
 
 # default:
@@ -1501,9 +1532,23 @@ CONFIG_BT_NIMBLE_SM_SC_ONLY=0
 # default:
 # CONFIG_BT_NIMBLE_NVS_PERSIST is not set
 # default:
+CONFIG_BT_NIMBLE_STORE_OVERFLOW_RR=y
+# default:
+# CONFIG_BT_NIMBLE_STORE_OVERFLOW_LFU is not set
+# default:
 CONFIG_BT_NIMBLE_MAX_BONDS=3
 # default:
 # CONFIG_BT_NIMBLE_HANDLE_REPEAT_PAIRING_DELETION is not set
+# default:
+CONFIG_BT_NIMBLE_SMP_HARDENED_REPAIRING=y
+# default:
+# CONFIG_BT_NIMBLE_SMP_REQUIRE_ENC_BEFORE_REPAIR is not set
+# default:
+CONFIG_BT_NIMBLE_SMP_REMOVE_BOND_ON_PAIR_FAIL_AS_CENTRAL=y
+# default:
+# CONFIG_BT_NIMBLE_SMP_REMOVE_BOND_ON_PAIR_FAIL_AS_PRPH is not set
+# default:
+# CONFIG_BT_NIMBLE_SMP_UNBOND_ON_KEY_MISSING is not set
 # end of Security (SMP)
 
 #
@@ -1782,6 +1827,8 @@ CONFIG_BT_NIMBLE_CPFD_CAFD=y
 CONFIG_BT_NIMBLE_RECONFIG_MTU=y
 # default:
 # CONFIG_BT_NIMBLE_LOW_SPEED_MODE is not set
+# default:
+# CONFIG_BT_NIMBLE_GAP_ALLOW_ADV_RESTART is not set
 # end of Extra Features
 
 #
@@ -2068,6 +2115,26 @@ CONFIG_BT_LE_DFT_CH39_TX_POWER_LEVEL_DBM_EFF=0
 #
 # default:
 # CONFIG_BT_PRF_TASK_ENABLED is not set
+
+#
+# Object Transfer Service (OTS) (EXPERIMENTAL)
+#
+
+#
+# OTS Client
+#
+# end of OTS Client
+
+#
+# OTS Server
+#
+# end of OTS Server
+# end of Object Transfer Service (OTS) (EXPERIMENTAL)
+
+#
+# Electronic Shelf Label (ESL) (EXPERIMENTAL)
+#
+# end of Electronic Shelf Label (ESL) (EXPERIMENTAL)
 # end of BLE Profiles
 # end of Bluetooth
 
@@ -2546,6 +2613,8 @@ CONFIG_ESP32C5_REV_MIN_100=y
 # default:
 # CONFIG_ESP32C5_REV_MIN_102 is not set
 # default:
+# CONFIG_ESP32C5_REV_MIN_103 is not set
+# default:
 CONFIG_ESP32C5_REV_MIN_FULL=100
 # default:
 CONFIG_ESP_REV_MIN_FULL=100
@@ -2761,6 +2830,35 @@ CONFIG_LIBC_ASSERT_BUFFER_SIZE=200
 # end of ESP-MM: Memory Management Configurations
 
 #
+# MSPI Flash configuration
+#
+
+#
+# SPI Flash behavior when brownout
+#
+# default:
+CONFIG_SPI_FLASH_BROWNOUT_RESET_XMC=y
+# default:
+CONFIG_SPI_FLASH_BROWNOUT_RESET=y
+# end of SPI Flash behavior when brownout
+
+#
+# Optional and Experimental MSPI Features (READ DOCS FIRST)
+#
+
+#
+# Features here require specific hardware (READ DOCS FIRST!)
+#
+# default:
+# CONFIG_SPI_FLASH_HPM_ENA is not set
+# default:
+CONFIG_SPI_FLASH_HPM_AUTO=y
+# default:
+# CONFIG_SPI_FLASH_HPM_DIS is not set
+# end of Optional and Experimental MSPI Features (READ DOCS FIRST)
+# end of MSPI Flash configuration
+
+#
 # ESP NETIF Adapter
 #
 # default:
@@ -2914,6 +3012,13 @@ CONFIG_SPIRAM_ALLOW_NOINIT_SEG_EXTERNAL_MEMORY=y
 # default:
 # CONFIG_RINGBUF_PLACE_ISR_FUNCTIONS_INTO_FLASH is not set
 # end of ESP Ringbuf
+
+#
+# RISC-V Trace Encoder Configurations
+#
+# default:
+# CONFIG_ESP_RISCV_TRACE_ENABLE is not set
+# end of RISC-V Trace Encoder Configurations
 
 #
 # ESP-ROM
@@ -3549,6 +3654,10 @@ CONFIG_FATFS_VFS_FSTAT_BLKSIZE=0
 # CONFIG_FATFS_USE_LABEL is not set
 # default:
 CONFIG_FATFS_LINK_LOCK=y
+# default:
+# CONFIG_FATFS_VFS_RENAME_REPLACES_DESTINATION is not set
+# default:
+# CONFIG_FATFS_VFS_RENAME_REJECTS_SELF_NESTING is not set
 # default:
 CONFIG_FATFS_USE_DYN_BUFFERS=y
 
@@ -4632,6 +4741,8 @@ CONFIG_PTHREAD_TASK_NAME_DEFAULT="pthread"
 #
 # default:
 CONFIG_SD_ENABLE_SDIO_SUPPORT=y
+# default:
+CONFIG_SD_READY_POLL_PERIOD_START_US=100
 # end of SD Protocol Layer Configuration
 
 #
@@ -4646,31 +4757,12 @@ CONFIG_MMU_PAGE_SIZE=0x10000
 # end of MMU Config
 
 #
-# Main Flash configuration
-#
-
-#
-# SPI Flash behavior when brownout
-#
-# default:
-CONFIG_SPI_FLASH_BROWNOUT_RESET_XMC=y
-# default:
-CONFIG_SPI_FLASH_BROWNOUT_RESET=y
-# end of SPI Flash behavior when brownout
-
-#
-# Optional and Experimental Features (READ DOCS FIRST)
+# Optional and Experimental SPI Flash Features (READ DOCS FIRST)
 #
 
 #
 # Features here require specific hardware (READ DOCS FIRST!)
 #
-# default:
-# CONFIG_SPI_FLASH_HPM_ENA is not set
-# default:
-CONFIG_SPI_FLASH_HPM_AUTO=y
-# default:
-# CONFIG_SPI_FLASH_HPM_DIS is not set
 # default:
 # CONFIG_SPI_FLASH_AUTO_SUSPEND is not set
 # default:
@@ -4683,8 +4775,7 @@ CONFIG_SPI_FLASH_SUSPEND_TRS_VAL_US=50
 # CONFIG_SPI_FLASH_FORCE_ENABLE_C6_H2_SUSPEND is not set
 # default:
 CONFIG_SPI_FLASH_PLACE_FUNCTIONS_IN_IRAM=y
-# end of Optional and Experimental Features (READ DOCS FIRST)
-# end of Main Flash configuration
+# end of Optional and Experimental SPI Flash Features (READ DOCS FIRST)
 
 #
 # SPI Flash driver
@@ -4962,6 +5053,7 @@ CONFIG_MDNS_PREDEF_NETIF_ETH=y
 # CONFIG_APP_BUILD_TYPE_ELF_RAM is not set
 # CONFIG_NO_BLOBS is not set
 # CONFIG_APP_ROLLBACK_ENABLE is not set
+# CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE is not set
 # CONFIG_BOOTLOADER_COMPILER_OPTIMIZATION_NONE is not set
 # CONFIG_LOG_BOOTLOADER_LEVEL_NONE is not set
 # CONFIG_LOG_BOOTLOADER_LEVEL_ERROR is not set

@@ -6,7 +6,7 @@ import org.jspecify.annotations.Nullable;
 import java.time.OffsetDateTime;
 
 @Entity
-public class Ticket {
+public class Ticket implements ITransportEntitlement {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -51,6 +51,7 @@ public class Ticket {
         return productId;
     }
 
+    @Override
     public Account getHolderAccount() {
         return holderAccount;
     }
@@ -72,16 +73,19 @@ public class Ticket {
         this.payload = payload;
     }
 
+    @Override
     @Nullable
     public OffsetDateTime getValidSince() {
         return validSince;
     }
 
+    @Override
     @Nullable
     public OffsetDateTime getValidUntil() {
         return validUntil;
     }
 
+    @Override
     @Nullable
     public String getValidZones() {
         return validZones;
