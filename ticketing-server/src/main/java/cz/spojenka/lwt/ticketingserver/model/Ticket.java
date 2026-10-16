@@ -1,6 +1,7 @@
 package cz.spojenka.lwt.ticketingserver.model;
 
 import jakarta.persistence.*;
+import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.jspecify.annotations.Nullable;
 
 import java.time.OffsetDateTime;
@@ -101,5 +102,20 @@ public class Ticket implements ITransportEntitlement {
         this.validUntil = this.validSince.plusMinutes(60); //todo - take from product
         this.validZones = validZones;
         this.activationRecord = activationRecord;
+    }
+
+    @Override
+    public String toString() {
+        return new ToStringBuilder(this)
+                .append("id", id)
+                .append("productId", productId)
+                .append("holderAccount", holderAccount.getId())
+                .append("activationToken", activationToken)
+                .append("payload", payload)
+                .append("validSince", validSince)
+                .append("validUntil", validUntil)
+                .append("validZones", validZones)
+                .append("activationRecord", activationRecord)
+                .toString();
     }
 }

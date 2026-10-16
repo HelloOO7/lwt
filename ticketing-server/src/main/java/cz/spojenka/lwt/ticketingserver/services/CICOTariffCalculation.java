@@ -1,22 +1,30 @@
 package cz.spojenka.lwt.ticketingserver.services;
 
 import cz.dpp.praguepublictransport.LitackaUtils;
+import cz.spojenka.datasources.enums.ArrivalOrDeparture;
 import cz.spojenka.datasources.enums.LineIDRegistry;
 import cz.spojenka.datasources.model.timetable.ConnectionEntity;
-import cz.spojenka.datasources.model.timetable.LineEntity;
 import cz.spojenka.datasources.model.timetable.TimetableDatabase;
+import cz.spojenka.datasources.persistentids.ParameterLine;
+import cz.spojenka.datasources.persistentids.PersistentIDService;
 import cz.spojenka.engine.jni.*;
 import cz.spojenka.lwt.ticketingserver.model.*;
 import cz.spojenka.lwt.ticketingserver.model.Ticket;
+import cz.spojenka.lwt.ticketingserver.util.TimetableUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 @Component
 @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
@@ -25,18 +33,21 @@ public class CICOTariffCalculation {
     @Value("${tickets.permitted-tariffs}")
     private List<String> permittedTariffs;
 
-    private final AccountService accountService;
+    @Autowired
+    private AccountService accountService;
 
-    private final TimetableDatabase tt;
-    private final SearchLibrary tcEngine;
+    @Autowired
+    private TimetableDatabase tt;
+    @Autowired
+    private SearchLibrary tcEngine;
 
     private final List<CICOEvent> events;
     private final Account account;
 
-    public CICOTariffCalculation(AccountService accountService, TimetableDatabase tt, SearchLibrary tcEngine, List<CICOEvent> events) {
-        this.accountService = accountService;
-        this.tt = tt;
-        this.tcEngine = tcEngine;
+    @Autowired
+    private PersistentIDService persistentIDs;
+
+    public CICOTariffCalculation(List<CICOEvent> events) {
         this.events = events;
         if (events.isEmpty()) {
             throw new IllegalArgumentException("No events were given");
@@ -50,14 +61,30 @@ public class CICOTariffCalculation {
     }
 
     public Result calculate() {
-        TariffResult tr = engineCalculate(reconstructJourneyFromEvents());
-        List<Ticket> tickets = new ArrayList<>(tr.tickets.length);
-        //for (Ticke)
-        return null;
+        Journey reconstructedJourney = reconstructJourneyFromEvents();
+        TariffResult tr = engineCalculate(reconstructedJourney);
+        List<Ticket> tickets = ticketsFromJni(tr, reconstructedJourney);
+        double price = Arrays.stream(tr.tickets).mapToDouble(t -> t.ticket.price).sum();
+        return new Result(tickets, price);
     }
 
     private Journey reconstructJourneyFromEvents() {
-        return null;
+        // debugging
+        Journey j = new Journey();
+        Trip t = new Trip();
+        ConnectionEntity conn = persistentIDs.getConnectionByPersistentID("L:CISJR:100384,CN:CISJR:1059,SD:2026-10-16,FS:crz:10034,FSI:0,FT:23:10:00,TS:crz:9998,TSI:14,TT:23:52:00");
+        var rs = conn.getRoute().stops();
+        t.connectionId = conn.getID();
+        t.from = new TripStop();
+        t.from.routeIndex = 0;
+        t.from.stopId = rs.at(t.from.routeIndex).getStopPost().getLongLinearID();
+        t.from.time = ZonedDateTime.of(2026, 10, 16, 23, 10, 0, 0, ZoneId.systemDefault());
+        t.to = new TripStop();
+        t.to.routeIndex = conn.stopTimes().count() - 1;
+        t.to.stopId = rs.at(t.to.routeIndex).getStopPost().getLongLinearID();
+        t.to.time = ZonedDateTime.of(2026, 10, 16, 23, 52, 0, 0, ZoneId.systemDefault());
+        j.trips = new Trip[]{t};
+        return j;
     }
 
     private List<Ticket> ticketsFromJni(TariffResult tr, Journey srcJourney) {
@@ -89,18 +116,29 @@ public class CICOTariffCalculation {
         for (Trip trip : journey.trips) {
             conns.add(tt.getConnectionById(trip.connectionId));
         }
-        StringBuilder sb = new StringBuilder();
+        List<String> sectionDescs = new ArrayList<>();
         for (var section : journeyTicket.validAtSections) {
-            if (!sb.isEmpty()) {
-                sb.append(">");
-            }
             for (int ti = section.from.journeyTripIndex; ti <= section.to.journeyTripIndex; ti++) {
+                ConnectionEntity conn = conns.get(ti);
                 int fs = ti == section.from.journeyTripIndex ? section.from.tripRouteIndex : 0;
-                int ts = ti == section.to.journeyTripIndex ? section.to.tripRouteIndex : conns.get(ti).stopTimes().count() - 1;
-                // todo
+                int ts = ti == section.to.journeyTripIndex ? section.to.tripRouteIndex : conn.stopTimes().count() - 1;
+
+                Map<String, String> sectionRec = Map.of(
+                        "CAN", persistentIDs.createPersistentConnectionID(
+                                conn,
+                                TimetableUtils.getStopTimeByStopTime(conn, journey.trips[ti].from, fs, ArrivalOrDeparture.DEPARTURE).toLocalDate(),
+                                fs,
+                                ArrivalOrDeparture.DEPARTURE,
+                                fs,
+                                ts
+                        ),
+                        "BU", ParameterLine.defaultConfig().encodePOJO(TripDescBackup.create(conn, journey.trips[ti].from, fs, ts, permittedTariffs))
+                );
+
+                sectionDescs.add(ParameterLine.withSeparator('|').encode(sectionRec));
             }
         }
-        return sb.toString();
+        return ParameterLine.escapeAndJoin(sectionDescs, '>');
     }
 
     private TariffResult engineCalculate(Journey journey) {
@@ -131,7 +169,7 @@ public class CICOTariffCalculation {
         return passenger;
     }
 
-    public static record Result(List<Ticket> tickets, float totalPrice) {
+    public static record Result(List<Ticket> tickets, double totalPrice) {
 
     }
 }

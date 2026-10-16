@@ -22,8 +22,7 @@ tickets:
     priv: "../pki/Ticket_signing_key_priv.key"
 
 ttz:
-  required-contents:
-    - "TIMETABLES"
+  required-contents: "TIMETABLES"
   working-directory: "data/index"
   bundle-path: "${SPOJENKA_ROOT}/spojenka-datasources/output/export/jizdnirady-bundle.ttz"
   engine:

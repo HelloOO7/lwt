@@ -1,6 +1,8 @@
 package cz.spojenka.lwt.ticketingserver.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
+import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.jspecify.annotations.NonNull;
 
 import java.time.OffsetDateTime;
@@ -16,6 +18,7 @@ public class TicketActivationRecord {
     @NonNull
     private TicketActivationSource activationSource;
     @NonNull
+    @Column(columnDefinition = "text")
     private String activationSourceMetadata;
 
     public TicketActivationRecord(
@@ -48,5 +51,15 @@ public class TicketActivationRecord {
 
     public @NonNull String getActivationSourceMetadata() {
         return activationSourceMetadata;
+    }
+
+    @Override
+    public String toString() {
+        return new ToStringBuilder(this)
+                .append("appId", appId)
+                .append("activationTime", activationTime)
+                .append("activationSource", activationSource)
+                .append("activationSourceMetadata", activationSourceMetadata)
+                .toString();
     }
 }
