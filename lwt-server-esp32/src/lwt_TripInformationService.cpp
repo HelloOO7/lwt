@@ -101,6 +101,20 @@ namespace lwt {
         );
     }
 
+    uint32_t ParseAswRunNumber(const IBIS_IP_string& runNumber)
+    {
+        if (runNumber.Value.empty()) {
+            return 0;
+        }
+
+        auto parts = str_split(runNumber.Value, '_');
+        if (parts.size() != 2) {
+            return 0;
+        }
+
+        return std::stoi(parts[0]) * 1000 + std::stoi(parts[1]);
+    }
+
     auto BuildTripInfo(flatbuffers::FlatBufferBuilder& fbb, const vdv301::SubscriberCIS::AllData& allData, const TripInformationStructure& tripInfo, const StopInformationStructure& curStop) {
         auto displayContent = vdv301::SubscriberCIS::FindDisplayContent("Interior", curStop);
         if (!displayContent) {
@@ -110,7 +124,7 @@ namespace lwt {
 
         return CreateTripInfo(
             fbb,
-            vdv301::SubscriberCIS::IsTripRefPresent(tripInfo) ? std::stoi(tripInfo.TripRef.Value) : 0,
+            vdv301::SubscriberCIS::IsTripRefPresent(tripInfo) ? std::stoi(tripInfo.TripRef.Value) : ParseAswRunNumber(*tripInfo.RunNumber),
             BuildLineInfo(fbb, allData, *displayContent)
         );
     }

@@ -774,7 +774,7 @@
         const isActive = Number(device.connectionId) === Number(state.trackedVehicleId);
         const beaconRadius = Number.isFinite(state.deviceScanRadiusMeters) ? state.deviceScanRadiusMeters : null;
         const details = getVehicleDetails(device);
-        const lineLabel = [details.line || 'Vehicle', `#${device.connectionId}`].filter(Boolean).join(' ');
+        const lineLabel = [details.line || 'Vehicle', `#${device.advData.tripNumber}`].filter(Boolean).join(' ');
 
         const idKey = String(device.connectionId);
         let entry = state.deviceLayerMap[idKey];

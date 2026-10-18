@@ -15,7 +15,10 @@ import cz.spojenka.lwt.cicomock.model.NearbyDevice;
 import org.springframework.stereotype.Service;
 
 import java.nio.ByteBuffer;
+import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -48,7 +51,7 @@ public class AdvDataConverter {
         return (int) calculateRssi(-70, dist, 2.5);
     }
 
-    public TripAdvertisementDataExt makeTripInformation(VehiclePositionResult result) {
+    public TripAdvertisementDataExt makeTripInformation(VehiclePositionResult result, ZonedDateTime queryTime) {
         ConnectionEntity conn = tt.getConnectionById(result.connectionId);
         RouteEntity route = conn.getRoute();
         int lineType = switch (route.getMeansOfTransport()) {
@@ -91,7 +94,7 @@ public class AdvDataConverter {
         LineEntity line = route.getLineAtStop(dataStopIdx);
         boolean isTrain = route.getMeansOfTransport() == TransportMeans.TRAIN;
         int lineLicenseNumber = getLineLicenseNumber(line, isTrain);
-        int tripNumber = getTripNumber(conn);
+        int tripNumber = getTripNumber(conn, getDispatchDayByQueryTime(conn, result.linearPosition, queryTime));
 
         String lineName = line != null ? getLineIDSName(line, String.valueOf(isTrain ? tripNumber : lineLicenseNumber)) : "?";
 
@@ -114,7 +117,18 @@ public class AdvDataConverter {
         );
     }
 
-    public static String getLineName(ConnectionEntity conn, VehicleLinearPosition pos) {
+    private static LocalDate getDispatchDayByQueryTime(ConnectionEntity conn, VehicleLinearPosition pos, ZonedDateTime queryTime) {
+        var st = conn.stopTimeAt(pos.lastStopIndex);
+        LocalTime stArr = st.getEffectiveArrivalTime();
+        ZonedDateTime stArrAbs = queryTime.with(stArr);
+        var diff = Duration.between(stArrAbs, queryTime);
+        if (diff.abs().compareTo(Duration.ofHours(12)) > 0) {
+            stArrAbs = stArrAbs.plusDays(diff.isPositive() ? -1 : 1);
+        }
+        return stArrAbs.toLocalDate().minusDays(st.getEffectiveArrivalOffset());
+    }
+
+    public static String getLineName(ConnectionEntity conn, VehicleLinearPosition pos, ZonedDateTime queryTime) {
         RouteEntity route = conn.getRoute();
         var routeStops = route.stops();
         int curStopIdx = pos.lastStopIndex;
@@ -125,7 +139,7 @@ public class AdvDataConverter {
         boolean isTrain = route.getMeansOfTransport() == TransportMeans.TRAIN;
 
         int lineLicenseNumber = getLineLicenseNumber(line, isTrain);
-        int tripNumber = getTripNumber(conn);
+        int tripNumber = getTripNumber(conn, getDispatchDayByQueryTime(conn, pos, queryTime));
 
         return line != null ? getLineIDSName(line, String.valueOf(isTrain ? tripNumber : lineLicenseNumber)) : "?";
     }
@@ -134,7 +148,7 @@ public class AdvDataConverter {
         return (int) (stop.getKilometers() * 1000);
     }
 
-    private static int getTripNumber(ConnectionEntity conn) {
+    private static int getTripNumber(ConnectionEntity conn, LocalDate dispatchDate) {
         int tripNumber = 0;
         Integer tripCisNum = conn.getConnNumberInt(LineIDRegistry.CIS);
         if (tripCisNum != null) {
@@ -143,9 +157,22 @@ public class AdvDataConverter {
             Integer tripOtn = conn.getConnNumberInt(LineIDRegistry.KADR_OTN);
             if (tripOtn != null) {
                 tripNumber = tripOtn;
+            } else {
+                String runNum = conn.getRunNumber(LineIDRegistry.PID, dispatchDate);
+                if (runNum != null) {
+                    tripNumber = pidRunNumToPackedInt(runNum);
+                }
             }
         }
         return tripNumber;
+    }
+
+    private static int pidRunNumToPackedInt(String runNum) {
+        String[] parts = runNum.split("/");
+        if (parts.length == 2) {
+            return Integer.parseInt(parts[0]) * 1000 + Integer.parseInt(parts[1]);
+        }
+        return 0;
     }
 
     private static int getLineLicenseNumber(LineEntity line, boolean isTrain) {

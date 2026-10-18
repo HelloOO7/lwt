@@ -101,10 +101,10 @@ public class DeviceScanThread extends Thread implements MockState.Observer {
             convResults.add(new NearbyDevice(
                     AdvDataConverter.makeFakeAddressForConnId(searchResult.connectionId),
                     searchResult.connectionId,
-                    AdvDataConverter.getLineName(db.getConnectionById(searchResult.connectionId), searchResult.linearPosition),
+                    AdvDataConverter.getLineName(db.getConnectionById(searchResult.connectionId), searchResult.linearPosition, time),
                     new Location(searchResult.lat, searchResult.lon),
                     searchResult.linearPosition,
-                    advDataConverter.makeTripInformation(searchResult)
+                    advDataConverter.makeTripInformation(searchResult, time)
             ));
         }
 

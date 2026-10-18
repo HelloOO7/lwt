@@ -608,8 +608,9 @@ namespace lwt {
         if (m_HasData) {
             auto tvi = GetValidationInfo();
             if (tvi->trip()) {
-                auto lineNum = tvi->trip()->trip()->line()->global_ref_id();
-                auto tripNum = tvi->trip()->trip()->global_ref_id();
+                auto* trip = tvi->trip()->trip();
+                auto lineNum = trip->line()->global_ref_id();
+                auto tripNum = trip->global_ref_id();
 
                 if (!tripNum) {
                     return std::to_string(lineNum);
