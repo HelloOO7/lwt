@@ -629,6 +629,7 @@
         2: 'before stop',
         3: 'after stop'
       }[locationState] || 'unknown';
+      const lwtMetadataString = device && device.lwtMetadataString ? device.lwtMetadataString : '';
 
       return {
         line,
@@ -637,7 +638,8 @@
         delay,
         stopArr: stopArr ? String(stopArr) : '—',
         stopDep: stopDep ? String(stopDep) : '—',
-        stateLabel
+        stateLabel,
+        lwtMetadataString
       };
     }
 
@@ -655,6 +657,7 @@
           <div><strong>State:</strong> <span data-field="stateLabel">${details.stateLabel}</span></div>
           <div><strong>Arrive:</strong> <span data-field="stopArr">${details.stopArr}</span></div>
           <div><strong>Depart:</strong> <span data-field="stopDep">${details.stopDep}</span></div>
+          <div><strong>LWT metadata:</strong><br><span data-field="lwtMetadataString">${details.lwtMetadataString}</span></div>
           <div style="margin-top: 10px;">
             <button data-connection-id="${device.connectionId}" style="width: 100%; height: 30px;">Board vehicle</button>
           </div>
@@ -1187,12 +1190,12 @@
       if (!device || Number(device.connectionId) !== Number(state.openPopupDeviceId)) return;
       // update only the data fields inside the existing popup to avoid DOM churn/flicker
       const details = getVehicleDetails(device);
-      const fields = ['line','conn','currentStop','headsign','delay','stateLabel','stopArr','stopDep'];
+      const fields = ['line','conn','currentStop','headsign','delay','stateLabel','stopArr','stopDep','lwtMetadataString'];
       fields.forEach(f => {
         const el = els.vehiclePopup.querySelector(`[data-field="${f}"]`);
         if (!el) return;
         const val = details[f];
-        if (val !== undefined && val !== null) {
+        if (val !== undefined && val !== null && String(val) !== el.textContent) {
           el.textContent = String(val);
         }
       });

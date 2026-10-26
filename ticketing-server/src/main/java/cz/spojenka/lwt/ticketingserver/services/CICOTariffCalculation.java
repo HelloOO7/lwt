@@ -17,10 +17,7 @@ import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
+import java.time.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -46,6 +43,8 @@ public class CICOTariffCalculation {
 
     @Autowired
     private PersistentIDService persistentIDs;
+    @Autowired
+    private TripLookupService tripLookup;
 
     public CICOTariffCalculation(List<CICOEvent> events) {
         this.events = events;
@@ -72,7 +71,13 @@ public class CICOTariffCalculation {
         // debugging
         Journey j = new Journey();
         Trip t = new Trip();
-        ConnectionEntity conn = persistentIDs.getConnectionByPersistentID("L:CISJR:100384,CN:CISJR:1059,SD:2026-10-16,FS:crz:10034,FSI:0,FT:23:10:00,TS:crz:9998,TSI:14,TT:23:52:00");
+        LwtTicketMetadata lookupKey = new LwtTicketMetadata();
+        lookupKey.tripKey = "100384/1059";
+        lookupKey.stopCis = 28037;
+        lookupKey.timetableDeparture = LocalTime.of(23, 10);
+        lookupKey.locationStateCode = LwtTicketMetadata.LocationStateCode.AT_STOP;
+        ConnectionEntity conn = tripLookup.lookupByLwtData(lookupKey, OffsetDateTime.of(2026, 10, 26, 23, 10, 0, 0, ZoneOffset.ofHours(2)));
+        //ConnectionEntity conn = persistentIDs.getConnectionByPersistentID("L:CISJR:100384,CN:CISJR:1059,SD:2026-10-16,FS:crz:10034,FSI:0,FT:23:10:00,TS:crz:9998,TSI:14,TT:23:52:00");
         var rs = conn.getRoute().stops();
         t.connectionId = conn.getID();
         t.from = new TripStop();

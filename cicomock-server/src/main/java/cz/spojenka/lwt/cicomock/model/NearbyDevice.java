@@ -9,6 +9,7 @@ public record NearbyDevice(
         String lineName,
         Location location,
         VehicleLinearPosition linearPosition,
-        TripAdvertisementDataExt advData
+        TripAdvertisementDataExt advData,
+        String lwtMetadataString
 ) {
 }
