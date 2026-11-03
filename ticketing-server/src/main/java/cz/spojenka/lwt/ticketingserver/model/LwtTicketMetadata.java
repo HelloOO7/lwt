@@ -20,7 +20,11 @@ public class LwtTicketMetadata {
     public LocationStateCode locationStateCode;
 
     public static LwtTicketMetadata parse(String data) {
-        return ParameterLine.withSeparator('|').decodePOJO(data, LwtTicketMetadata.class);
+        return parse(data, LwtTicketMetadata.class);
+    }
+
+    public static <T extends LwtTicketMetadata> T parse(String data, Class<T> clazz) {
+        return ParameterLine.withSeparator('|').decodePOJO(data, clazz);
     }
 
     public static enum LocationStateCode {

@@ -698,6 +698,9 @@ public class CICOService extends Service {
     private void updateCurrentDevice(LwtDevice device) {
         currentDevice = device;
         currentDeviceLiveData.setValue(currentDevice);
+        if (currentLwtClient != null) {
+            currentLwtClient.notifyDeviceInfoChanged(device);
+        }
         updateServiceState();
     }
 

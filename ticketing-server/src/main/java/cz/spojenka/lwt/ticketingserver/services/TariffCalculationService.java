@@ -1,12 +1,10 @@
 package cz.spojenka.lwt.ticketingserver.services;
 
-import cz.spojenka.lwt.ticketing.api.CICOEventType;
 import cz.spojenka.lwt.ticketingserver.model.CICOEvent;
+import cz.spojenka.lwt.ticketingserver.model.CICORepository;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -14,18 +12,17 @@ import java.util.UUID;
 public class TariffCalculationService {
 
     private final AccountService accountService;
+    private final CICORepository cicoRepository;
     private final ObjectProvider<CICOTariffCalculation> cicoCalcProvider;
 
-    public TariffCalculationService(AccountService accountService, ObjectProvider<CICOTariffCalculation> cicoCalcProvider) {
+    public TariffCalculationService(AccountService accountService, CICORepository cicoRepository, ObjectProvider<CICOTariffCalculation> cicoCalcProvider) {
         this.accountService = accountService;
+        this.cicoRepository = cicoRepository;
         this.cicoCalcProvider = cicoCalcProvider;
     }
 
-    @Transactional
-    public void test() {
-        System.out.println(calculateCICOTariff(List.of(
-                new CICOEvent(UUID.randomUUID(), null, UUID.randomUUID(), accountService.findByIdOrThrow(1), OffsetDateTime.now(), CICOEventType.CHECK_IN, "")
-        )));
+    public CICOTariffCalculation.Result calculateTariffForCICOSession(UUID sessionId) {
+        return calculateCICOTariff(cicoRepository.findAllInSession(sessionId));
     }
 
     public CICOTariffCalculation.Result calculateCICOTariff(List<CICOEvent> events) {

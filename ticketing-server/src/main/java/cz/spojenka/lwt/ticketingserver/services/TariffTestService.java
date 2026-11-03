@@ -15,6 +15,6 @@ public class TariffTestService {
 
     @EventListener(ApplicationReadyEvent.class)
     public void doTest() {
-        parent.test();
+        //parent.test();
     }
 }

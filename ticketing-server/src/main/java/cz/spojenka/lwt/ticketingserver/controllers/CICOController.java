@@ -4,37 +4,38 @@ import cz.spojenka.lwt.ticketing.api.*;
 import cz.spojenka.lwt.ticketingserver.api.AccessDeniedException;
 import cz.spojenka.lwt.ticketingserver.api.NotFoundException;
 import cz.spojenka.lwt.ticketingserver.model.*;
-import cz.spojenka.lwt.ticketingserver.services.AccountService;
-import cz.spojenka.lwt.ticketingserver.services.CICOIngestionService;
-import cz.spojenka.lwt.ticketingserver.services.CertificateAuthService;
+import cz.spojenka.lwt.ticketingserver.services.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.annotation.Secured;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
+@Tag(name = "CICO events and tariff", description = "CICO event ingestion and client tariff calculation API")
 public class CICOController {
 
     private final AccountService accountService;
     private final CICORepository repository;
     private final CICOIngestionService ingestionService;
+    private final TariffCalculationService tariffService;
 
     @Value("${tickets.allow-self-checkout:false}")
     private boolean allowSelfCheckout;
 
-    public CICOController(AccountService accountService, CICORepository repository, CICOIngestionService ingestionService) {
+    public CICOController(AccountService accountService, CICORepository repository, CICOIngestionService ingestionService, TariffCalculationService tariffService) {
         this.accountService = accountService;
         this.repository = repository;
         this.ingestionService = ingestionService;
+        this.tariffService = tariffService;
     }
 
     @PostMapping("/cico/check-in")
@@ -66,13 +67,7 @@ public class CICOController {
         boolean privileged = CertificateAuthService.hasRole(authentication, Privileges.LWT_DEVICE);
         Account account = accountService.getAccountByCicoToken(checkOutRequest.checkInToken());
         if (!privileged) {
-            if (authentication.getPrincipal() instanceof AccountPrincipal loggedAccount) {
-                if (account.getId() != loggedAccount.requireAccount().getId()) {
-                    throw new AccessDeniedException("Attempt to check out wrong account");
-                }
-            } else {
-                throw new AccessDeniedException("Not logged in");
-            }
+            requireAccountMatch(account, authentication);
         }
         CICOEvent lastEvent = repository.findNewestEventInSession(checkOutRequest.sessionId());
         if (lastEvent == null) {
@@ -81,7 +76,21 @@ public class CICOController {
         if (lastEvent.getAccount().getId() != account.getId()) {
             throw new AccessDeniedException("CICO token and session do not match (accounts are different)");
         }
+        if (lastEvent.getEventType() == CICOEventType.BE_OUT || lastEvent.getEventType() == CICOEventType.CHECK_OUT) {
+            // already checked out
+            return;
+        }
         ingestionService.ingestSelfCheckout(account, checkOutRequest.sessionId(), lastEvent);
+    }
+
+    private void requireAccountMatch(Account account, Authentication authentication) {
+        if (authentication.getPrincipal() instanceof AccountPrincipal loggedAccount) {
+            if (account.getId() != loggedAccount.requireAccount().getId()) {
+                throw new AccessDeniedException("Account " + loggedAccount.getId() + " is not authorized to perform operations on behalf of another.");
+            }
+        } else {
+            throw new AccessDeniedException("Not logged in");
+        }
     }
 
     @PostMapping("/cico/events")
@@ -105,5 +114,29 @@ public class CICOController {
             }
         }
         ingestionService.ingestEvents(absoluteEvents);
+    }
+
+    @GetMapping("/cico/evaluate-session")
+    @Operation(
+            summary = "Evaluate a CICO session and calculate tariff",
+            description = "Given a session ID, the server will evaluate it into a journey in its known timetable (if possible) and "
+                    + "calculate an intermediate tariff for it. This should be used by clients to check the current cost of a journey "
+                    + "before clearing. The timeframe where this method can be used is restricted, as after some time, the used trips will no longer "
+                    + "be present in the timetable and, as such, tariff calculation will not be possible. These results are informative only, the final "
+                    + "price will only be known after clearing at the end of day. Caller must be either the account holder for the session or have the "
+                    + "TICKET_ISSUER privilege."
+    )
+    public CICOTariffCalculation.Result evaluateCICOSession(@RequestParam("sessionId") UUID sessionId, Authentication authentication) {
+        List<CICOEvent> events = repository.findAllInSession(sessionId);
+        if (events.isEmpty()) {
+            throw new NotFoundException("Session not found: " + sessionId);
+        }
+
+        boolean privileged = CertificateAuthService.hasRole(authentication, Privileges.TICKET_ISSUER);
+        if (!privileged) {
+            requireAccountMatch(events.getFirst().getAccount(), authentication);
+        }
+
+        return tariffService.calculateCICOTariff(events);
     }
 }

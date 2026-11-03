@@ -6,6 +6,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.OffsetDateTime;
@@ -32,12 +33,17 @@ public class CICOMockDeviceClient implements ICICODeviceClient {
 
     private static final byte[] PRESENCE_TRACKING_OFF_ADDRESS = new byte[6];
 
-    private final LwtDevice device;
+    private LwtDevice device;
     private final LwdnMockClient mockServerClient;
 
     public CICOMockDeviceClient(LwtDevice device, LwdnMockClient mockServerClient) {
         this.device = device;
         this.mockServerClient = mockServerClient;
+    }
+
+    @Override
+    public void notifyDeviceInfoChanged(LwtDevice newDeviceInfo) {
+        this.device = newDeviceInfo;
     }
 
     private <T> T repackFbb(FlatBufferBuilder fbb, Class<T> objType) {
@@ -184,7 +190,8 @@ public class CICOMockDeviceClient implements ICICODeviceClient {
     @Override
     public CompletableFuture<CICOTicketFragment> confirmCheckIn(CheckInIntermediate intermediate, PresenceTrackingClient presenceTrackingClient) {
         // session id is extracted from confirmation token
-        return doTicketRefresh(null, BLEScanRecordUtil.parseUUID128(intermediate.confirmationTokenAsByteBuffer()));
+        // attention: flatbuffer bytebuffers are little endian, so we must flip them to big endian here to ensure consistency with startCheckIn
+        return doTicketRefresh(null, BLEScanRecordUtil.parseUUID128(intermediate.confirmationTokenAsByteBuffer().order(ByteOrder.BIG_ENDIAN)));
     }
 
     private UUID getSessionIdFromTicket(CICOTicketFragment ticket) {

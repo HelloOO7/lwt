@@ -5,9 +5,9 @@ import cz.spojenka.datasources.enums.LineIDRegistry;
 import cz.spojenka.datasources.model.timetable.ConnectionEntity;
 import cz.spojenka.datasources.model.timetable.LineEntity;
 import cz.spojenka.datasources.model.timetable.TimetableDatabase;
-import cz.spojenka.engine.jni.SearchEnums;
 import cz.spojenka.engine.jni.SearchLibrary;
 import cz.spojenka.lwt.ticketingserver.model.LwtTicketMetadata;
+import cz.spojenka.lwt.ticketingserver.util.TripAtDay;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,14 +71,15 @@ public class TripLookupService {
         tripKeyIndex.computeIfAbsent(key, k -> new ArrayList<>()).add(conn);
     }
 
-    public ConnectionEntity lookupByLwtData(LwtTicketMetadata metadata, OffsetDateTime referenceTimepoint) {
+    public Result lookupByLwtData(LwtTicketMetadata metadata, OffsetDateTime referenceTimepoint) {
         List<ConnectionEntity> connsByTk = tripKeyIndex.get(metadata.tripKey);
         if (connsByTk == null) {
             return null;
         }
         for (ConnectionEntity conn : connsByTk) {
-            if (checkConnectionInService(conn, findStopIndexCandidates(conn, metadata), referenceTimepoint)) {
-                return conn;
+            Result res = findConnectionInService(conn, findStopIndexCandidates(conn, metadata), referenceTimepoint);
+            if (res != null) {
+                return res;
             }
         }
         return null;
@@ -112,15 +113,15 @@ public class TripLookupService {
         return false;
     }
 
-    private boolean checkConnectionInService(ConnectionEntity conn, int[] stopIndexes, OffsetDateTime referenceTimepoint) {
+    private Result findConnectionInService(ConnectionEntity conn, int[] stopIndexes, OffsetDateTime referenceTimepoint) {
         var jniConn = jni.getConnection(conn.getID());
         for (int si : stopIndexes) {
             LocalDate dd = getClosestDispatchDayByLocalTime(conn, si, referenceTimepoint);
             if (jniConn.isInService(dd, -1, 0)) {
-                return true;
+                return new Result(new TripAtDay(conn, dd), si);
             }
         }
-        return false;
+        return null;
     }
 
     private static LocalDate getClosestDispatchDayByLocalTime(ConnectionEntity conn, int stopIndex, OffsetDateTime candidateStopArr) {
@@ -132,5 +133,9 @@ public class TripLookupService {
             stArrAbs = stArrAbs.plusDays(diff.isPositive() ? -1 : 1);
         }
         return stArrAbs.toLocalDate().minusDays(st.getEffectiveArrivalOffset());
+    }
+
+    public static record Result(TripAtDay trip, int stopIndex) {
+
     }
 }

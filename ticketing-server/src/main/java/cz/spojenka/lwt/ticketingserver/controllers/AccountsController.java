@@ -5,6 +5,7 @@ import cz.spojenka.lwt.ticketing.api.ClientOAuthConfig;
 import cz.spojenka.lwt.ticketingserver.model.Account;
 import cz.spojenka.lwt.ticketingserver.model.AccountPrincipal;
 import cz.spojenka.lwt.ticketingserver.services.AccountService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
+@Tag(name = "User accounts", description = "User account information and management API")
 public class AccountsController {
 
     @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}")

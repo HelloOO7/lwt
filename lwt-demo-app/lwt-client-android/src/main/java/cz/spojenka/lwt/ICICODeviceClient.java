@@ -8,6 +8,10 @@ public interface ICICODeviceClient extends AutoCloseable {
     public CompletableFuture<CICOTicketFragment> confirmCheckIn(CheckInIntermediate intermediate, PresenceTrackingClient presenceTrackingClient);
     public CompletableFuture<CICOTicketFragment> refreshTicket(CICOTicketFragment lastTicket, PresenceTrackingClient presenceTrackingClient);
     public CompletableFuture<CheckOutResponse> checkOut(CICOTicketFragment currentTicket);
+
+    public default void notifyDeviceInfoChanged(LwtDevice newDeviceInfo) {
+
+    }
     @Override
     public void close();
 }

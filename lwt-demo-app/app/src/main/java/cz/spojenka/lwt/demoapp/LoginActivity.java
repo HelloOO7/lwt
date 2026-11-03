@@ -181,7 +181,7 @@ public class LoginActivity extends BaseActivity {
             if (authConfig == null || authConfig.isCompletedExceptionally()) {
                 authConfig = new CompletableFuture<>();
             }
-            if (!authConfig.isDone() && clientConfigIsNew) {
+            if (!authConfig.isDone() || clientConfigIsNew) {
                 clientConfig.thenAccept(clientOAuthConfig -> {
                     AuthorizationServiceConfiguration.fetchFromIssuer(Uri.parse(clientOAuthConfig.issuerUri()), new AuthorizationServiceConfiguration.RetrieveConfigurationCallback() {
                         @Override

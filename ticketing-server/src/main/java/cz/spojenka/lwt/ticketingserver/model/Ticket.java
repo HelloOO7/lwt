@@ -1,5 +1,6 @@
 package cz.spojenka.lwt.ticketingserver.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.jspecify.annotations.Nullable;
@@ -53,8 +54,13 @@ public class Ticket implements ITransportEntitlement {
     }
 
     @Override
+    @JsonIgnore
     public Account getHolderAccount() {
         return holderAccount;
+    }
+
+    public long getHolderAccountId() {
+        return holderAccount.getId();
     }
 
     @Nullable
