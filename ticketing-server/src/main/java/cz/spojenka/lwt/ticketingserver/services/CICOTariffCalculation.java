@@ -33,6 +33,8 @@ import org.springframework.stereotype.Component;
 
 import java.time.*;
 import java.util.*;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 @Component
 @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
@@ -81,12 +83,11 @@ public class CICOTariffCalculation {
     private Journey reconstructJourneyFromEvents() {
         List<CICOEvent> sortedEvents = sortEventsTopologically(events);
         List<TripEventCollection> tripEvents = splitEventsByTrips(sortedEvents);
-        for (TripEventCollection ec : tripEvents) {
-            cleanUpTripEvents(ec, tripEvents);
-        }
+        cleanUpAllTripEvents(tripEvents);
+        trimAllOverlappingTrips(tripEvents);
         tripEvents = tripEvents
                 .stream()
-                .filter(ec -> !ec.events.isEmpty())
+                .filter(Predicate.not(TripEventCollection::isEmpty))
                 .sorted(Comparator.comparing(TripEventCollection::getFirstEventTime))
                 .toList();
 
@@ -95,18 +96,58 @@ public class CICOTariffCalculation {
         return j;
     }
 
-    private void cleanUpTripEvents(TripEventCollection ec, List<TripEventCollection> allCollections) {
+    private void cleanUpAllTripEvents(List<TripEventCollection> tripEventCollections) {
+        for (TripEventCollection ec : tripEventCollections) {
+            cleanUpTripEvents(ec);
+        }
+    }
+
+    private void cleanUpTripEvents(TripEventCollection ec) {
+        fixBeoutsOutsideComponent(ec);
         removeObsoleteBeouts(ec);
         removeSingletons(ec);
-        trimOverlappingTrips(ec, allCollections);
-        removeSingletons(ec);
+    }
+
+    private void trimAllOverlappingTrips(List<TripEventCollection> tripEventCollections) {
+        for (TripEventCollection ec : tripEventCollections) {
+            trimOverlappingTrips(ec, tripEventCollections);
+            removeSingletons(ec);
+        }
+    }
+
+    private void fixBeoutsOutsideComponent(TripEventCollection ec) {
+        // be-out events from CICOmock location tracking always follow the last tracked event, which may be from another vehicle.
+        // if we encounter those, we will override them to be sorted by time. this is safe as the time is always monotonic in mock
+        // scenarios, and this "error" would not happen in a real environment.
+        Set<CICOEvent> knownEvents = ec.events().stream().map(TripEvent::event).collect(Collectors.toSet());
+        List<TripEvent> toResort = new ArrayList<>();
+        for (TripEvent e : ec.events()) {
+            if (e.event().getEventType() == CICOEventType.BE_OUT) {
+                if (!knownEvents.contains(e.event().getPredecessor())) {
+                    toResort.add(e);
+                }
+            }
+        }
+        ec.events().removeAll(toResort);
+        for (TripEvent e : toResort) {
+            ec.events().add(findFirstNewerEventIndex(ec.events(), e), e);
+        }
+    }
+
+    private int findFirstNewerEventIndex(List<TripEvent> events, TripEvent e) {
+        for (int i = 0; i < events.size(); i++) {
+            if (events.get(i).event().getEventTime().isAfter(e.event().getEventTime())) {
+                return i;
+            }
+        }
+        return events.size();
     }
 
     private void removeObsoleteBeouts(TripEventCollection ec) {
         Set<TripEvent> toRemove = new HashSet<>();
         // all be-out events that are not the last event in the sequence are superseded and should
         // be ignored
-        for (int i = ec.events().size() - 1; i >= 0; i--) {
+        for (int i = ec.events().size() - 2; i >= 0; i--) {
             TripEvent e = ec.events().get(i);
             if (e.event().getEventType() == CICOEventType.BE_OUT) {
                 toRemove.add(e);
@@ -116,16 +157,22 @@ public class CICOTariffCalculation {
     }
 
     private void trimOverlappingTrips(TripEventCollection ec, List<TripEventCollection> allCollections) {
+        if (ec.isEmpty()) {
+            return;
+        }
         for (TripEventCollection other : allCollections) {
-            if (other.isFirstTimeAfter(ec)) {
-                OffsetDateTime firstTime = other.getFirstEventTime();
-                ec.events().removeIf(e -> e.event().getEventTime().isAfter(firstTime));
+            if (other.isEmpty()) {
+                continue;
+            }
+            OffsetDateTime otherNonBoFirst = other.getFirstNonBeOutEventTime();
+            if (otherNonBoFirst != null && otherNonBoFirst.isAfter(ec.getFirstEventTime())) {
+                ec.events().removeIf(e -> e.event().getEventTime().isAfter(otherNonBoFirst));
             }
         }
     }
 
     private void removeSingletons(TripEventCollection ec) {
-        if (!ec.events().isEmpty() && isSingletonTrip(ec)) {
+        if (!ec.isEmpty() && isSingletonTrip(ec)) {
             ec.events().clear();
         }
     }
@@ -141,9 +188,17 @@ public class CICOTariffCalculation {
         return true;
     }
 
+    private LwtTicketMetadata.LocationStateCode getAdjustedLocationState(TripEvent event) {
+        LwtTicketMetadata.LocationStateCode ls = event.lwtInfo().locationStateCode;
+        if (ls == LwtTicketMetadata.LocationStateCode.BETWEEN_STOPS && event.event().getEventType() == CICOEventType.BE_OUT) {
+            ls = LwtTicketMetadata.LocationStateCode.AFTER_STOP;
+        }
+        return ls;
+    }
+
     private int getClosestStopIndex(TripEvent event) {
         int i = event.trip().stopIndex();
-        if (i > 0 && event.lwtInfo().locationStateCode == LwtTicketMetadata.LocationStateCode.AFTER_STOP) {
+        if (i > 0 && getAdjustedLocationState(event) == LwtTicketMetadata.LocationStateCode.AFTER_STOP) {
             i--;
         }
         return i;
@@ -296,31 +351,6 @@ public class CICOTariffCalculation {
         return Math.abs(prevStopIdx - nextStopIdx) > 1 && Duration.between(prev.event().getEventTime(), next.event().getEventTime()).toMinutes() > 10;
     }
 
-    private Journey debugRreconstructJourneyFromEvents() {
-        // debugging
-        Journey j = new Journey();
-        Trip t = new Trip();
-        LwtTicketMetadata lookupKey = new LwtTicketMetadata();
-        lookupKey.tripKey = "100384/1059";
-        lookupKey.stopCis = 28037;
-        lookupKey.timetableDeparture = LocalTime.of(23, 10);
-        lookupKey.locationStateCode = LwtTicketMetadata.LocationStateCode.AT_STOP;
-        ConnectionEntity conn = tripLookup.lookupByLwtData(lookupKey, OffsetDateTime.of(2026, 10, 26, 23, 10, 0, 0, ZoneOffset.ofHours(2))).trip().conn();
-        //ConnectionEntity conn = persistentIDs.getConnectionByPersistentID("L:CISJR:100384,CN:CISJR:1059,SD:2026-10-16,FS:crz:10034,FSI:0,FT:23:10:00,TS:crz:9998,TSI:14,TT:23:52:00");
-        var rs = conn.getRoute().stops();
-        t.connectionId = conn.getID();
-        t.from = new TripStop();
-        t.from.routeIndex = 0;
-        t.from.stopId = rs.at(t.from.routeIndex).getStopPost().getLongLinearID();
-        t.from.time = ZonedDateTime.of(2026, 10, 16, 23, 10, 0, 0, ZoneId.systemDefault());
-        t.to = new TripStop();
-        t.to.routeIndex = conn.stopTimes().count() - 1;
-        t.to.stopId = rs.at(t.to.routeIndex).getStopPost().getLongLinearID();
-        t.to.time = ZonedDateTime.of(2026, 10, 16, 23, 52, 0, 0, ZoneId.systemDefault());
-        j.trips = new Trip[]{t};
-        return j;
-    }
-
     private List<Ticket> ticketsFromJni(TariffResult tr, Journey srcJourney) {
         return Arrays.stream(tr.tickets)
                 .map(tik -> ticketFromJni(tik, srcJourney))
@@ -418,15 +448,21 @@ public class CICOTariffCalculation {
 
     private static record TripEventCollection(TripAtDay trip, List<TripEvent> events) {
 
+        public boolean isEmpty() {
+            return events().isEmpty();
+        }
+
         public OffsetDateTime getFirstEventTime() {
             return events().getFirst().event().getEventTime();
         }
 
-        public boolean isFirstTimeAfter(TripEventCollection other) {
-            if (events.isEmpty() || other.events().isEmpty()) {
-                return false;
+        public OffsetDateTime getFirstNonBeOutEventTime() {
+            for (TripEvent e : events()) {
+                if (e.event().getEventType() != CICOEventType.BE_OUT) {
+                    return e.event().getEventTime();
+                }
             }
-            return getFirstEventTime().isAfter(other.getFirstEventTime());
+            return null;
         }
     }
 
