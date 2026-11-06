@@ -270,8 +270,8 @@ public class CICOTariffCalculation {
         List<TripEventCollection> result = new ArrayList<>();
         List<TripEvent> currentCollection = new ArrayList<>();
 
-        for (int i = 1; i < events.events().size(); i++) {
-            if (shouldSplitBetweenEvents(events.events().get(i - 1), events.events().get(i))) {
+        for (int i = 0; i < events.events().size(); i++) {
+            if (i == 0 || shouldSplitBetweenEvents(events.events().get(i - 1), events.events().get(i))) {
                 if (!currentCollection.isEmpty()) {
                     result.add(new TripEventCollection(events.trip(), currentCollection));
                     currentCollection = new ArrayList<>();
@@ -280,9 +280,8 @@ public class CICOTariffCalculation {
             currentCollection.add(events.events().get(i));
         }
 
-        if (!currentCollection.isEmpty()) {
-            result.add(new TripEventCollection(events.trip(), currentCollection));
-        }
+        // will never be empty
+        result.add(new TripEventCollection(events.trip(), currentCollection));
 
         return result;
     }
