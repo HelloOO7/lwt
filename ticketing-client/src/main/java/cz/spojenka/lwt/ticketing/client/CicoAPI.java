@@ -1,13 +1,14 @@
 package cz.spojenka.lwt.ticketing.client;
 
-import cz.spojenka.lwt.ticketing.api.CICOEventBatch;
-import cz.spojenka.lwt.ticketing.api.CheckInRequest;
-import cz.spojenka.lwt.ticketing.api.CheckInResponse;
-import cz.spojenka.lwt.ticketing.api.CheckOutRequest;
+import cz.spojenka.lwt.ticketing.api.*;
 import okhttp3.ResponseBody;
 import retrofit2.Call;
 import retrofit2.http.Body;
+import retrofit2.http.GET;
 import retrofit2.http.POST;
+import retrofit2.http.Query;
+
+import java.util.UUID;
 
 public interface CicoAPI {
 
@@ -19,4 +20,7 @@ public interface CicoAPI {
 
     @POST("/cico/events")
     public Call<ResponseBody> pushEvents(@Body CICOEventBatch events);
+
+    @GET("/cico/evaluate-session")
+    public Call<CICOClearedFare> evaluateSession(@Query("sessionId") UUID sessionId);
 }

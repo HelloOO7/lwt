@@ -187,10 +187,26 @@
     <string name="beout_notice_not_supported">This device does not support automatic check-out. Make sure to check out as you leave your final vehicle, otherwise you may be charged a fare to the next stop.</string>
     <string name="check_out_header">Are we there yet?</string>
     <string name="error_cico_no_account">In order to use CI/CO ticketing, you must be logged in and have a valid payment method bound to your account.</string>
-    <string name="login_retry">Try again</string>
+    <string name="error_btn_retry">Try again</string>
     <string name="login_state_oidc">Downloading configuration</string>
     <string name="login_state_user_auth">Starting login flow</string>
     <string name="login_state_get_tokens">Obtaining credentials</string>
     <string name="login_state_get_account">Loading account information</string>
     <string name="login_state_done">Done</string>
+    <string name="cico_history_title">Past travels</string>
+    <string name="cico_history_active_header">Active</string>
+    <string name="cico_history_cleared_header">History</string>
+    <string name="cico_history_check_in_label">"Check-in: "</string>
+    <string name="cico_history_check_out_label">"Newest check-out: "</string>
+    <string name="cico_history_check_in_label_without">No check-in</string>
+    <string name="cico_history_check_out_label_without">Not yet checked out</string>
+    <string name="check_in_open_fare_history">Fare history</string>
+    <string name="cico_history_clearing_explanation">Active sessions are billed at the end of the day. After clearing, the history tab will show your final fare including the route that your were billed for.</string>
+    <string name="cico_fare_summary_title">Fare summary</string>
+    <string name="cico_fare_summary_price_label">Billed total:</string>
+    <string name="czk_format">CZK %1$s</string>
+    <string name="cico_fare_summary_ticket_desc">Ticket valid in %1$s %2$s.</string>
+    <string name="cico_fare_summary_line_name_format">Line %1$s</string>
+    <string name="cico_fare_summary_line_name_trip_num_format">Line %1$s/%2$s</string>
+    <string name="cico_fare_summary_trip_num_format">Trip %1$s</string>
 </resources>

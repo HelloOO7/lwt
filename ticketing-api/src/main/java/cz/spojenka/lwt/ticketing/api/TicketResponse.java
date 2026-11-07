@@ -1,5 +1,6 @@
 package cz.spojenka.lwt.ticketing.api;
 
+import java.io.Serializable;
 import java.time.OffsetDateTime;
 
 public record TicketResponse(
@@ -13,5 +14,5 @@ public record TicketResponse(
     OffsetDateTime activationTime,
     String activationAppId,
     TicketPayloadResponse payload
-) {
+) implements Serializable {
 }

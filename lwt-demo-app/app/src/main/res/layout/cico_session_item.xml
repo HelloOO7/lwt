@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:foreground="?android:selectableItemBackground">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="@dimen/section_margin_normal">
+
+        <TextView
+            android:id="@+id/tvSessionTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:textSize="@dimen/text_title_s"
+            android:textAppearance="@style/TextAppearance.MaterialComponents.Subtitle1"
+            android:layout_marginEnd="@dimen/item_margin_normal"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toTopOf="@id/titleDivider"
+            app:layout_constraintEnd_toStartOf="@+id/ivChevron"
+            app:layout_constraintStart_toStartOf="parent"
+            tools:text="7. listopadu 2026" />
+
+        <com.google.android.material.divider.MaterialDivider
+            android:id="@+id/titleDivider"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:textSize="@dimen/text_title_xs"
+            android:layout_marginVertical="@dimen/item_margin_normal"
+            app:layout_constraintTop_toBottomOf="@id/tvSessionTitle"
+            app:layout_constraintBottom_toTopOf="@id/tvCheckInLabel"
+            app:layout_constraintStart_toStartOf="@id/tvSessionTitle"
+            app:layout_constraintEnd_toEndOf="@id/tvSessionTitle" />
+
+        <ImageView
+            android:id="@+id/ivCheckInIcon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="@+id/tvCheckInLabel"
+            app:layout_constraintBottom_toBottomOf="@+id/tvCheckInLabel"
+            app:srcCompat="@drawable/ic_flag_24px" />
+
+        <TextView
+            android:id="@+id/tvCheckInLabel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="@dimen/item_margin_normal"
+            android:gravity="center_vertical"
+            app:layout_constraintTop_toBottomOf="@id/titleDivider"
+            app:layout_constraintBottom_toTopOf="@id/tvCheckOutLabel"
+            app:layout_constraintEnd_toStartOf="@+id/ivChevron"
+            app:layout_constraintStart_toEndOf="@+id/ivCheckInIcon"
+            tools:text="Check-in: Beroun, sídliště" />
+
+        <ImageView
+            android:id="@+id/ivCheckOutIcon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:layout_constraintStart_toStartOf="@id/ivCheckInIcon"
+            app:layout_constraintBottom_toBottomOf="@+id/tvCheckOutLabel"
+            app:layout_constraintTop_toTopOf="@+id/tvCheckOutLabel"
+            app:srcCompat="@drawable/ic_finish_flag_24px" />
+
+        <TextView
+            android:id="@+id/tvCheckOutLabel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="@dimen/item_margin_normal"
+            android:gravity="center_vertical"
+            app:layout_constraintEnd_toStartOf="@+id/ivChevron"
+            app:layout_constraintStart_toEndOf="@+id/ivCheckOutIcon"
+            app:layout_constraintTop_toBottomOf="@id/tvCheckInLabel"
+            app:layout_constraintBottom_toBottomOf="parent"
+            tools:text="Zatím bez check-outu" />
+
+        <ImageView
+            android:id="@+id/ivChevron"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:srcCompat="@drawable/ic_chevron_right_24px"
+            app:tint="?attr/colorPrimary" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</androidx.cardview.widget.CardView>

@@ -1,4 +1,6 @@
 package cz.spojenka.lwt.ticketing.api;
 
-public record TicketPayloadResponse(byte[] etd, byte[] derivedTotpSeed) {
+import java.io.Serializable;
+
+public record TicketPayloadResponse(byte[] etd, byte[] derivedTotpSeed) implements Serializable {
 }

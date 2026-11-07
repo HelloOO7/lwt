@@ -186,10 +186,26 @@
     <string name="beout_notice_not_supported">Vaše zařízení nepodporuje automatický check-out. Při výstupu z posledního spoje je doporučeno ukončit jízdu ručně, jinak je možné, že vám bude účtováno jízdné i do další zastávky.</string>
     <string name="check_out_header">Už tam budeme?</string>
     <string name="error_cico_no_account">Chcete-li používat funkci flexibilního odbavení, musíte být přihlášeni a mít k účtu připojenu platební metodu.</string>
-    <string name="login_retry">Zkusit znovu</string>
+    <string name="error_btn_retry">Zkusit znovu</string>
     <string name="login_state_user_auth">Otevírání přihlašovacího rozhraní</string>
     <string name="login_state_get_tokens">Navazuji přihlášení</string>
     <string name="login_state_get_account">Načítání uživatelských údajů</string>
     <string name="login_state_done">Hotovo</string>
     <string name="login_state_oidc">Stahování konfigurace</string>
+    <string name="cico_history_title">Vaše jízdy</string>
+    <string name="cico_history_active_header">Otevřené</string>
+    <string name="cico_history_cleared_header">Historie</string>
+    <string name="cico_history_check_in_label">"Zahájena v: "</string>
+    <string name="cico_history_check_out_label">"Nejnovější check-out v: "</string>
+    <string name="cico_history_check_in_label_without">Nezahájena</string>
+    <string name="cico_history_check_out_label_without">Zatím bez check-outu</string>
+    <string name="check_in_open_fare_history">Historie</string>
+    <string name="cico_history_clearing_explanation">Jízdy zůstávají otevřené do konce dne, kdy jsou vyúčtovány dohromady. V historii se poté zobrazí konečná cena včetně zaúčtované trasy.</string>
+    <string name="cico_fare_summary_title">Souhrn jízdy</string>
+    <string name="cico_fare_summary_price_label">Celková cena:</string>
+    <string name="czk_format">%1$s Kč</string>
+    <string name="cico_fare_summary_ticket_desc">Jízdenka platná v %1$s %2$s.</string>
+    <string name="cico_fare_summary_line_name_format">Linka %1$s</string>
+    <string name="cico_fare_summary_line_name_trip_num_format">Linka %1$s/%2$s</string>
+    <string name="cico_fare_summary_trip_num_format">Spoj %1$s</string>
 </resources>

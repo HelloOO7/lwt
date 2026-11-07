@@ -1,13 +1,14 @@
 package cz.spojenka.lwt.ticketingserver.controllers;
 
-import cz.spojenka.lwt.ticketing.api.AccountResponse;
-import cz.spojenka.lwt.ticketing.api.ClientOAuthConfig;
-import cz.spojenka.lwt.ticketingserver.model.Account;
-import cz.spojenka.lwt.ticketingserver.model.AccountPrincipal;
+import cz.spojenka.lwt.ticketing.api.*;
+import cz.spojenka.lwt.ticketingserver.model.*;
 import cz.spojenka.lwt.ticketingserver.services.AccountService;
+import cz.spojenka.lwt.ticketingserver.services.CICOFacade;
+import cz.spojenka.lwt.ticketingserver.services.CICOSessionService;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PagedModel;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,9 +25,13 @@ public class AccountsController {
     private String oidcIssuerUri;
 
     private final AccountService accountService;
+    private final CICOSessionService cicoSessionService;
+    private final CICOFacade cicoFacade;
 
-    public AccountsController(AccountService accountService) {
+    public AccountsController(AccountService accountService, CICOSessionService cicoSessionService, CICOFacade cicoFacade) {
         this.accountService = accountService;
+        this.cicoSessionService = cicoSessionService;
+        this.cicoFacade = cicoFacade;
     }
 
     @GetMapping("/accounts/oauth-config")
@@ -62,7 +67,28 @@ public class AccountsController {
         return createAccountResponse(principal.withAccount(accountService.resetCicoToken(principal.requireAccount())));
     }
 
+    @GetMapping("/accounts/me/cico-sessions")
+    public PagedModel<CICOSessionInfo> getCicoSessions(
+            @RequestParam(value = "includeCleared", required = false) boolean includeCleared,
+            @AuthenticationPrincipal AccountPrincipal principal,
+            Pageable pageable
+    ) {
+        return new PagedModel<>(
+                cicoSessionService
+                        .getSessionsForAccount(principal.requireAccount(), includeCleared, pageable)
+                        .map(cicoFacade::exportSessionInfo)
+        );
+    }
+
     private AccountResponse createAccountResponse(AccountPrincipal account) {
         return new AccountResponse(account.requireAccount().getId(), account.getClaimAsString("email"), account.requireAccount().getCicoToken());
+    }
+
+    @GetMapping("/accounts/me/cico-fare-history")
+    public PagedModel<CICOClearedFare> getCicoFareHistory(@AuthenticationPrincipal AccountPrincipal principal, Pageable pageable) {
+        return new PagedModel<>(
+                cicoSessionService.getClearingsForAccount(principal.requireAccount(), pageable)
+                        .map(clearing -> cicoFacade.exportClearedFare(clearing, cicoSessionService.findSessionIDsInClearing(clearing)))
+        );
     }
 }

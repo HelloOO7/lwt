@@ -151,6 +151,8 @@ public class CheckInActivity extends CICOActivityBase {
                     .show();
         });
 
+        binding.btnOpenFareHistory.setOnClickListener(v -> startActivity(new Intent(this, CICOFareHistoryActivity.class)));
+
         return ViewUtils.wrapInScrollView(binding.getRoot());
     }
 

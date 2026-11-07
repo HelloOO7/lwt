@@ -9,6 +9,7 @@ import cz.spojenka.lwt.ticketingserver.model.*;
 import cz.spojenka.lwt.ticketingserver.services.AccountService;
 import cz.spojenka.lwt.ticketingserver.services.CertificateAuthService;
 import cz.spojenka.lwt.ticketingserver.services.TicketActivationService;
+import cz.spojenka.lwt.ticketingserver.services.TicketFacade;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,11 +30,13 @@ public class TicketsController {
     private final TicketRepository repository;
     private final TicketActivationService activationService;
     private final AccountService accountService;
+    private final TicketFacade facade;
 
-    public TicketsController(TicketRepository repository, TicketActivationService activationService, AccountService accountService) {
+    public TicketsController(TicketRepository repository, TicketActivationService activationService, AccountService accountService, TicketFacade facade) {
         this.repository = repository;
         this.activationService = activationService;
         this.accountService = accountService;
+        this.facade = facade;
     }
 
     @PostMapping("/tickets/new")
@@ -47,7 +50,7 @@ public class TicketsController {
         Ticket ticket = new Ticket(productId, accountService.findByIdOrThrow(holderAccountId));
         activationService.generateActivationToken(ticket, 0);
         ticket = repository.save(ticket);
-        return createTicketResponse(ticket, true, true);
+        return facade.exportTicket(ticket, true, true);
     }
 
     @GetMapping("/tickets/{id}")
@@ -72,7 +75,7 @@ public class TicketsController {
         } else {
             canShowPayloads = true;
         }
-        return createTicketResponse(ticket, privileged, canShowPayloads);
+        return facade.exportTicket(ticket, privileged, canShowPayloads);
     }
 
     private Ticket getTicketOrThrow(long id) {
@@ -96,7 +99,7 @@ public class TicketsController {
                         if (appId != null) {
                             canShowPayloads = Objects.equals(appId, ticket.getActivationRecord() != null ? ticket.getActivationRecord().getAppId() : null);
                         }
-                        return createTicketResponse(ticket, false, canShowPayloads);
+                        return facade.exportTicket(ticket, false, canShowPayloads);
                     })
                     .toList();
         }
@@ -116,7 +119,7 @@ public class TicketsController {
                 throw new AccessDeniedException("Unprivileged caller attempted to activate a ticket that isn't theirs!");
             }
         }
-        return createTicketResponse(activateTicketImpl(
+        return facade.exportTicket(activateTicketImpl(
                 ticket,
                 params,
                 isPrivileged,
@@ -130,30 +133,5 @@ public class TicketsController {
         }
         ticket = activationService.activateTicket(ticket, params, isPrivileged, source);
         return ticket;
-    }
-
-    private TicketResponse createTicketResponse(Ticket ticket, boolean privileged, boolean canShowPayloads) {
-        return new TicketResponse(
-                ticket.getId(),
-                ticket.getProductId(),
-                ticket.getHolderAccount() != null ? ticket.getHolderAccount().getId() : 0,
-                ticket.getValidSince(),
-                ticket.getValidUntil(),
-                ticket.getValidZones(),
-                ticket.getActivationToken() != null && (privileged || ticket.getPayload() == null) ? ticket.getActivationToken().getActivationToken() : null,
-                ticket.getActivationRecord() != null ? ticket.getActivationRecord().getActivationTime() : null,
-                ticket.getActivationRecord() != null && privileged ? ticket.getActivationRecord().getAppId() : null,
-                canShowPayloads ? createTicketPayloadResponse(ticket.getPayload()) : null
-        );
-    }
-
-    private TicketPayloadResponse createTicketPayloadResponse(TicketPayload payload) {
-        if (payload == null) {
-            return null;
-        }
-        return new TicketPayloadResponse(
-                payload.getEtd(),
-                payload.getDerivedTotpSeed()
-        );
     }
 }

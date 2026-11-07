@@ -72,6 +72,17 @@ public class CICOTariffCalculation {
         }
     }
 
+    public boolean canCalculate() {
+        for (CICOEvent event : events) {
+            LwtCICOTicketMetadata lwtInfo = getEventLwtMetadata(event);
+            TripLookupService.Result trip = tripLookup.lookupByLwtData(lwtInfo, event.getEventTime());
+            if (trip == null) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public Result calculate() {
         Journey reconstructedJourney = reconstructJourneyFromEvents();
         TariffResult tr = engineCalculate(reconstructedJourney);
@@ -255,7 +266,7 @@ public class CICOTariffCalculation {
         }
 
         ObjectIntMap<CICOEvent> componentPositions = new ObjectIntHashMap<>();
-        for (List<CICOEvent > componentEvents : componentTopologicalOrdering) {
+        for (List<CICOEvent> componentEvents : componentTopologicalOrdering) {
             for (int j = 0; j < componentEvents.size(); j++) {
                 componentPositions.put(componentEvents.get(j), j);
             }
@@ -291,16 +302,20 @@ public class CICOTariffCalculation {
         return sortedVertices;
     }
 
+    private LwtCICOTicketMetadata getEventLwtMetadata(CICOEvent event) {
+        LwtCICOTicketMetadata lwtInfo = LwtCICOTicketMetadata.parse(event.getLwtMetadata());
+        if (event.getEventType() == CICOEventType.CHECK_OUT && lwtInfo.checkOutType == LwtCICOTicketMetadata.CheckOutType.SELF) {
+            lwtInfo = LwtCICOTicketMetadata.parse(Objects.requireNonNull(event.getPredecessor()).getLwtMetadata());
+        }
+        return lwtInfo;
+    }
+
     private List<TripEventCollection> splitEventsByTrips(List<CICOEvent> events) {
         Map<TripAtDay, List<TripEvent>> eventsByTrip = new HashMap<>();
 
         for (CICOEvent event : events) {
-            LwtCICOTicketMetadata lwtInfo = LwtCICOTicketMetadata.parse(event.getLwtMetadata());
-            LwtCICOTicketMetadata lwtInfoForTrip = lwtInfo;
-            if (event.getEventType() == CICOEventType.CHECK_OUT && lwtInfo.checkOutType == LwtCICOTicketMetadata.CheckOutType.SELF) {
-                lwtInfoForTrip = LwtCICOTicketMetadata.parse(Objects.requireNonNull(event.getPredecessor()).getLwtMetadata());
-            }
-            TripLookupService.Result trip = tripLookup.lookupByLwtData(lwtInfoForTrip, event.getEventTime());
+            LwtCICOTicketMetadata lwtInfo = getEventLwtMetadata(event);
+            TripLookupService.Result trip = tripLookup.lookupByLwtData(lwtInfo, event.getEventTime());
             if (trip == null) {
                 throw new IllegalArgumentException("Tariff calculation is no longer possible - trip for event " + event.getLwtMetadata() + " can not be found in the timetable!");
             }
@@ -372,6 +387,8 @@ public class CICOTariffCalculation {
                     )
             );
         }
+        ticket.setValidSince(jniTicket.validFrom.toOffsetDateTime());
+        ticket.setValidUntil(jniTicket.validTo.toOffsetDateTime());
         return ticket;
     }
 
@@ -380,29 +397,27 @@ public class CICOTariffCalculation {
         for (Trip trip : journey.trips) {
             conns.add(tt.getConnectionById(trip.connectionId));
         }
-        List<String> sectionDescs = new ArrayList<>();
+        List<TravelRecordString> sectionDescs = new ArrayList<>();
         for (var section : journeyTicket.validAtSections) {
             for (int ti = section.from.journeyTripIndex; ti <= section.to.journeyTripIndex; ti++) {
                 ConnectionEntity conn = conns.get(ti);
                 int fs = ti == section.from.journeyTripIndex ? section.from.tripRouteIndex : 0;
                 int ts = ti == section.to.journeyTripIndex ? section.to.tripRouteIndex : conn.stopTimes().count() - 1;
 
-                Map<String, String> sectionRec = Map.of(
-                        "CAN", persistentIDs.createPersistentConnectionID(
-                                conn,
-                                TimetableUtils.getStopTimeByStopTime(conn, journey.trips[ti].from, fs, ArrivalOrDeparture.DEPARTURE).toLocalDate(),
-                                fs,
-                                ArrivalOrDeparture.DEPARTURE,
-                                fs,
-                                ts
-                        ),
-                        "BU", ParameterLine.defaultConfig().encodePOJO(TripDescBackup.create(conn, journey.trips[ti].from, fs, ts, permittedTariffs))
+                String canonicalId = persistentIDs.createPersistentConnectionID(
+                        conn,
+                        TimetableUtils.getStopTimeByStopTime(conn, journey.trips[ti].from, fs, ArrivalOrDeparture.DEPARTURE).toLocalDate(),
+                        fs,
+                        ArrivalOrDeparture.DEPARTURE,
+                        fs,
+                        ts
                 );
+                String backupString = TripDescBackup.create(conn, journey.trips[ti].from, fs, ts, permittedTariffs).encode();
 
-                sectionDescs.add(ParameterLine.withSeparator('|').encode(sectionRec));
+                sectionDescs.add(new TravelRecordString(canonicalId, backupString));
             }
         }
-        return ParameterLine.escapeAndJoin(sectionDescs, '>');
+        return TravelRecordString.joinMultiple(sectionDescs);
     }
 
     private TariffResult engineCalculate(Journey journey) {

@@ -33,6 +33,9 @@ public class CICOEvent {
     private CICOEventType eventType;
     private String lwtMetadata;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    private CICOClearingRecord clearedBy;
+
     CICOEvent() {
 
     }
@@ -74,5 +77,17 @@ public class CICOEvent {
 
     public String getLwtMetadata() {
         return lwtMetadata;
+    }
+
+    public void clear(CICOClearingRecord clearingRecord) {
+        this.clearedBy = clearingRecord;
+    }
+
+    public void undoClearing() {
+        this.clearedBy = null;
+    }
+
+    public CICOClearingRecord getClearedBy() {
+        return clearedBy;
     }
 }

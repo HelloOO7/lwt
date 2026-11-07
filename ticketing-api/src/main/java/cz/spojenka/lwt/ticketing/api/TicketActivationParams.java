@@ -1,6 +1,7 @@
 package cz.spojenka.lwt.ticketing.api;
 import jakarta.validation.constraints.NotNull;
 
+import java.io.Serializable;
 import java.time.OffsetDateTime;
 
 public record TicketActivationParams(
@@ -10,5 +11,5 @@ public record TicketActivationParams(
         String zones,
         @NotNull String appId,
         String activationSourceMetadata
-) {
+) implements Serializable {
 }

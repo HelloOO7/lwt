@@ -1,4 +1,6 @@
 package cz.spojenka.lwt.ticketing.api;
 
-public record CheckInRequest(byte[] checkInToken) {
+import java.io.Serializable;
+
+public record CheckInRequest(byte[] checkInToken) implements Serializable {
 }

@@ -31,4 +31,6 @@
     <dimen name="ticket_qr_min_width">250dp</dimen>
     <dimen name="check_in_huge_margin">60dp</dimen>
     <dimen name="device_list_vertical_padding">6dp</dimen>
+    <dimen name="load_more_height">80dp</dimen>
+    <dimen name="journey_item_route_width">20dp</dimen>
 </resources>

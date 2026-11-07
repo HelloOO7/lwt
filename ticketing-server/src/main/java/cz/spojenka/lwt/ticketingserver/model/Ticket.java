@@ -3,6 +3,7 @@ package cz.spojenka.lwt.ticketingserver.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.time.OffsetDateTime;
@@ -35,6 +36,9 @@ public class Ticket implements ITransportEntitlement {
     @Nullable
     @Embedded
     public TicketActivationRecord activationRecord;
+
+    @NonNull
+    private TicketState state = TicketState.ISSUED;
 
     Ticket() {
 
@@ -86,10 +90,18 @@ public class Ticket implements ITransportEntitlement {
         return validSince;
     }
 
+    public void setValidSince(@Nullable OffsetDateTime validSince) {
+        this.validSince = validSince;
+    }
+
     @Override
     @Nullable
     public OffsetDateTime getValidUntil() {
         return validUntil;
+    }
+
+    public void setValidUntil(@Nullable OffsetDateTime validUntil) {
+        this.validUntil = validUntil;
     }
 
     @Override
@@ -103,11 +115,23 @@ public class Ticket implements ITransportEntitlement {
         return activationRecord;
     }
 
+    public @NonNull TicketState getState() {
+        return state;
+    }
+
     public void activate(OffsetDateTime validSince, String validZones, TicketActivationRecord activationRecord) {
         this.validSince = validSince;
         this.validUntil = this.validSince.plusMinutes(60); //todo - take from product
         this.validZones = validZones;
         this.activationRecord = activationRecord;
+    }
+
+    public boolean canBeCancelledByUser() {
+        return state == TicketState.ISSUED;
+    }
+
+    public void cancel() {
+        this.state = TicketState.CANCELLED;
     }
 
     @Override

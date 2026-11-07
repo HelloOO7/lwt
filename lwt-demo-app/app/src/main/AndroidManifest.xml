@@ -59,6 +59,8 @@
         <activity android:name=".CICOTicketDisplayActivity" android:exported="false" android:theme="@style/Theme.LWTDemo.EdgeToEdge.QRContrast" />
         <activity android:name=".RssiTrackerActivity" android:exported="false" />
         <activity android:name=".LoginActivity" android:exported="true" android:launchMode="singleTop" />
+        <activity android:name=".CICOFareHistoryActivity" android:exported="false" />
+        <activity android:name=".CICOFareSummaryActivity" android:exported="false" />
 
         <service
             android:name=".BleScanService"

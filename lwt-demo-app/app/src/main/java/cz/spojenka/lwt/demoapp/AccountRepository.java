@@ -39,7 +39,9 @@ public class AccountRepository {
 
     private AuthorizationService authService;
     private AuthState authState;
+    private String lastSerializedAuthState;
     private AccountResponse accountData;
+    private CompletableFuture<String> tokenRefresh;
 
     public AccountRepository(Context context) {
         context = context.getApplicationContext();
@@ -80,12 +82,17 @@ public class AccountRepository {
         saveAuthState();
     }
 
+    public boolean isLoggedIn() {
+        return getAuthState() != null && getAuthState().isAuthorized();
+    }
+
     public AuthState getAuthState() {
         if (authState == null) {
             String json = prefs.getString(PK_AUTH_STATE, null);
             if (json != null) {
                 try {
                     authState = AuthState.jsonDeserialize(json);
+                    lastSerializedAuthState = json;
                 } catch (JSONException e) {
                     Log.e(TAG, "Error parsing auth state", e);
                 }
@@ -96,7 +103,11 @@ public class AccountRepository {
 
     private void saveAuthState() {
         if (authState != null) {
-            prefs.edit().putString(PK_AUTH_STATE, authState.jsonSerializeString()).apply();
+            String serialized = authState.jsonSerializeString();
+            if (!Objects.equals(lastSerializedAuthState, serialized)) {
+                prefs.edit().putString(PK_AUTH_STATE, serialized).apply();
+                lastSerializedAuthState = serialized;
+            }
         } else {
             prefs.edit().remove(PK_AUTH_STATE).apply();
         }
@@ -118,37 +129,50 @@ public class AccountRepository {
         return new TicketingAuthenticator() {
             @Override
             public String getAccessToken() throws IOException {
-                AuthState authState = getAuthState();
-                if (authState != null) {
-                    String lastToken = authState.getAccessToken();
-                    CompletableFuture<String> future = new CompletableFuture<>();
-                    authState.performActionWithFreshTokens(authService, new AuthState.AuthStateAction() {
-                        @Override
-                        public void execute(@Nullable String accessToken, @Nullable String idToken, @Nullable AuthorizationException ex) {
-                            if (ex == null) {
-                                future.complete(accessToken);
-                                if (Objects.equals(lastToken, accessToken)) {
-                                    saveAuthState();
+                CompletableFuture<String> future;
+                synchronized (AccountRepository.this) {
+                    AuthState currentAuthState = getAuthState();
+                    if (currentAuthState == null) {
+                        return null;
+                    }
+
+                    // Refresh tokens may be rotated by the server. Share one refresh
+                    // operation so concurrent requests cannot race condition and reuse the old token.
+                    if (tokenRefresh == null) {
+                        CompletableFuture<String> refresh = new CompletableFuture<>();
+                        tokenRefresh = refresh;
+                        future = refresh;
+                        currentAuthState.performActionWithFreshTokens(authService, new AuthState.AuthStateAction() {
+                            @Override
+                            public void execute(@Nullable String accessToken, @Nullable String idToken, @Nullable AuthorizationException ex) {
+                                synchronized (AccountRepository.this) {
+                                    if (ex == null) {
+                                        saveAuthState();
+                                        refresh.complete(accessToken);
+                                    } else {
+                                        setAuthState(null);
+                                        refresh.completeExceptionally(ex);
+                                    }
+                                    tokenRefresh = null;
                                 }
-                            } else {
-                                future.completeExceptionally(ex);
-                                setAuthState(null);
                             }
-                        }
-                    });
-                    try {
-                        return future.join();
-                    } catch (CompletionException ex) {
-                        if (ex.getCause() instanceof IOException ioe) {
-                            throw ioe;
-                        } else if (ex.getCause() instanceof AuthorizationException auth) {
-                            throw new IOException("Authorization error", auth);
-                        } else {
-                            throw ex;
-                        }
+                        });
+                    } else {
+                        future = tokenRefresh;
                     }
                 }
-                return null;
+
+                try {
+                    return future.join();
+                } catch (CompletionException ex) {
+                    if (ex.getCause() instanceof IOException ioe) {
+                        throw ioe;
+                    } else if (ex.getCause() instanceof AuthorizationException auth) {
+                        throw new IOException("Authorization error", auth);
+                    } else {
+                        throw ex;
+                    }
+                }
             }
         };
     }

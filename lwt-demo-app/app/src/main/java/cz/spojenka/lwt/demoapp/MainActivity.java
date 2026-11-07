@@ -105,7 +105,7 @@ public class MainActivity extends BaseActivity {
 
         Log.d(TAG, "Client key present: " + GlobalTrustManager.isClientKeyPresent());
 
-        startActivity(new Intent(this, LoginActivity.class));
+        //startActivity(new Intent(this, LoginActivity.class));
     }
 
     private void testNanDatapath() {

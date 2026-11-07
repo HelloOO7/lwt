@@ -1,12 +1,15 @@
 package cz.spojenka.lwt.ticketingserver.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import cz.dpp.praguepublictransport.LitackaUtils;
 import cz.spojenka.datasources.enums.ArrivalOrDeparture;
 import cz.spojenka.datasources.enums.IDSID;
 import cz.spojenka.datasources.enums.LineIDRegistry;
 import cz.spojenka.datasources.model.timetable.ConnectionEntity;
 import cz.spojenka.datasources.model.timetable.LineEntity;
+import cz.spojenka.datasources.persistentids.ParameterLine;
 import cz.spojenka.engine.jni.Trip;
 import cz.spojenka.engine.jni.TripStop;
 import cz.spojenka.lwt.ticketingserver.util.TimetableUtils;
@@ -33,6 +36,10 @@ public class TripDescBackup {
     public String fromStopName;
     @JsonProperty("TSN")
     public String toStopName;
+    @JsonProperty("FZ")
+    public String fromStopZone;
+    @JsonProperty("TZ")
+    public String toStopZone;
     @JsonProperty("ST")
     public ZonedDateTime startTime;
     @JsonProperty("ET")
@@ -74,8 +81,42 @@ public class TripDescBackup {
         }
         res.fromStopName = TimetableUtils.getConnStopName(conn, fromStop);
         res.toStopName = TimetableUtils.getConnStopName(conn, toStop);
+        res.fromStopZone = formatStopZones(TimetableUtils.getConnStopZones(conn, fromStop, tariffPreference));
+        res.toStopZone = formatStopZones(TimetableUtils.getConnStopZones(conn, toStop, tariffPreference));
         res.startTime = TimetableUtils.getStopTimeByStopTime(conn, refDepStop, fromStop, ArrivalOrDeparture.DEPARTURE);
         res.endTime = TimetableUtils.getStopTimeByStopTime(conn, refDepStop, toStop, ArrivalOrDeparture.ARRIVAL);
         return res;
+    }
+
+    private static String formatStopZones(List<String> stopZones) {
+        if (stopZones == null || stopZones.isEmpty()) {
+            return null;
+        }
+        return LitackaUtils.createCommaSeparatedList(stopZones);
+    }
+
+    private static List<String> parseStopZones(String stopZones) {
+        if (stopZones == null || stopZones.isEmpty()) {
+            return List.of();
+        }
+        return LitackaUtils.parseCommaSeparatedList(stopZones);
+    }
+
+    public String encode() {
+        return ParameterLine.defaultConfig().encodePOJO(this);
+    }
+
+    @JsonIgnore
+    public List<String> getParsedFromStopZones() {
+        return parseStopZones(fromStopZone);
+    }
+
+    @JsonIgnore
+    public List<String> getParsedToStopZones() {
+        return parseStopZones(toStopZone);
+    }
+
+    public static TripDescBackup parse(String encoded) {
+        return ParameterLine.defaultConfig().decodePOJO(encoded, TripDescBackup.class);
     }
 }

@@ -20,5 +20,14 @@ tickets:
   issuer: "DPP"
   activation-protection: 60
   max-validity-backlog: "P3D" # DPP 3 day prague ticket
-  allow-self-checkout: true
   permitted-tariffs: "PID"
+  cico:
+    allow-self-checkout: true
+    # only sessions that have been inactive for 30 minutes are allowed to be cleared without a check-out
+    # clearing still runs during the night, so in rare cases where this affects anyone, it would split their
+    # fare in two.
+    allow-timeout-clearing-after: "PT30M"
+    # sessions spanning longer than 24 hours will have old events cleared, even if there was some activity that
+    # would meet the threshold above. this is to prevent abuse by continuously extending a session and never
+    # actually clearing it and paying.
+    force-session-clearing-after: "P1D"

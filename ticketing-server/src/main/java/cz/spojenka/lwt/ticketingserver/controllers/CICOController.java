@@ -14,6 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,16 +27,20 @@ public class CICOController {
     private final AccountService accountService;
     private final CICORepository repository;
     private final CICOIngestionService ingestionService;
+    private final CICOSessionService sessionService;
     private final TariffCalculationService tariffService;
+    private final CICOFacade facade;
 
-    @Value("${tickets.allow-self-checkout:false}")
+    @Value("${tickets.cico.allow-self-checkout:false}")
     private boolean allowSelfCheckout;
 
-    public CICOController(AccountService accountService, CICORepository repository, CICOIngestionService ingestionService, TariffCalculationService tariffService) {
+    public CICOController(AccountService accountService, CICORepository repository, CICOIngestionService ingestionService, CICOSessionService sessionService, TariffCalculationService tariffService, CICOFacade facade) {
         this.accountService = accountService;
         this.repository = repository;
         this.ingestionService = ingestionService;
+        this.sessionService = sessionService;
         this.tariffService = tariffService;
+        this.facade = facade;
     }
 
     @PostMapping("/cico/check-in")
@@ -126,17 +131,52 @@ public class CICOController {
                     + "price will only be known after clearing at the end of day. Caller must be either the account holder for the session or have the "
                     + "TICKET_ISSUER privilege."
     )
-    public CICOTariffCalculation.Result evaluateCICOSession(@RequestParam("sessionId") UUID sessionId, Authentication authentication) {
+    public CICOClearedFare evaluateCICOSession(@RequestParam("sessionId") UUID sessionId, Authentication authentication) {
         List<CICOEvent> events = repository.findAllInSession(sessionId);
         if (events.isEmpty()) {
             throw new NotFoundException("Session not found: " + sessionId);
         }
 
         boolean privileged = CertificateAuthService.hasRole(authentication, Privileges.TICKET_ISSUER);
+        Account sessionAccount = events.getFirst().getAccount();
         if (!privileged) {
-            requireAccountMatch(events.getFirst().getAccount(), authentication);
+            requireAccountMatch(sessionAccount, authentication);
         }
 
-        return tariffService.calculateCICOTariff(events);
+        var fare = tariffService.calculateCICOTariff(events);
+
+        return facade.exportClearedFare(new CICOClearingRecord(sessionAccount, OffsetDateTime.now(), fare.tickets(), fare.totalPrice()), List.of(sessionId));
+    }
+
+    // this is a GET only for debugging purposes because firefox does not send mTLS certificate in POST requests
+    // from dev tools
+    @GetMapping("/cico/run-clearing")
+    @Operation(
+            summary = "Run clearing of CICO sessions",
+            description = "This endpoint can be used by a privileged ticket issuer to run clearing of CICO sessions " +
+                    "for one or all accounts.",
+            security = {@SecurityRequirement(name = "certificate", scopes = {Privileges.TICKET_ISSUER})}
+    )
+    @Secured(Privileges.TICKET_ISSUER)
+    public ClearingStats runClearing(@RequestParam(value = "accountId", required = false) Long accountId) {
+        if (accountId != null) {
+            return sessionService.runClearingForAccount(accountService.findByIdOrThrow(accountId));
+        } else {
+            return sessionService.runGlobalClearing();
+        }
+    }
+
+    @DeleteMapping("/cico/undo-clearing")
+    @Operation(
+            summary = "Undo a specific clearing operation",
+            description = "This endpoint can be used by a privileged ticket issuer to undo a specific clearing operation, " +
+                    "which will mark all events cleared by the specified clearing record as uncleared and cancel any issued tickets. " +
+                    "This operation can only be performed while the timetable is new enough that the cleared tariff can be calculated again. " +
+                    "If this condition is not met, the operation will fail with an error. Caller must have the TICKET_ISSUER privilege.",
+            security = {@SecurityRequirement(name = "certificate", scopes = {Privileges.TICKET_ISSUER})}
+    )
+    @Secured(Privileges.TICKET_ISSUER)
+    public void undoClearing(@RequestParam("clearingId") long clearingId) {
+        sessionService.undoClearing(sessionService.findClearingByIdOrThrow(clearingId));
     }
 }

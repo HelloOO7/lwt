@@ -25,6 +25,13 @@ public class TariffCalculationService {
         return calculateCICOTariff(cicoRepository.findAllInSession(sessionId));
     }
 
+    public boolean canCalculateCICOTariff(List<CICOEvent> events) {
+        if (events.isEmpty()) {
+            return false;
+        }
+        return cicoCalcProvider.getObject(events).canCalculate();
+    }
+
     public CICOTariffCalculation.Result calculateCICOTariff(List<CICOEvent> events) {
         return cicoCalcProvider.getObject(events).calculate();
     }

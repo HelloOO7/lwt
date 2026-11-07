@@ -1,6 +1,7 @@
 package cz.spojenka.lwt.demoapp;
 
 import android.app.Application;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -20,11 +21,11 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContract;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.browser.customtabs.CustomTabsIntent;
-import androidx.core.content.res.ResourcesCompat;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
@@ -36,7 +37,6 @@ import cz.spojenka.lwt.ticketing.api.AccountResponse;
 import cz.spojenka.lwt.ticketing.api.ClientOAuthConfig;
 import cz.spojenka.lwt.ticketing.client.AccountsAPI;
 import cz.spojenka.lwt.ticketing.client.TicketingAuthenticator;
-import cz.spojenka.lwt.ticketing.client.TicketingClient;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.HttpException;
@@ -44,7 +44,21 @@ import retrofit2.Response;
 
 public class LoginActivity extends BaseActivity {
 
+    public static final ActivityResultContract<Void, Void> LOG_IN = new ActivityResultContract<Void, Void>() {
+        @NonNull
+        @Override
+        public Intent createIntent(@NonNull Context context, Void unused) {
+            return new Intent(context, LoginActivity.class);
+        }
+
+        @Override
+        public Void parseResult(int i, @Nullable Intent intent) {
+            return null;
+        }
+    };
+
     private ActivityLoginBinding binding;
+    private ErrorAndRetryScreen errorScreen;
 
     private AuthorizationService authService;
     private ViewModel viewModel;
@@ -56,7 +70,8 @@ public class LoginActivity extends BaseActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         binding = ActivityLoginBinding.inflate(getLayoutInflater());
-        setContentView(binding.getRoot());
+        errorScreen = new ErrorAndRetryScreen(this, binding.getRoot());
+        setContentView(errorScreen.getRoot());
         authService = AccountRepository.getInstance(this).getAuthService();
         viewModel = new ViewModelProvider(this).get(ViewModel.class);
         customTabsIntent = authService.createCustomTabsIntentBuilder().build();
@@ -71,9 +86,7 @@ public class LoginActivity extends BaseActivity {
         viewModel.getLoadingState().observe(this, loading -> {
             boolean loadingVisible = loading != LoadingState.ERROR;
             binding.pbLoginProgress.setVisibility(loadingVisible ? View.VISIBLE : View.GONE);
-            if (loadingVisible) {
-                updateTextByLoginState();
-            }
+            updateTextByLoginState();
             if (loading == LoadingState.USER_AUTH) {
                 callOidc();
             } else if (loading == LoadingState.ALL_DONE) {
@@ -81,22 +94,15 @@ public class LoginActivity extends BaseActivity {
             }
         });
 
+        errorScreen.bindErrorSignal(this, viewModel.getErrorSignal(), viewModel::retryLogin);
+
         viewModel.getErrorSignal().observe(this, err -> {
             if (err != null) {
-                binding.tvLoginState.setText(err.getMessage());
-                binding.btnRetryLogin.setVisibility(View.VISIBLE);
-                binding.ivLoginErrorIcon.setVisibility(View.VISIBLE);
+                errorScreen.showError(err);
             } else {
-                binding.btnRetryLogin.setVisibility(View.GONE);
-                binding.ivLoginErrorIcon.setVisibility(View.GONE);
                 updateTextByLoginState();
             }
         }, true);
-
-        binding.btnRetryLogin.setOnClickListener(v -> {
-            viewModel.getErrorSignal().ack();
-            viewModel.retryLogin();
-        });
     }
 
     private void updateTextByLoginState() {
@@ -131,9 +137,7 @@ public class LoginActivity extends BaseActivity {
         public ViewModel(@NonNull Application application) {
             super(application);
             accountRepository = AccountRepository.getInstance(getApplication());
-            accountsAPI = new TicketingClient(
-                    BuildConfig.TICKETING_SERVER_URL,
-                    GlobalTrustManager.createMosNetworkClient(application),
+            accountsAPI = TicketingRepository.getInstance(application).createTicketingClient(
                     new TicketingAuthenticator() {
 
                         private final TicketingAuthenticator baseAuth = accountRepository.createAuthenticator();
