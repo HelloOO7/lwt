@@ -85,9 +85,13 @@ public class AccountsController {
     }
 
     @GetMapping("/accounts/me/cico-fare-history")
-    public PagedModel<CICOClearedFare> getCicoFareHistory(@AuthenticationPrincipal AccountPrincipal principal, Pageable pageable) {
+    public PagedModel<CICOClearedFare> getCicoFareHistory(
+            @RequestParam(value = "includeCancelled", required = false) boolean includeCancelled,
+            @AuthenticationPrincipal AccountPrincipal principal,
+            Pageable pageable
+    ) {
         return new PagedModel<>(
-                cicoSessionService.getClearingsForAccount(principal.requireAccount(), pageable)
+                cicoSessionService.getClearingsForAccount(principal.requireAccount(), includeCancelled, pageable)
                         .map(clearing -> cicoFacade.exportClearedFare(clearing, cicoSessionService.findSessionIDsInClearing(clearing)))
         );
     }

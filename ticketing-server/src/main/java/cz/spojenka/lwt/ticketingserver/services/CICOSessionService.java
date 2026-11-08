@@ -41,8 +41,8 @@ public class CICOSessionService {
         return cicoRepository.findUnclearedSessionsByAccountId(account.getId());
     }
 
-    public Page<CICOClearingRecord> getClearingsForAccount(Account account, Pageable pageable) {
-        return clearingRepository.findByAccountId(account.getId(), pageable);
+    public Page<CICOClearingRecord> getClearingsForAccount(Account account, boolean includeCancelled, Pageable pageable) {
+        return clearingRepository.findByAccountId(account.getId(), includeCancelled, pageable);
     }
 
     public CICOClearingRecord findClearingByIdOrThrow(long clearingId) {

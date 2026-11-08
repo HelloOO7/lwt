@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<cz.spojenka.android.ui.helpers.CoordinatorLayoutFix xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvTicketList"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:paddingHorizontal="@dimen/activity_horizontal_margin"
+            android:paddingBottom="@dimen/fab_top_offset"
+            app:paddingWindowInsets="horizontal" />
+
+        <cz.spojenka.android.ui.view.NoResultsPlaceholder
+            android:id="@+id/noResults"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:text="@string/ticketing_home_no_tickets" />
+
+    </FrameLayout>
+
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        android:id="@+id/fabBuyTicket"
+        style="@style/Widget.MaterialComponents.ExtendedFloatingActionButton"
+        android:layout_width="wrap_content"
+        android:layout_height="@dimen/fab_height"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="@dimen/activity_horizontal_margin"
+        android:layout_marginBottom="@dimen/fab_bottom_offset"
+        android:text="@string/ticketing_home_buy_ticket"
+        app:icon="@drawable/ic_shopping_cart_24px"
+        app:marginWindowInsets="horizontal" />
+</cz.spojenka.android.ui.helpers.CoordinatorLayoutFix>

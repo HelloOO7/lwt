@@ -384,8 +384,11 @@ namespace lwt {
         else {
             m_CISCanUseTicketing = false;
             m_IsInLastStop = false;
+            m_NextTariffZonesFromRoute.clear();
             if (!m_TVS) {
                 m_TimeForTicketValidityStart = 0;
+                m_TariffZonesForValidation.clear();
+                m_NextTariffZonesForValidation.clear();
             }
         }
 
@@ -507,15 +510,18 @@ namespace lwt {
         if (tsi.IsNull()) {
             ESP_LOGW(TAG, "TripStateInfo is null, cannot update ticket validation info");
         }
-        if (m_TimeForTicketValidityStart == 0) {
-            ESP_LOGW(TAG, "Time for ticket validity start not set, cannot update ticket validation info");
-        }
 
-        if (tsi.IsNull() || m_TimeForTicketValidityStart == 0) {
+        if (tsi.IsNull()) {
             return;
         }
 
-        LwtLocalDateTime validityStart(m_TimeForTicketValidityStart);
+        auto validityStartTs = m_TimeForTicketValidityStart;
+        if (validityStartTs <= 0) {
+            // negative values are interpreted as null in lwt
+            validityStartTs = -1;
+        }
+
+        LwtLocalDateTime validityStart(validityStartTs);
 
         FinishValidationInfo(CreateTicketValidationInfo(
             m_ValidationInfoFBB,

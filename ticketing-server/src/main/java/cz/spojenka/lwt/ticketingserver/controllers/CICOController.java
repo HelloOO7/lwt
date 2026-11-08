@@ -166,7 +166,8 @@ public class CICOController {
         }
     }
 
-    @DeleteMapping("/cico/undo-clearing")
+    // dtto
+    @GetMapping("/cico/undo-clearing")
     @Operation(
             summary = "Undo a specific clearing operation",
             description = "This endpoint can be used by a privileged ticket issuer to undo a specific clearing operation, " +

@@ -17,12 +17,28 @@
             android:layout_height="wrap_content"
             android:textSize="@dimen/text_title_s"
             android:textAppearance="@style/TextAppearance.MaterialComponents.Subtitle1"
-            android:layout_marginEnd="@dimen/item_margin_normal"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toTopOf="@id/titleDivider"
-            app:layout_constraintEnd_toStartOf="@+id/ivChevron"
+            app:layout_constraintEnd_toStartOf="@+id/tvFareTotal"
             app:layout_constraintStart_toStartOf="parent"
             tools:text="7. listopadu 2026" />
+
+        <TextView
+            android:id="@+id/tvFareTotal"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="@style/TextAppearance.MaterialComponents.Subtitle2"
+            android:textSize="@dimen/text_title_s"
+            android:visibility="gone"
+            app:drawableStartCompat="@drawable/ic_toll_24px"
+            android:drawablePadding="@dimen/item_margin_small"
+            tools:visibility="visible"
+            android:layout_marginStart="@dimen/item_margin_normal"
+            app:layout_constraintBottom_toBottomOf="@+id/tvSessionTitle"
+            app:layout_constraintEnd_toEndOf="@+id/titleDivider"
+            app:layout_constraintStart_toEndOf="@id/tvSessionTitle"
+            app:layout_constraintTop_toTopOf="@+id/tvSessionTitle"
+            tools:text="84 CZK" />
 
         <com.google.android.material.divider.MaterialDivider
             android:id="@+id/titleDivider"
@@ -31,10 +47,11 @@
             android:gravity="center_vertical"
             android:textSize="@dimen/text_title_xs"
             android:layout_marginVertical="@dimen/item_margin_normal"
+            android:layout_marginEnd="@dimen/item_margin_normal"
             app:layout_constraintTop_toBottomOf="@id/tvSessionTitle"
             app:layout_constraintBottom_toTopOf="@id/tvCheckInLabel"
-            app:layout_constraintStart_toStartOf="@id/tvSessionTitle"
-            app:layout_constraintEnd_toEndOf="@id/tvSessionTitle" />
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/ivChevron" />
 
         <ImageView
             android:id="@+id/ivCheckInIcon"

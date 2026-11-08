@@ -70,28 +70,15 @@
         android:id="@+id/confirmCheckin"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="@dimen/check_in_huge_margin"
+        android:layout_margin="@dimen/check_in_huge_margin"
         android:layout_marginBottom="@dimen/item_margin_normal"
-        app:layout_constraintBottom_toTopOf="@id/btnOpenFareHistory"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintWidth_min="wrap"
-        app:marginWindowInsets="horizontal"
+        app:marginWindowInsets="horizontal|bottom"
         app:text="@string/check_in_confirm"
         app:text_appearance="@style/TextAppearance.LWTDemo.SlideToAct"
         app:complete_icon="@drawable/ic_inprogress_animated" />
-
-    <Button
-        android:id="@+id/btnOpenFareHistory"
-        style="@style/Widget.MaterialComponents.Button.TextButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="@dimen/activity_vertical_margin"
-        app:marginWindowInsets="horizontal|bottom"
-        android:text="@string/check_in_open_fare_history"
-        app:icon="@drawable/ic_history_24px"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

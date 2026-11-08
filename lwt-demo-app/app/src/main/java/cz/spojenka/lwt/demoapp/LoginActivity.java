@@ -17,6 +17,8 @@ import net.openid.appauth.ResponseTypeValues;
 import net.openid.appauth.TokenResponse;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
@@ -234,7 +236,9 @@ public class LoginActivity extends BaseActivity {
                     ResponseTypeValues.CODE,
                     Uri.parse("lwtapp://oauth/callback")
             );
-            builder.setScopes(clientConfig.join().requiredScopes());
+            List<String> scopes = new ArrayList<>(clientConfig.join().requiredScopes());
+            scopes.add("offline_access"); // longer expiration for mobile app
+            builder.setScopes(scopes);
             return builder.build();
         }
 

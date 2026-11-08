@@ -80,21 +80,7 @@ public class MainActivity extends BaseActivity {
 
         binding.btnRunTicketInspection.setOnClickListener(v -> startActivity(new Intent(this, TicketInspectionHomeActivity.class)));
 
-        binding.btnOpenCico.setOnClickListener(v -> {
-            byte[] cicoToken = null;
-            var acc = AccountRepository.getInstance(this).getAccountData();
-            if (acc != null) {
-                cicoToken = acc.cicoToken();
-            }
-            if (cicoToken == null) {
-                startActivity(new Intent(this, LoginActivity.class));
-            } else {
-                startActivity(
-                        new Intent(this, CheckInActivity.class)
-                                .putExtra(CheckInActivity.EXTRA_CICO_TOKEN, cicoToken)
-                );
-            }
-        });
+        binding.btnOpenCico.setOnClickListener(v -> startActivity(new Intent(this, TicketingHomeActivity.class)));
 
         binding.btnTrackRssi.setOnClickListener(v -> startActivity(new Intent(this, RssiTrackerActivity.class)));
 

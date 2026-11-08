@@ -150,7 +150,9 @@ public class AccountRepository {
                                         saveAuthState();
                                         refresh.complete(accessToken);
                                     } else {
-                                        setAuthState(null);
+                                        if (ex != AuthorizationException.GeneralErrors.NETWORK_ERROR && ex != AuthorizationException.GeneralErrors.SERVER_ERROR) {
+                                            setAuthState(null);
+                                        }
                                         refresh.completeExceptionally(ex);
                                     }
                                     tokenRefresh = null;

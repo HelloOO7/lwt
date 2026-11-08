@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/ticketing_nav_tickets"
+        android:icon="@drawable/ic_transit_ticket_24px"
+        android:title="@string/ticketing_nav_tickets_title" />
+
+    <item
+        android:id="@+id/ticketing_nav_cico"
+        android:icon="@drawable/ic_mobile_ticket_24px"
+        android:title="@string/ticketing_nav_cico_title" />
+
+    <item
+        android:id="@+id/ticketing_nav_cico_history"
+        android:icon="@drawable/ic_history_24px"
+        android:title="@string/ticketing_nav_cico_history_title" />
+
+</menu>

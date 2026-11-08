@@ -10,8 +10,8 @@ import java.util.UUID;
 
 public interface CICOClearingRepository extends JpaRepository<CICOClearingRecord, Long> {
 
-    @Query("SELECT c FROM CICOClearingRecord c WHERE c.payerAccount.id = :accountId ORDER BY c.clearedAt DESC")
-    public Page<CICOClearingRecord> findByAccountId(long accountId, Pageable pageable);
+    @Query("SELECT c FROM CICOClearingRecord c WHERE c.payerAccount.id = :accountId AND (:includeCancelled = true OR c.state != CANCELLED) ORDER BY c.clearedAt DESC")
+    public Page<CICOClearingRecord> findByAccountId(long accountId, boolean includeCancelled, Pageable pageable);
 
     @Query("SELECT DISTINCT e.sessionId FROM CICOEvent e WHERE e.clearedBy.id = :clearingId")
     public List<UUID> findSessionIDsInClearing(long clearingId);

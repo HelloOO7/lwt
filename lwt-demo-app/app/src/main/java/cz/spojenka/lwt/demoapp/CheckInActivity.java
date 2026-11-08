@@ -68,6 +68,11 @@ public class CheckInActivity extends CICOActivityBase {
         }
     };
 
+    public static Intent newIntent(Context context, byte[] checkInToken) {
+        return new Intent(context, CheckInActivity.class)
+                .putExtra(EXTRA_CICO_TOKEN, checkInToken);
+    }
+
     @Override
     protected View doCreateView(@Nullable Bundle savedInstanceState) {
         binding = ActivityCheckInBinding.inflate(getLayoutInflater());
@@ -150,8 +155,6 @@ public class CheckInActivity extends CICOActivityBase {
                     .setPositiveButton(android.R.string.ok, (dialog, which) -> dialog.dismiss())
                     .show();
         });
-
-        binding.btnOpenFareHistory.setOnClickListener(v -> startActivity(new Intent(this, CICOFareHistoryActivity.class)));
 
         return ViewUtils.wrapInScrollView(binding.getRoot());
     }

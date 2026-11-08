@@ -53,6 +53,9 @@ public class CICOFareSummaryActivity extends BaseActivity {
     }
 
     private FareSection getLastFareSection() {
+        if (fare.tickets().isEmpty()) {
+            return null;
+        }
         CICOTicketResponse lastTicket = fare.tickets().get(fare.tickets().size() - 1);
         return lastTicket.travelRecord().sections().get(lastTicket.travelRecord().sections().size() - 1);
     }

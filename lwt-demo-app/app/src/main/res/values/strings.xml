@@ -197,7 +197,8 @@
     <string name="cico_history_active_header">Active</string>
     <string name="cico_history_cleared_header">History</string>
     <string name="cico_history_check_in_label">"Check-in: "</string>
-    <string name="cico_history_check_out_label">"Newest check-out: "</string>
+    <string name="cico_history_check_out_label">"Check-out: "</string>
+    <string name="cico_history_newest_check_out_label">"Newest check-out: "</string>
     <string name="cico_history_check_in_label_without">No check-in</string>
     <string name="cico_history_check_out_label_without">Not yet checked out</string>
     <string name="check_in_open_fare_history">Fare history</string>
@@ -209,4 +210,12 @@
     <string name="cico_fare_summary_line_name_format">Line %1$s</string>
     <string name="cico_fare_summary_line_name_trip_num_format">Line %1$s/%2$s</string>
     <string name="cico_fare_summary_trip_num_format">Trip %1$s</string>
+    <string name="cico_history_no_active_sessions">No journeys yet to be billed.</string>
+    <string name="cico_history_no_fare_history">No fare history has been recorded.</string>
+    <string name="ticketing_home_title">My tickets</string>
+    <string name="ticketing_nav_tickets_title">Single tickets</string>
+    <string name="ticketing_nav_cico_title">PID Go</string>
+    <string name="ticketing_nav_cico_history_title">Travel history</string>
+    <string name="ticketing_home_no_tickets">No tickets purchased</string>
+    <string name="ticketing_home_buy_ticket">Buy a ticket</string>
 </resources>

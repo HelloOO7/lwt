@@ -196,7 +196,8 @@
     <string name="cico_history_active_header">Otevřené</string>
     <string name="cico_history_cleared_header">Historie</string>
     <string name="cico_history_check_in_label">"Zahájena v: "</string>
-    <string name="cico_history_check_out_label">"Nejnovější check-out v: "</string>
+    <string name="cico_history_check_out_label">"Ukončena v: "</string>
+    <string name="cico_history_newest_check_out_label">"Nejnovější check-out v: "</string>
     <string name="cico_history_check_in_label_without">Nezahájena</string>
     <string name="cico_history_check_out_label_without">Zatím bez check-outu</string>
     <string name="check_in_open_fare_history">Historie</string>
@@ -208,4 +209,12 @@
     <string name="cico_fare_summary_line_name_format">Linka %1$s</string>
     <string name="cico_fare_summary_line_name_trip_num_format">Linka %1$s/%2$s</string>
     <string name="cico_fare_summary_trip_num_format">Spoj %1$s</string>
+    <string name="cico_history_no_active_sessions">Žádné nevyúčtované jízdy.</string>
+    <string name="cico_history_no_fare_history">Historie jízd je prázdná.</string>
+    <string name="ticketing_home_title">Moje jízdenky</string>
+    <string name="ticketing_nav_tickets_title">Jednotlivé jízdenky</string>
+    <string name="ticketing_nav_cico_title">PID Go</string>
+    <string name="ticketing_nav_cico_history_title">Historie jízd</string>
+    <string name="ticketing_home_no_tickets">Žádné zakoupené jízdenky</string>
+    <string name="ticketing_home_buy_ticket">Koupit jízdenku</string>
 </resources>
