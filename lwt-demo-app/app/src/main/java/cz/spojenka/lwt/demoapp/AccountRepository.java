@@ -150,7 +150,8 @@ public class AccountRepository {
                                         saveAuthState();
                                         refresh.complete(accessToken);
                                     } else {
-                                        if (ex != AuthorizationException.GeneralErrors.NETWORK_ERROR && ex != AuthorizationException.GeneralErrors.SERVER_ERROR) {
+                                        if (!ex.equals(AuthorizationException.GeneralErrors.NETWORK_ERROR) && !ex.equals(AuthorizationException.GeneralErrors.SERVER_ERROR)) {
+                                            Log.e(TAG, "Authorization has failed, auth state will be cleared to force manual login");
                                             setAuthState(null);
                                         }
                                         refresh.completeExceptionally(ex);
