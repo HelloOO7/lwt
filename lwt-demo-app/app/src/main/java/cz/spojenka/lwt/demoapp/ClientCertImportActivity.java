@@ -328,6 +328,7 @@ public class ClientCertImportActivity extends BaseActivity {
                                 )
                                 .build()
                 );
+                GlobalTrustManager.reset();
             }).whenCompleteAsync((unused, throwable) -> {
                 isBusy.setValue(false);
                 if (throwable != null) {

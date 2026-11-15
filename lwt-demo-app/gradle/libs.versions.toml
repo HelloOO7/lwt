@@ -1,6 +1,7 @@
 [versions]
 agp = "9.3.1"
 appauth = "0.11.1"
+bouncycastle = "1.87"
 connectorLitacka = "1.0-SNAPSHOT"
 jackson = "2.22.2"
 junit = "4.13.2"
@@ -24,6 +25,7 @@ camerax = "1.6.1"
 
 [libraries]
 appauth = { module = "net.openid:appauth", version.ref = "appauth" }
+bouncycastle = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
 connector-litacka = { module = "cz.spojenka.connectors:connector-litacka", version.ref = "connectorLitacka" }
 jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
 jackson-datatype-jsr310 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310", version.ref = "jackson" }

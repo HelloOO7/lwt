@@ -38,6 +38,7 @@ public class TicketInspectionRepository {
 
     private static final String PK_INSPECTION_SECRETS = "inspection_secrets";
     private static final String PK_PUBLIC_KEYS = "public_keys";
+    private static final String PK_STAFF_NUMBER = "staff_number";
 
     private static final String TAG = "TicketInspection";
 
@@ -51,7 +52,7 @@ public class TicketInspectionRepository {
     private List<byte[]> publicKeys;
     private List<PublicKey> decodedPublicKeys;
 
-    public TicketInspectionRepository(Application appContext) {
+    private TicketInspectionRepository(Application appContext) {
         prefs = appContext.getSharedPreferences("ticket_inspection", Application.MODE_PRIVATE);
         remote = new TicketingClient(BuildConfig.TICKETING_SERVER_URL, GlobalTrustManager.createMosNetworkClient(appContext)).getInspectionAPI();
     }
@@ -177,7 +178,7 @@ public class TicketInspectionRepository {
         return false;
     }
 
-    private byte[] getInspectionSecretForTime(Instant time) {
+    public byte[] getInspectionSecretForTime(Instant time) {
         for (InspectionSecretResponse secret : getInspectionSecrets()) {
             if (!secret.validFrom().isAfter(time) && time.isBefore(secret.validTo())) {
                 return secret.data();
@@ -191,7 +192,11 @@ public class TicketInspectionRepository {
     }
 
     public boolean isCicoTicket(LitackaETD ticketData) {
-        return new TicketETDParser(ticketData).getCicoSessionId() != null; //CICO session ID
+        return isCicoTicket(new TicketETDParser(ticketData));
+    }
+
+    public boolean isCicoTicket(TicketETDParser ticketData) {
+        return ticketData.getCicoSessionId() != null; //CICO session ID
     }
 
     public Boolean checkCicoTripKeyMatch(LitackaETD ticketData, String tripKey) {
@@ -214,46 +219,35 @@ public class TicketInspectionRepository {
     }
 
     public boolean verifyTicketAuthenticity(LitackaETD ticketData, Instant totpInstant, PublicKey key, byte[] derivationSecret) {
-        String totp = ticketData.getProperty("X-TOTP");
-        if (totp == null) {
-            Log.w(TAG, "Ticket TOTP is missing");
+        if (!checkTicketSignature(ticketData, key)) {
             return false;
         }
-        String vs = ticketData.getProperty("VS");
-        if (vs == null) {
-            Log.w(TAG, "Ticket VS is missing");
+        if (!checkTicketRotationData(ticketData, derivationSecret, totpInstant)) {
             return false;
         }
-        OffsetDateTime validityStart;
-        try {
-            validityStart = OffsetDateTime.parse(vs);
-        } catch (Exception ex) {
-            Log.w(TAG, "Failed to parse ticket VS: " + vs, ex);
-            return false;
-        }
-        if (derivationSecret == null) {
-            derivationSecret = getInspectionSecretForTime(validityStart.toInstant());
-        }
-        if (derivationSecret == null) {
-            Log.w(TAG, "No inspection secret available for the given time");
-            return false;
-        }
-        String signature = ticketData.getProperty(ETDUtils.SIGNATURE_PROPERTY);
+        return true;
+    }
+
+    private boolean checkTicketSignature(LitackaETD ticketData, PublicKey key) {
+        byte[] signature = bindEtd(ticketData).getDecodedSignature();
         if (signature == null) {
             Log.w(TAG, "Ticket signature is missing");
             return false;
         }
-        ticketData.removeProperty("X-TOTP");
-        ticketData.removeProperty(ETDUtils.SIGNATURE_PROPERTY);
 
-        byte[] decodedSignature = ETDUtils.decodeTicketSignature(signature);
-        byte[] rawTicketData = ticketData.encode().getBytes(StandardCharsets.UTF_8);
+        LitackaETD innerData = new LitackaETD(ticketData);
+
+        innerData.removeProperty("X-TOTP");
+        innerData.removeProperty(ETDUtils.TS_PROPERTY);
+        innerData.removeProperty(ETDUtils.SIGNATURE_PROPERTY);
+
+        byte[] rawTicketData = innerData.encode().getBytes(StandardCharsets.UTF_8);
 
         boolean verifyResult;
         if (key != null) {
-            verifyResult = validateSignature(rawTicketData, decodedSignature, key);
+            verifyResult = validateSignature(rawTicketData, signature, key);
         } else {
-            verifyResult = validateSignature(rawTicketData, decodedSignature);
+            verifyResult = validateSignature(rawTicketData, signature);
         }
 
         if (!verifyResult) {
@@ -261,7 +255,64 @@ public class TicketInspectionRepository {
             return false;
         }
 
-        PIDTicketTOTP totpChecker = new PIDTicketTOTP(PIDTicketTOTP.deriveSeedSecret(decodedSignature, derivationSecret));
+        return true;
+    }
+
+    private boolean checkTicketRotationData(LitackaETD ticketData, byte[] derivationSecret, Instant totpInstant) {
+        if (isCanTicketNotHaveTimestamp(ticketData)) {
+            return true;
+        }
+
+        String totp = bindEtd(ticketData).getTOTP();
+        String ts = ETDUtils.getTimestampHash(ticketData);
+        if (!isAllowLegacyRotationScheme(ticketData) && ts != null) {
+            Log.w(TAG, "X-TS property was set on a non-legacy ticket (downgrade attack attempt?)");
+            ts = null;
+        }
+
+        if (totp == null && ts == null) {
+            Log.w(TAG, "Ticket TOTP/TS is missing");
+            return false;
+        }
+
+        if (totp != null) {
+            if (checkTicketTOTP(ticketData, derivationSecret, totpInstant, totp)) {
+                return true;
+            }
+            Log.w(TAG, "No TOTP matched ticket value: " + totp);
+        }
+        if (ts != null) {
+            if (checkTicketTSLegacy(ticketData, totpInstant, ts)) {
+                return true;
+            }
+            Log.w(TAG, "No TS matched ticket value: " + ts);
+        }
+
+        return false;
+    }
+
+    private boolean checkTicketTOTP(LitackaETD etd, byte[] derivationSecret, Instant totpInstant, String totp) {
+        if (derivationSecret == null) {
+            String vs = etd.getProperty("VS");
+            if (vs == null) {
+                Log.w(TAG, "Ticket VS is missing");
+                return false;
+            }
+            OffsetDateTime validityStart;
+            try {
+                validityStart = OffsetDateTime.parse(vs);
+            } catch (Exception ex) {
+                Log.w(TAG, "Failed to parse ticket VS: " + vs, ex);
+                return false;
+            }
+            derivationSecret = getInspectionSecretForTime(validityStart.toInstant());
+        }
+        if (derivationSecret == null) {
+            Log.w(TAG, "No inspection secret available for the given time");
+            return false;
+        }
+
+        PIDTicketTOTP totpChecker = new PIDTicketTOTP(PIDTicketTOTP.deriveSeedSecret(bindEtd(etd).getDecodedSignature(), derivationSecret));
 
         for (int i = -1; i <= 1; i++) {
             Instant checkTime = totpInstant.plusSeconds(i * totpChecker.getRefreshInterval().getSeconds());
@@ -271,14 +322,48 @@ public class TicketInspectionRepository {
             }
         }
 
-        Log.w(TAG, "No TOTP matched ticket value: " + totp);
-
         return false;
+    }
+
+    private boolean checkTicketTSLegacy(LitackaETD etd, Instant tsInstant, String ts) {
+        String expectedTs = ETDUtils.createTimestampHash(bindEtd(etd).getSignature(), tsInstant);
+        return expectedTs != null && expectedTs.equals(ts);
+    }
+
+    private boolean isCanTicketNotHaveTimestamp(LitackaETD etd) {
+        return "PAPER".equals(bindEtd(etd).getTicketType()); // paper IDOL tickets from POP
+    }
+
+    private boolean isAllowLegacyRotationScheme(LitackaETD etd) {
+        // only allow legacy (insecure) X-TS timestamps on non-LWT tickets
+        return bindEtd(etd).getLwtMetadata() == null;
     }
 
     public boolean isCicoCheckedOut(LitackaETD etd, Set<UUID> blacklist) {
         // this should only be called on a trusted ticket, so data absence is not checked
-        UUID uuid = UUID.fromString(new TicketETDParser(etd).getCicoSessionId());
+        UUID uuid = UUID.fromString(bindEtd(etd).getCicoSessionId());
         return !blacklist.contains(uuid);
+    }
+
+    private TicketETDParser bindEtd(LitackaETD etd) {
+        return new TicketETDParser(etd);
+    }
+
+    public boolean isStaffNumberSet() {
+        return prefs.contains(PK_STAFF_NUMBER);
+    }
+
+    public int getStaffNumber() {
+        return prefs.getInt(PK_STAFF_NUMBER, 0);
+    }
+
+    public void setStaffNumber(int staffNumber) {
+        prefs.edit().putInt(PK_STAFF_NUMBER, staffNumber)
+                .apply();
+    }
+
+    public void clearStaffNumber() {
+        prefs.edit().remove(PK_STAFF_NUMBER)
+                .apply();
     }
 }

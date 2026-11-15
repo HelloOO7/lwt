@@ -20,8 +20,21 @@ public class TicketETDParser {
         this(LitackaETD.parse(etdString));
     }
 
+    public Long getTicketId() {
+        String ti = etd.getProperty("TI");
+        if (ti == null) {
+            return null;
+        } else {
+            return Long.parseUnsignedLong(ti);
+        }
+    }
+
     public String getIssuerName() {
         return etd.getProperty("IN");
+    }
+
+    public String getTicketType() {
+        return etd.getProperty("TT");
     }
 
     private OffsetDateTime getDateTime(String propertyName) {
@@ -57,11 +70,15 @@ public class TicketETDParser {
         return etd.getProperty("X-SID");
     }
 
-    public byte[] getSignature() {
+    public byte[] getDecodedSignature() {
         if (etd.getProperty(ETDUtils.SIGNATURE_PROPERTY) == null) {
             return null;
         }
         return ETDUtils.getDecodedTicketSignature(etd);
+    }
+
+    public String getSignature() {
+        return ETDUtils.getTicketSignature(etd);
     }
 
     public String getTOTP() {

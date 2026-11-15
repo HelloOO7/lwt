@@ -128,7 +128,7 @@
     <string name="ticket_inspection_detail_not_valid_current_zone">Not valid in current zone: %1$s</string>
     <string name="ticket_inspection_detail_not_valid_current_zones">Not valid in any of current zones: %1$s</string>
     <string name="ticket_inspection_detail_from_current_trip">This connection</string>
-    <string name="ticket_inspection_detail_linsp">Activation vehicle</string>
+    <string name="ticket_inspection_detail_linsp">Activated on</string>
     <string name="ticket_inspection_toggle_razzia">Ticket control mode</string>
     <string name="ticket_inspection_razzia_error">Unable to update ticket control mode.</string>
     <string name="ticket_inspection_razzia_entering">Entering ticket control mode</string>
@@ -218,4 +218,19 @@
     <string name="ticketing_nav_cico_history_title">Travel history</string>
     <string name="ticketing_home_no_tickets">No tickets purchased</string>
     <string name="ticketing_home_buy_ticket">Buy a ticket</string>
+    <string name="ticket_inspection_must_login_message">To control ticket inspection mode, please log in using your staff number.</string>
+    <string name="ticket_inspection_more">More</string>
+    <string name="ticket_inspection_login">Log in</string>
+    <string name="ticket_inspection_logout">Log out</string>
+    <string name="ticket_inspection_logged_in_as">Logged in as: %1$d</string>
+    <string name="ticket_inspection_not_logged_in">Not logged in</string>
+    <string name="ticket_inspection_login_prompt">Enter your ticket inspection staff badge number:</string>
+    <string name="ticket_inspection_login_confirm">Log in</string>
+    <string name="ticket_inspection_invalid_staff_number">The staff number you have entered is invalid.</string>
+    <string name="ticket_inspection_detail_already_seen_here">Already inspected</string>
+    <string name="ticket_inspection_detail_already_seen_by">Already inspected by: %1$s</string>
+    <string name="ticket_inspection_auth_error_show_anyway">Continue anyway</string>
+    <string name="ticket_display_id">Ticket ID</string>
+    <string name="ticket_display_sid">CI/CO session</string>
+    <string name="ticket_inspection_nearby_devices_format">Group: %1$s</string>
 </resources>

@@ -18,19 +18,20 @@
         app:marginWindowInsets="horizontal|top" />
 
     <Button
-        android:id="@+id/btnSyncKeys"
+        android:id="@+id/btnMore"
         style="@style/Widget.MaterialComponents.Button.TextButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginBottom="@dimen/activity_vertical_margin"
-        app:marginWindowInsets="bottom"
-        android:text="@string/ticket_inspection_sync_keys"
-        app:icon="@drawable/ic_cloud_download_24px"
+        android:layout_marginHorizontal="@dimen/activity_horizontal_margin"
+        android:text="@string/ticket_inspection_more"
+        app:icon="@drawable/ic_more_horiz_24px"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/llSpringboard"
-        app:layout_constraintVertical_bias="1.0" />
+        app:layout_constraintTop_toBottomOf="@+id/btnRefreshVehicleData"
+        app:layout_constraintStart_toEndOf="@id/btnLoginLogout"
+        app:layout_constraintVertical_bias="1.0"
+        app:marginWindowInsets="bottom|horizontal" />
 
     <LinearLayout
         android:id="@+id/llSpringboard"
@@ -99,5 +100,37 @@
         app:layout_constraintStart_toStartOf="@+id/tvVehicleInfo"
         app:layout_constraintTop_toBottomOf="@+id/switchRazzia"
         tools:visibility="visible" />
+
+    <Button
+        android:id="@+id/btnLoginLogout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        tools:text="Login/logout"
+        android:layout_marginHorizontal="@dimen/activity_horizontal_margin"
+        android:layout_marginBottom="@dimen/activity_vertical_margin"
+        app:marginWindowInsets="bottom|horizontal"
+        app:layout_constraintHorizontal_chainStyle="spread_inside"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/btnMore"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <TextView
+        android:id="@+id/tvLoginStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        tools:text="Přihlášen jako 1234"
+        android:layout_marginBottom="@dimen/item_margin_small"
+        app:layout_goneMarginBottom="@dimen/item_margin_normal"
+        app:layout_constraintBottom_toTopOf="@+id/tvNearbyDevices"
+        app:layout_constraintStart_toStartOf="@+id/btnLoginLogout" />
+
+    <TextView
+        android:id="@+id/tvNearbyDevices"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        tools:text="Skupina: 4321, 5432"
+        android:layout_marginBottom="@dimen/item_margin_normal"
+        app:layout_constraintBottom_toTopOf="@+id/btnLoginLogout"
+        app:layout_constraintStart_toStartOf="@+id/btnLoginLogout" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

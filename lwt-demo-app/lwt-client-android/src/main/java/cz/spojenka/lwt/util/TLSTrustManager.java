@@ -4,6 +4,8 @@ import android.content.Context;
 import android.content.res.AssetManager;
 import android.util.Log;
 
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -44,7 +46,10 @@ public class TLSTrustManager {
     }
 
     public KeyStore loadPKCS12(InputStream in, char[] password) throws IOException, GeneralSecurityException {
-        KeyStore keyStore = KeyStore.getInstance("PKCS12");
+        // Android 10 BC does not recognize the PBKDF used in our PKCS12 files. We will therefore
+        // force using the statically linked bouncycastle to make sure we have all the latest
+        // cryptography available.
+        KeyStore keyStore = KeyStore.getInstance("PKCS12", BouncyCastleUtil.getBcProvider());
         keyStore.load(in, password);
         return keyStore;
     }

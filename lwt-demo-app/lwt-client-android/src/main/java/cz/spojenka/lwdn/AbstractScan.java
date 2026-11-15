@@ -3,7 +3,7 @@ package cz.spojenka.lwdn;
 import java.util.ArrayList;
 import java.util.List;
 
-public abstract class AbstractScan<R extends IScanResult, E extends Exception, THIS extends AbstractScan<R, E, THIS>> {
+public abstract class AbstractScan<R, E extends Exception, THIS extends AbstractScan<R, E, THIS>> {
 
     private final List<R> results = new ArrayList<>();
     private boolean isFinished = false;
@@ -53,7 +53,7 @@ public abstract class AbstractScan<R extends IScanResult, E extends Exception, T
 
     private int findExistingResultIndex(R result) {
         for (int i = 0; i < results.size(); i++) {
-            if (results.get(i).addressEquals(result)) {
+            if (isResultAddressEqual(results.get(i), result)) {
                 return i;
             }
         }
@@ -81,7 +81,7 @@ public abstract class AbstractScan<R extends IScanResult, E extends Exception, T
             // not accepting any more results
             return;
         }
-        if (results.removeIf(r -> r.addressEquals(result))) {
+        if (results.removeIf(r -> isResultAddressEqual(r, result))) {
             for (var listener : resultListeners) {
                 listener.onResultLost(getThis(), result);
             }
@@ -98,6 +98,9 @@ public abstract class AbstractScan<R extends IScanResult, E extends Exception, T
     }
 
     protected synchronized void markFailed(E e) {
+        if (isFinished()) {
+            return;
+        }
         this.isFinished = true;
         this.failureException = e;
         for (var listener : resultListeners) {
@@ -132,9 +135,17 @@ public abstract class AbstractScan<R extends IScanResult, E extends Exception, T
         }
     }
 
+    protected boolean isResultAddressEqual(R res1, R res2) {
+        if (res1 instanceof IScanResult s1 && res2 instanceof IScanResult s2) {
+            return s1.addressEquals(s2);
+        } else {
+            return res1.equals(res2);
+        }
+    }
+
     protected abstract void onCancel();
 
-    protected static interface OnResultListener<S extends AbstractScan<R, E, S>, R extends IScanResult, E extends Exception> {
+    protected static interface OnResultListener<S extends AbstractScan<R, E, S>, R, E extends Exception> {
 
         void onResult(S scan, R result);
 
@@ -145,7 +156,7 @@ public abstract class AbstractScan<R extends IScanResult, E extends Exception, T
         void onFailure(S scan, E e);
     }
 
-    protected static interface OnFinishedListener<S extends AbstractScan<R, E, S>, R extends IScanResult, E extends Exception> {
+    protected static interface OnFinishedListener<S extends AbstractScan<R, E, S>, R, E extends Exception> {
 
         void onFinished(S scan);
 

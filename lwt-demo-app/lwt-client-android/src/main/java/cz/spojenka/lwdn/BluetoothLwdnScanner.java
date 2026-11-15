@@ -1,24 +1,17 @@
 package cz.spojenka.lwdn;
 
-import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothManager;
-import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
 import android.content.Context;
-import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelUuid;
-import android.os.SystemClock;
 import android.util.Log;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,14 +25,11 @@ import cz.spojenka.lwdn.util.DeviceSpecifics;
 
 public class BluetoothLwdnScanner implements LwdnScanner {
 
-    private static final String TAG = BluetoothLwdnScanner.class.getName();
-
     private final Context context;
     private final BluetoothAdapter adapter;
     private final int addressPsm;
 
     private final Handler handler;
-    private Runnable restartScanCallback;
 
     public BluetoothLwdnScanner(Context context, BluetoothAdapter adapter, int addressPsm) {
         this.context = context;
@@ -49,55 +39,23 @@ public class BluetoothLwdnScanner implements LwdnScanner {
     }
 
     public static @Nullable BluetoothLwdnScanner create(Context context, int addressPsm) {
-        BluetoothManager btm = context.getSystemService(BluetoothManager.class);
-        if (btm != null) {
-            BluetoothAdapter adapter = btm.getAdapter();
-            if (adapter != null && isSupported(context)) {
-                return new BluetoothLwdnScanner(context, adapter, addressPsm);
-            }
+        BluetoothAdapter adapter = BluetoothLeScan.getBluetoothAdapter(context);
+        if (adapter != null) {
+            return new BluetoothLwdnScanner(context, adapter, addressPsm);
         }
         return null;
     }
 
     public static boolean isSupported(Context context) {
-        return context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE);
-    }
-
-    private static boolean isBackgroundLocationPermissionExists() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q;
+        return BluetoothLeScan.isSupported(context);
     }
 
     public static boolean isBackgroundLocationPermissionNeeded(Context context) {
-        if (!isBackgroundLocationPermissionExists()) {
-            // no background location permission exists on Android 9 and below
-            return true;
-        }
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                PackageInfo pi = context.getPackageManager().getPackageInfo(context.getPackageName(), PackageManager.GET_PERMISSIONS);
-                if (pi.requestedPermissions != null && pi.requestedPermissionsFlags != null) {
-                    for (int i = 0; i < pi.requestedPermissions.length; i++) {
-                        if (Manifest.permission.BLUETOOTH_SCAN.equals(pi.requestedPermissions[i]) &&
-                                (pi.requestedPermissionsFlags[i] & PackageInfo.REQUESTED_PERMISSION_NEVER_FOR_LOCATION) != 0) {
-                            return false;
-                        }
-                    }
-                }
-            }
-            // on Android 10, the background location permission does exist,
-            // and is needed to start LE scans in the background
-        } catch (PackageManager.NameNotFoundException e) {
-            Log.e(TAG, "Failed to get package info", e);
-        }
-        return true;
+        return BluetoothLeScan.isBackgroundLocationPermissionNeeded(context);
     }
 
     public boolean canStartInBackground() {
-        if (isBackgroundLocationPermissionExists() && isBackgroundLocationPermissionNeeded(context)) {
-            return context.checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED;
-        } else {
-            return true;
-        }
+        return BluetoothLeScan.canStartInBackground(context);
     }
 
     @Override
@@ -105,66 +63,23 @@ public class BluetoothLwdnScanner implements LwdnScanner {
         return adapter.isEnabled();
     }
 
-    private boolean isServiceUUIDFilteringBroken() {
-        // not necessarily - it seems to work fine on a Huawei device running Pie
-        // and a Samsung Galaxy S II running Q.
-        // not so much on a Pie LG device and Q Xiaomi device, unfortunately.
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q) {
-            return true;
-        }
-        if (DeviceSpecifics.isXiaomi()) {
-            return !adapter.isLeExtendedAdvertisingSupported();
-        }
-        return false;
-    }
-
-    private boolean shouldUseSoftwareUUIDFiltering() {
-        return isServiceUUIDFilteringBroken() || BluetoothCompatibilityMode.getInstance(context).isForcedSoftwareFiltering();
-    }
-
     @Override
     public LwdnScan startScan(List<LwdnServiceID> services, LwdnScanConfig config) {
         LwdnScan scan = new LwdnScan();
 
-        BluetoothLeScanner scanner = adapter.getBluetoothLeScanner();
-
-        if (scanner != null) {
-            new ScanController(scanner, scan).startScan(services, config);
-        } else {
-            if (adapter.isEnabled()) {
-                scan.markFailed(new LwdnScanException(ScanErrorCode.NOT_SUPPORTED, "Bluetooth LE scanner is not supported (even though Bluetooth is enabled)"));
-            } else {
-                scan.markFailed(new LwdnScanException(ScanErrorCode.NOT_ENABLED, "Bluetooth is off"));
-            }
-        }
+        new ScanController(scan).startScan(services, config);
 
         return scan;
     }
 
-    private class TimeoutScanCallback extends ScanCallback {
-
-        public void startTimeout(Duration timeout) {
-            handler.postDelayed(this::onTimedOut, timeout.toMillis());
-        }
-
-        protected void onTimedOut() {
-
-        }
-    }
-
     private class ScanController {
 
-        private final BluetoothLeScanner scanner;
-        private TimeoutScanCallback callback;
+        private BluetoothLeScan leScan;
         private final LwdnScan scan;
 
         private DeviceLostTimeoutManager lostTimeoutManager;
 
-        private long scanStartTime;
-        private long scanEndTime;
-
-        public ScanController(BluetoothLeScanner scanner, LwdnScan scan) {
-            this.scanner = scanner;
+        public ScanController(LwdnScan scan) {
             this.scan = scan;
             this.lostTimeoutManager = new DeviceLostTimeoutManager(handler, scan);
             scan.setCancellationHandler(this::stopScan);
@@ -177,13 +92,22 @@ public class BluetoothLwdnScanner implements LwdnScanner {
 
             Predicate<ScanResult> softwareFilter = buildSoftwareScanFilterIfNeeded(btUuids);
 
-            callback = new TimeoutScanCallback() {
+            ScanSettings settings = buildScanSettings(config, isUsingExtendedAdvertising);
+            List<ScanFilter> filters = buildScanFilters(services);
 
+            leScan = new BluetoothLeScan.Builder(context)
+                    .setSettings(settings)
+                    .setFilters(filters)
+                    .setScanTimeout(config.getTimeout())
+                    .build();
+
+            leScan.addOnResultListener(new BluetoothLeScan.OnResultListener() {
                 @Override
-                public synchronized void onScanResult(int callbackType, ScanResult result) {
+                public void onResult(BluetoothLeScan leScan, ScanResult result) {
                     if (isUsingExtendedAdvertising && result.isLegacy()) {
-                        // huawei (on Pie) returns legacy advertisements even when scanning for extended advertisements,
-                        // (despite the fact that this is not supposed to happen)
+                        // devices using software filtering (device name only at first) will receive
+                        // both legacy and extended results, which we do not want in LWDN (extended
+                        // advertising has its own service ID)
                         return;
                     }
                     if (!softwareFilter.test(result)) {
@@ -195,62 +119,69 @@ public class BluetoothLwdnScanner implements LwdnScanner {
                         return;
                     }
 
-                    BluetoothLwdnAddress address = new BluetoothLwdnAddress(result.getDevice(), addressPsm);
-
-                    if (callbackType != ScanSettings.CALLBACK_TYPE_MATCH_LOST) {
-                        if (scan.getResultCount() < config.getMaxDevices()) {
-                            if (result.getScanRecord() != null) {
-                                Map<LwdnServiceID, byte[]> serviceData = new HashMap<>();
-                                for (LwdnServiceID.BluetoothUUID btUuid : btUuids) {
-                                    byte[] data = result.getScanRecord().getServiceData().get(new ParcelUuid(btUuid.uuid()));
-                                    if (data != null) {
-                                        serviceData.put(btUuid, data);
-                                    }
+                    if (scan.getResultCount() < config.getMaxDevices()) {
+                        BluetoothLwdnAddress address = lwdnAddressFromResult(result);
+                        if (result.getScanRecord() != null) {
+                            Map<LwdnServiceID, byte[]> serviceData = new HashMap<>();
+                            for (LwdnServiceID.BluetoothUUID btUuid : btUuids) {
+                                byte[] data = result.getScanRecord().getServiceData().get(new ParcelUuid(btUuid.uuid()));
+                                if (data != null) {
+                                    serviceData.put(btUuid, data);
                                 }
-                                scan.addResult(new LwdnScanResult(address, result.getRssi(), serviceData));
                             }
-                            lostTimeoutManager.updateDeviceLostTimeout(address, config.getDeviceLostTimeout());
+                            scan.addResult(new LwdnScanResult(address, result.getRssi(), serviceData));
                         }
-                        if (scan.getResultCount() >= config.getMaxDevices()) {
-                            stopScan();
-                        }
-                    } else {
-                        scan.removeResult(new LwdnScanResult(address, 0, Map.of()));
+                        lostTimeoutManager.updateDeviceLostTimeout(address, config.getDeviceLostTimeout());
+                    }
+                    if (scan.getResultCount() >= config.getMaxDevices()) {
+                        stopScan();
                     }
                 }
 
                 @Override
-                protected void onTimedOut() {
-                    stopScan();
+                public void onResultLost(BluetoothLeScan leScan, ScanResult result) {
+                    scan.removeResult(new LwdnScanResult(lwdnAddressFromResult(result), result.getRssi(), Map.of()));
+                }
+
+                private BluetoothLwdnAddress lwdnAddressFromResult(ScanResult result) {
+                    return new BluetoothLwdnAddress(result.getDevice(), addressPsm);
                 }
 
                 @Override
-                public void onScanFailed(int errorCode) {
-                    scan.markFailed(new LwdnScanException(switch (errorCode) {
-                        case ScanCallback.SCAN_FAILED_FEATURE_UNSUPPORTED ->
-                                ScanErrorCode.NOT_SUPPORTED;
-                        case ScanCallback.SCAN_FAILED_ALREADY_STARTED ->
-                                ScanErrorCode.ALREADY_RUNNING;
-                        case BluetoothLeScannerCompat.SCAN_FAILED_SCANNING_TOO_FREQUENTLY ->
-                                ScanErrorCode.THROTTLED;
-                        case ScanCallback.SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES ->
-                                ScanErrorCode.OUT_OF_RESOURCES;
-                        default -> ScanErrorCode.INTERNAL_ERROR;
-                    }));
+                public void onFailure(BluetoothLeScan leScan, Exception e) {
+                    // handled in OnFinishedListener
                 }
-            };
+            });
 
-            ScanSettings settings = buildScanSettings(config, isUsingExtendedAdvertising);
-            List<ScanFilter> filters = buildScanFilters(services);
-
-            scanStartTime = SystemClock.elapsedRealtime();
-            scanEndTime = config.getTimeout() != null ? scanStartTime + config.getTimeout().toMillis() : 0;
-
-            if (startScanImpl(settings, filters)) {
-                if (config.getTimeout() != null) {
-                    callback.startTimeout(config.getTimeout());
+            leScan.addOnFinishedListener(new BluetoothLeScan.OnFinishedListener() {
+                @Override
+                public void onFinished(BluetoothLeScan leScan) {
+                    scan.markFinished();
                 }
-            }
+
+                @Override
+                public void onFinishedExceptionally(BluetoothLeScan leScan, Exception e) {
+                    if (e instanceof SecurityException) {
+                        scan.markFailed(new LwdnScanException(ScanErrorCode.NOT_PERMITTED, e));
+                    } else if (e instanceof UnsupportedOperationException) {
+                        scan.markFailed(new LwdnScanException(ScanErrorCode.NOT_SUPPORTED, e));
+                    } else if (e instanceof BluetoothLeScanException leScanException) {
+                        scan.markFailed(new LwdnScanException(switch (leScanException.getErrorCode()) {
+                            case ScanCallback.SCAN_FAILED_FEATURE_UNSUPPORTED ->
+                                    ScanErrorCode.NOT_SUPPORTED;
+                            case ScanCallback.SCAN_FAILED_ALREADY_STARTED ->
+                                    ScanErrorCode.ALREADY_RUNNING;
+                            case BluetoothLeScannerCompat.SCAN_FAILED_SCANNING_TOO_FREQUENTLY ->
+                                    ScanErrorCode.THROTTLED;
+                            case ScanCallback.SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES ->
+                                    ScanErrorCode.OUT_OF_RESOURCES;
+                            default -> ScanErrorCode.INTERNAL_ERROR;
+                        }));
+                    }
+                }
+            });
+
+            leScan.start();
         }
 
         private boolean containsExtendedService(List<? extends LwdnServiceID> services) {
@@ -284,42 +215,6 @@ public class BluetoothLwdnScanner implements LwdnScanner {
             return out;
         }
 
-        private boolean startScanImpl(ScanSettings settings, List<ScanFilter> filters) {
-            try {
-                //XiaomiBLERestrictionKiller.apply();
-                long thisScanStartTime = SystemClock.elapsedRealtime();
-                BluetoothLeScannerCompat.startScan(context, scanner, filters, settings, callback);
-
-                int systemScanTimeout = BluetoothLeThrottling.getScanDowngradeTimeout(adapter, settings, filters);
-                if (systemScanTimeout != 0) {
-                    if (scanEndTime == 0 || thisScanStartTime + systemScanTimeout < scanEndTime) {
-                        if (canStartInBackground()) {
-                            handler.postDelayed(restartScanCallback = () -> restartScan(settings, filters), (long) (systemScanTimeout * 0.95f));
-                        } else {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                                Log.e(TAG, "Background location permission not granted. Scan will be downgraded to low-power mode after 10 minutes.");
-                            } else {
-                                Log.e(TAG, "Background location permission not granted. Scan will be downgraded to opportunistic mode after 30 minutes!!");
-                            }
-                        }
-                    }
-                }
-
-                return true;
-            } catch (SecurityException ex) {
-                scan.markFailed(new LwdnScanException(ScanErrorCode.NOT_PERMITTED, ex));
-                return false;
-            }
-        }
-
-        private void restartScan(ScanSettings settings, List<ScanFilter> filters) {
-            Log.d(TAG, "Restarting scan to avoid downgrade");
-            if (!scan.isFinished()) {
-                stopScanImpl();
-                startScanImpl(settings, filters);
-            }
-        }
-
         private ScanSettings buildScanSettings(LwdnScanConfig config, boolean isUsingExtendedAdvertising) {
             ScanSettings.Builder settings = new ScanSettings.Builder()
                     .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
@@ -343,7 +238,7 @@ public class BluetoothLwdnScanner implements LwdnScanner {
         private List<ScanFilter> buildScanFilters(List<LwdnServiceID> services) {
             List<ScanFilter> filters = new ArrayList<>();
             for (LwdnServiceID serviceId : services) {
-                if (!shouldUseSoftwareUUIDFiltering()) {
+                if (!BluetoothLeScan.shouldUseSoftwareUUIDFiltering(context)) {
                     if (serviceId instanceof LwdnServiceID.BluetoothUUID serviceBluetoothUUID) {
                         filters.add(
                                 new ScanFilter.Builder()
@@ -370,7 +265,7 @@ public class BluetoothLwdnScanner implements LwdnScanner {
         }
 
         private Predicate<ScanResult> buildSoftwareScanFilterIfNeeded(List<LwdnServiceID.BluetoothUUID> services) {
-            if (!shouldUseSoftwareUUIDFiltering()) {
+            if (!BluetoothLeScan.shouldUseSoftwareUUIDFiltering(context)) {
                 return result -> true;
             } else {
                 return buildSoftwareScanFilter(services);
@@ -398,26 +293,11 @@ public class BluetoothLwdnScanner implements LwdnScanner {
         }
 
         public void stopScan() {
-            stopScanImpl();
-            if (restartScanCallback != null) {
-                handler.removeCallbacks(restartScanCallback);
-                restartScanCallback = null;
+            if (leScan != null) {
+                leScan.stop();
             }
             lostTimeoutManager.cancelPendingTimeouts();
             scan.markFinished();
-        }
-
-        private void stopScanImpl() {
-            try {
-                try {
-                    scanner.stopScan(callback);
-                } catch (IllegalStateException ex) {
-                    Log.e(TAG, "stopScan failed, assuming bluetooth off", ex);
-                    // adapter disabled by user, ignore
-                }
-            } catch (SecurityException ex) {
-                scan.markFailed(new LwdnScanException(ScanErrorCode.NOT_PERMITTED, ex));
-            }
         }
     }
 }

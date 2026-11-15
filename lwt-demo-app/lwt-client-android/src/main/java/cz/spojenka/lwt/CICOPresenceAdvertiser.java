@@ -1,19 +1,9 @@
 package cz.spojenka.lwt;
 
-import android.Manifest;
 import android.annotation.SuppressLint;
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothManager;
 import android.bluetooth.le.AdvertiseData;
-import android.bluetooth.le.AdvertisingSet;
-import android.bluetooth.le.AdvertisingSetCallback;
 import android.bluetooth.le.AdvertisingSetParameters;
-import android.bluetooth.le.BluetoothLeAdvertiser;
-import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
-import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.ParcelUuid;
@@ -22,19 +12,11 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
-import cz.spojenka.lwdn.util.BLEScanRecordUtil;
-import cz.spojenka.lwdn.util.DeviceSpecifics;
+import cz.spojenka.lwdn.BluetoothLeAdvertisement;
 
 public class CICOPresenceAdvertiser implements AutoCloseable {
 
-    private final Context context;
-
-    private AdvertiseData lastAdvData;
-    private BluetoothLeAdvertiser currentAdvertiser;
-    private AdvertisingSet currentAdvSet;
-    private AdvertisingSetCallback callback;
-
-    private final BroadcastReceiver bluetoothStateReceiver;
+    private BluetoothLeAdvertisement advertisement;
 
     private final Handler handler;
     private final Runnable updateAdvertisementsRunnable = this::updateAdvertisements;
@@ -43,58 +25,29 @@ public class CICOPresenceAdvertiser implements AutoCloseable {
     private PresenceTrackingClient trackingClient;
 
     public CICOPresenceAdvertiser(Context context) {
-        this.context = context.getApplicationContext();
         this.handler = new Handler(context.getMainLooper());
-        bluetoothStateReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                int newState = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR);
-                if (newState == BluetoothAdapter.STATE_ON) {
-                    tryStartAdvertiser();
-                } else if (newState != BluetoothAdapter.STATE_TURNING_ON) {
-                    stopAdvertiser();
-                }
-            }
-        };
-        this.context.registerReceiver(bluetoothStateReceiver, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
+        advertisement = new BluetoothLeAdvertisement(context, buildAdvertiseSettings());
 
         trackingClient = new PresenceTrackingClient();
     }
 
     public static boolean isSupported(Context context) {
-        BluetoothManager btm = context.getSystemService(BluetoothManager.class);
-        if (btm != null) {
-            BluetoothAdapter adapter = btm.getAdapter();
-            if (adapter != null) {
-                return adapter.isMultipleAdvertisementSupported();
-            }
-        }
-        return false;
-    }
-
-    private BluetoothLeAdvertiser newBluetoothLeAdvertiser() {
-        BluetoothManager btm = context.getSystemService(BluetoothManager.class);
-        if (btm != null) {
-            BluetoothAdapter adapter = btm.getAdapter();
-            if (adapter != null) {
-                return adapter.getBluetoothLeAdvertiser();
-            }
-        }
-        return null;
+        return BluetoothLeAdvertisement.isSupported(context);
     }
 
     public void start() {
         if (!isRunning) {
             isRunning = true;
+            advertisement.start();
             updateAdvertisements();
         }
     }
 
     public void stop() {
         if (isRunning) {
-            isRunning = false;
+            advertisement.stop();
             handler.removeCallbacks(updateAdvertisementsRunnable);
-            stopAdvertiser();
+            isRunning = false;
         }
     }
 
@@ -125,64 +78,11 @@ public class CICOPresenceAdvertiser implements AutoCloseable {
 
     @SuppressLint("MissingPermission")
     private void advertise(byte[] data) {
-        this.lastAdvData = new AdvertiseData.Builder()
+        AdvertiseData advData = new AdvertiseData.Builder()
                 .addServiceData(new ParcelUuid(LwtServiceConstants.BLE_SERVICE_UUID_CICO_KEEPALIVE.uuid()), data)
                 .build();
-        if (currentAdvSet != null) {
-            if (hasAdvertisePermission()) {
-                currentAdvSet.setAdvertisingData(lastAdvData);
-            }
-        } else {
-            tryStartAdvertiser();
-        }
-    }
 
-    private void tryStartAdvertiser() {
-        if (callback != null || lastAdvData == null) {
-            return;
-        }
-        if (currentAdvertiser == null) {
-            currentAdvertiser = newBluetoothLeAdvertiser();
-        }
-        if (currentAdvertiser == null) {
-            // bt not enabled
-            return;
-        }
-        currentAdvertiser.startAdvertisingSet(
-                buildAdvertiseSettings(),
-                lastAdvData,
-                null,
-                null,
-                null,
-                callback = new AdvertisingSetCallback() {
-
-                    @Override
-                    public void onAdvertisingSetStarted(AdvertisingSet advertisingSet, int txPower, int status) {
-                        if (this == callback) {
-                            currentAdvSet = advertisingSet;
-                        }
-                    }
-                }
-        );
-    }
-
-    private boolean hasAdvertisePermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            return context.checkSelfPermission(Manifest.permission.BLUETOOTH_ADVERTISE) == PackageManager.PERMISSION_GRANTED;
-        } else {
-            return true;
-        }
-    }
-
-    @SuppressLint("MissingPermission")
-    private void stopAdvertiser() {
-        if (currentAdvertiser != null && callback != null) {
-            if (hasAdvertisePermission()) {
-                currentAdvertiser.stopAdvertisingSet(callback);
-            }
-            currentAdvertiser = null;
-            callback = null;
-        }
+        advertisement.advertise(advData);
     }
 
     private AdvertisingSetParameters buildAdvertiseSettings() {

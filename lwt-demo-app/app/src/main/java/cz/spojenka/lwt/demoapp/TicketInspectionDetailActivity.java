@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -21,12 +22,15 @@ import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 import androidx.core.content.res.ResourcesCompat;
 import androidx.core.widget.TextViewCompat;
+import cz.dpp.praguepublictransport.LitackaUtils;
 import cz.spojenka.android.ui.activity.BaseActivity;
+import cz.spojenka.android.ui.resources.ListFormat;
 import cz.spojenka.android.util.DateTimeUtils;
 import cz.spojenka.android.util.ViewUtils;
 import cz.spojenka.lwt.LwtTicketMetadata;
 import cz.spojenka.lwt.demoapp.databinding.ActivityTicketInspectionDetailBinding;
 import cz.spojenka.lwt.demoapp.databinding.TicketInfoLineRowBinding;
+import shaded.org.apache.commons.codec.binary.Base32;
 
 public class TicketInspectionDetailActivity extends BaseActivity {
 
@@ -34,6 +38,8 @@ public class TicketInspectionDetailActivity extends BaseActivity {
     public static final String EXTRA_INSPECTION_ZONES = TicketInspectionDetailActivity.class.getName() + ".EXTRA_INSPECTION_ZONES";
     public static final String EXTRA_INSPECTION_TIME = TicketInspectionDetailActivity.class.getName() + ".EXTRA_INSPECTION_TIME";
     public static final String EXTRA_INSPECTION_TK = TicketInspectionDetailActivity.class.getName() + ".EXTRA_INSPECTION_TK";
+    public static final String EXTRA_SEEN_BY = TicketInspectionDetailActivity.class.getName() + ".EXTRA_SEEN_BY";
+    public static final String EXTRA_MY_STAFF_NUMBER = TicketInspectionDetailActivity.class.getName() + ".EXTRA_MY_STAFF_NUMBER";
 
     private ActivityTicketInspectionDetailBinding binding;
 
@@ -53,6 +59,17 @@ public class TicketInspectionDetailActivity extends BaseActivity {
         List<String> inspectionZones = getIntent().getStringArrayListExtra(EXTRA_INSPECTION_ZONES);
         Instant inspectionTime = Instant.ofEpochMilli(getIntent().getLongExtra(EXTRA_INSPECTION_TIME, System.currentTimeMillis()));
         String inspectionTk = getIntent().getStringExtra(EXTRA_INSPECTION_TK);
+
+        Long tid = etd.getTicketId();
+        if (tid != null) {
+            // we format this to base36 for easier comparison (IDOL ticket IDs are very long)
+            addInfoView(R.string.ticket_display_id, Long.toUnsignedString(tid, 36).toUpperCase());
+        }
+        String sid = etd.getCicoSessionId();
+        if (sid != null) {
+            // same thing - do not display the whole UUID, for comparison, a hash is enough
+            addInfoView(R.string.ticket_display_sid, Integer.toUnsignedString(sid.hashCode(), 36).toUpperCase());
+        }
 
         OffsetDateTime validSince = etd.getValidSince();
         addTimeInfoViews(R.string.ticket_display_valid_since, validSince, inspectionTime, false);
@@ -101,6 +118,18 @@ public class TicketInspectionDetailActivity extends BaseActivity {
             if (Objects.equals(inspectionTk, lwtMetadata.getTripKey())) {
                 addInfoView(0, getString(R.string.ticket_inspection_detail_from_current_trip), R.drawable.ic_info_f_24px, R.color.ticket_inspection_status_informative);
             }
+        }
+        List<Integer> seenBy = getIntent().getIntegerArrayListExtra(EXTRA_SEEN_BY);
+        if (seenBy != null && !seenBy.isEmpty()) {
+            int myStaffNum = getIntent().getIntExtra(EXTRA_MY_STAFF_NUMBER, -1);
+            String alreadySeenText;
+            if (seenBy.equals(List.of(myStaffNum))) {
+                alreadySeenText = getString(R.string.ticket_inspection_detail_already_seen_here);
+            } else {
+                Collections.sort(seenBy);
+                alreadySeenText = getString(R.string.ticket_inspection_detail_already_seen_by, ListFormat.formatList(this, seenBy));
+            }
+            addInfoView(0, alreadySeenText, R.drawable.ic_warning_f_24px, R.color.delay_mid);
         }
     }
 

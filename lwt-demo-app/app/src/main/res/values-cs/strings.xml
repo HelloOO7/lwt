@@ -127,7 +127,7 @@
     <string name="ticket_inspection_detail_not_valid_current_zone">Neplatí v aktuálním pásmu: %1$s</string>
     <string name="ticket_inspection_detail_not_valid_current_zones">Neplatí v žádném z akt. pásem: %1$s</string>
     <string name="ticket_inspection_detail_from_current_trip">Tento spoj</string>
-    <string name="ticket_inspection_detail_linsp">Označující linkospoj</string>
+    <string name="ticket_inspection_detail_linsp">Označeno v</string>
     <string name="ticket_inspection_toggle_razzia">Režim kontroly jízdenek</string>
     <string name="ticket_inspection_razzia_error">Změna režimu kontroly jízdenek se nezdařila.</string>
     <string name="ticket_inspection_razzia_entering">Aktivace režimu kontroly jízdenek</string>
@@ -217,4 +217,19 @@
     <string name="ticketing_nav_cico_history_title">Historie jízd</string>
     <string name="ticketing_home_no_tickets">Žádné zakoupené jízdenky</string>
     <string name="ticketing_home_buy_ticket">Koupit jízdenku</string>
+    <string name="ticket_inspection_must_login_message">Pro ovládání režimu kontroly jízdenek se přihlaste svým služebním číslem.</string>
+    <string name="ticket_inspection_more">Více</string>
+    <string name="ticket_inspection_login">Přihlásit se</string>
+    <string name="ticket_inspection_logout">Odhlásit se</string>
+    <string name="ticket_inspection_logged_in_as">Přihlášen/a jako: %1$d</string>
+    <string name="ticket_inspection_not_logged_in">Nejste přihlášeni</string>
+    <string name="ticket_inspection_login_prompt">Zadejte číslo svého služebního odznaku přepravní kontroly:</string>
+    <string name="ticket_inspection_login_confirm">Přihlásit</string>
+    <string name="ticket_inspection_invalid_staff_number">Zadané služební číslo je neplatné.</string>
+    <string name="ticket_inspection_detail_already_seen_here">Opětovné načtení</string>
+    <string name="ticket_inspection_detail_already_seen_by">Již zkontrolováno (revizor: %1$s)</string>
+    <string name="ticket_inspection_auth_error_show_anyway">Přesto zobrazit</string>
+    <string name="ticket_display_id">ID dokladu</string>
+    <string name="ticket_display_sid">Relace CI/CO</string>
+    <string name="ticket_inspection_nearby_devices_format">Skupina: %1$s</string>
 </resources>

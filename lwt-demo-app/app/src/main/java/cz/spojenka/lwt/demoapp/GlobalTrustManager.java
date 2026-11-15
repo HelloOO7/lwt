@@ -38,6 +38,10 @@ public class GlobalTrustManager {
         return INSTANCE;
     }
 
+    public static void reset() {
+        INSTANCE = null;
+    }
+
     public static SSLContext createSSLContext(Application app) {
         try {
             TLSTrustManager trustManager = getInstance(app);

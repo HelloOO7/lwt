@@ -1,20 +1,30 @@
 package cz.spojenka.lwt.demoapp;
 
 import android.app.Application;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Bundle;
 import android.os.Handler;
+import android.text.InputType;
 import android.util.Log;
 import android.view.View;
+import android.widget.EditText;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.zxing.BarcodeFormat;
 
+import java.nio.ByteBuffer;
 import java.security.PublicKey;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -22,6 +32,8 @@ import java.util.concurrent.Executors;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.widget.AppCompatEditText;
+import androidx.appcompat.widget.PopupMenu;
 import androidx.core.os.BundleCompat;
 import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.MutableLiveData;
@@ -34,7 +46,10 @@ import cz.spojenka.android.ui.dialog.CommonDialogs;
 import cz.spojenka.android.ui.dialog.ProgressDialog;
 import cz.spojenka.android.ui.resources.ListFormat;
 import cz.spojenka.android.util.AsyncUtils;
+import cz.spojenka.android.util.LiveDataUtils;
+import cz.spojenka.android.util.ViewUtils;
 import cz.spojenka.lwdn.LwdnAddress;
+import cz.spojenka.lwt.InspectionSyncTransceiver;
 import cz.spojenka.lwt.LocalCICOInspectionData;
 import cz.spojenka.lwt.LwtAPIClient;
 import cz.spojenka.lwt.LwtDevice;
@@ -47,6 +62,7 @@ import cz.spojenka.lwt.util.RazziaHeartbeatKeeper;
 import cz.spojenka.lwt.util.TextMarkupConverter;
 import cz.spojenka.lwtp.LwtpTLSConfig;
 import cz.spojenka.lwtp.LwtpTLSPolicy;
+import shaded.org.apache.commons.codec.digest.DigestUtils;
 
 public class TicketInspectionHomeActivity extends BaseActivity {
 
@@ -79,10 +95,10 @@ public class TicketInspectionHomeActivity extends BaseActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         binding = ActivityTicketInspectionHomeBinding.inflate(getLayoutInflater());
-        setContentView(binding.getRoot());
+        setContentView(ViewUtils.wrapInScrollView(binding.getRoot()));
 
-        repository = new TicketInspectionRepository(getApplication());
         viewModel = new ViewModelProvider(this).get(ViewModel.class);
+        repository = viewModel.getRepository();
 
         if (savedInstanceState != null) {
             linkedVehicle = BundleCompat.getParcelable(savedInstanceState, STATE_LINKED_VEHICLE, LwtDevice.class);
@@ -116,7 +132,17 @@ public class TicketInspectionHomeActivity extends BaseActivity {
             }
         });
 
-        binding.btnSyncKeys.setOnClickListener(v -> syncKeys(true));
+        binding.btnMore.setOnClickListener(v -> {
+            PopupMenu popup = new PopupMenu(this, v);
+            popup.getMenu()
+                    .add(R.string.ticket_inspection_sync_keys)
+                    .setIcon(R.drawable.ic_cloud_download_24px)
+                    .setOnMenuItemClickListener(item -> {
+                        syncKeys(true);
+                        return true;
+                    });
+            popup.show();
+        });
 
         binding.btnScanTicketQR.setOnClickListener(v -> {
             ensureNewestKeysAndRun(() -> scanQRLauncher.launch(BarcodeFormat.QR_CODE));
@@ -135,7 +161,7 @@ public class TicketInspectionHomeActivity extends BaseActivity {
         viewModel.getRazziaStateLiveData().observe(this, state -> {
             // if the dialog is up, keep it enabled to avoid flickering animations
             binding.switchRazzia.setEnabled(!state.isProcessing() || isRazziaDialogUp);
-            binding.switchRazzia.setChecked(state.isRazzia());
+            binding.switchRazzia.setChecked(state.isActive());
 
             if (state.error() != null) {
                 viewModel.ackRazziaError();
@@ -147,15 +173,35 @@ public class TicketInspectionHomeActivity extends BaseActivity {
         binding.switchRazzia.setOnClickListener(v -> {
             // use onClick and not onCheckedChangeListener to avoid triggering when we programmatically change the checked state
             boolean isChecked = binding.switchRazzia.isChecked();
-            isRazziaDialogUp = true;
-            ProgressDialog.doInBackground(
-                    this,
-                    isChecked ? R.string.ticket_inspection_razzia_entering : R.string.ticket_inspection_razzia_exiting,
-                    viewModel.setRazzia(isChecked)
-            ).whenCompleteAsync((unused, throwable) -> isRazziaDialogUp = false, getLifecycleExecutor());
+            if (isChecked && !repository.isStaffNumberSet()) {
+                binding.switchRazzia.setChecked(false);
+                CommonDialogs.newInfoDialog(this, R.string.ticket_inspection_action_required_title, R.string.ticket_inspection_must_login_message).show();
+                return;
+            }
+            Runnable cont = () -> {
+                isRazziaDialogUp = true;
+                ProgressDialog.doInBackground(
+                        this,
+                        isChecked ? R.string.ticket_inspection_razzia_entering : R.string.ticket_inspection_razzia_exiting,
+                        viewModel.setRazzia(isChecked)
+                ).whenCompleteAsync((unused, throwable) -> isRazziaDialogUp = false, getLifecycleExecutor());
+            };
+            if (isChecked) {
+                ensureNewestKeysAndRun(cont).handleAsync((unused, err) -> {
+                    if (err != null) {
+                        binding.switchRazzia.setChecked(false);
+                    }
+                    return null;
+                }, getLifecycleExecutor());
+            } else {
+                cont.run();
+            }
         });
 
+        viewModel.getNearbyDevicesLiveData().observe(this, this::updateNearbyDevicesUI);
+
         updateVehicleInfoUI();
+        updateLoginUI();
     }
 
     private boolean checkNoCicoData(LitackaETD etd) {
@@ -201,19 +247,23 @@ public class TicketInspectionHomeActivity extends BaseActivity {
         return true;
     }
 
-    private void finalInspectTicket(Instant time, LitackaETD etd) {
+    private void finalInspectTicket(Instant time, LitackaETD etd, boolean ignoreAuthenticity) {
         boolean isCico = repository.isCicoTicket(etd);
         PublicKey forcedKey = isCico ? currentCicoData.deviceCertificate().getPublicKey() : null;
         byte[] forcedSecret = isCico ? currentCicoData.seedDerivationSecrets().get(0).token() : null;
-        if (!repository.verifyTicketAuthenticity(etd, time, forcedKey, forcedSecret)) {
-            showUntrustedTicketDialog();
+        if (!ignoreAuthenticity && !repository.verifyTicketAuthenticity(etd, time, forcedKey, forcedSecret)) {
+            showUntrustedTicketDialog(time, etd);
         } else {
+            Set<Integer> alreadySeenBy = viewModel.getPastScanDevicesForTicket(etd);
+            viewModel.syncTicketAcknowledgement(etd);
             startActivity(
                     new Intent(this, TicketInspectionDetailActivity.class)
                             .putExtra(TicketInspectionDetailActivity.EXTRA_ETD, etd.encode())
                             .putExtra(TicketInspectionDetailActivity.EXTRA_INSPECTION_TIME, time.toEpochMilli())
                             .putStringArrayListExtra(TicketInspectionDetailActivity.EXTRA_INSPECTION_ZONES, currentValidationZones)
                             .putExtra(TicketInspectionDetailActivity.EXTRA_INSPECTION_TK, currentTripKey)
+                            .putIntegerArrayListExtra(TicketInspectionDetailActivity.EXTRA_SEEN_BY, new ArrayList<>(alreadySeenBy))
+                            .putExtra(TicketInspectionDetailActivity.EXTRA_MY_STAFF_NUMBER, repository.getStaffNumber())
             );
         }
     }
@@ -228,23 +278,25 @@ public class TicketInspectionHomeActivity extends BaseActivity {
         if (!checkCorrectCicoDevice(etd)) {
             return;
         }
-        finalInspectTicket(time, etd);
+        finalInspectTicket(time, etd, false);
     }
 
-    private void showUntrustedTicketDialog() {
+    private void showUntrustedTicketDialog(Instant inspectionTime, LitackaETD etd) {
         new MaterialAlertDialogBuilder(this)
                 .setIcon(R.drawable.ic_untrusted_48px)
                 .setTitle(R.string.ticket_inspection_auth_error_title)
                 .setMessage(R.string.ticket_inspection_auth_error_desc)
                 .setPositiveButton(R.string.ok, null)
+                .setNeutralButton(R.string.ticket_inspection_auth_error_show_anyway,  (dlg, which) -> finalInspectTicket(inspectionTime, etd, true))
                 .show();
     }
 
-    private void ensureNewestKeysAndRun(Runnable callback) {
+    private CompletableFuture<?> ensureNewestKeysAndRun(Runnable callback) {
         if (repository.hasSecretForTime(Instant.now())) {
             callback.run();
+            return CompletableFuture.completedFuture(null);
         } else {
-            syncKeys(false).thenAcceptAsync(unused -> callback.run(), getLifecycleExecutor());
+            return syncKeys(false).thenAcceptAsync(unused -> callback.run(), getLifecycleExecutor());
         }
     }
 
@@ -325,34 +377,120 @@ public class TicketInspectionHomeActivity extends BaseActivity {
                     ListFormat.formatList(this, currentValidationZones)
             ));
             binding.btnRefreshVehicleData.setVisibility(View.VISIBLE);
-            binding.switchRazzia.setVisibility(View.VISIBLE);
         } else {
             binding.tvVehicleInfo.setText(R.string.ticket_inspection_vehicle_none);
             binding.btnRefreshVehicleData.setVisibility(View.GONE);
-            binding.switchRazzia.setVisibility(View.GONE);
+        }
+    }
+    
+    private void updateLoginUI() {
+        if (repository.isStaffNumberSet()) {
+            binding.btnLoginLogout.setText(R.string.ticket_inspection_logout);
+            binding.tvLoginStatus.setText(getString(R.string.ticket_inspection_logged_in_as, repository.getStaffNumber()));
+            binding.btnLoginLogout.setOnClickListener(v -> {
+                repository.clearStaffNumber();
+                updateLoginUI();
+            });
+        } else {
+            binding.btnLoginLogout.setText(R.string.ticket_inspection_login);
+            binding.tvLoginStatus.setText(R.string.ticket_inspection_not_logged_in);
+            binding.btnLoginLogout.setOnClickListener(v -> {
+                EditText input = new AppCompatEditText(this);
+                input.setInputType(InputType.TYPE_CLASS_NUMBER);
+                input.requestFocus();
+                CommonDialogs.newTextInputDialog(this, input)
+                        .setTitle(R.string.ticket_inspection_login)
+                        .setMessage(R.string.ticket_inspection_login_prompt)
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .setPositiveButton(R.string.ticket_inspection_login_confirm, (dlg, which) -> {
+                            try {
+                                repository.setStaffNumber(Integer.parseInt(input.getText().toString()));
+                                updateLoginUI();
+                            } catch (NumberFormatException ex) {
+                                CommonDialogs.newInfoDialog(this, R.string.error, R.string.ticket_inspection_invalid_staff_number).show();
+                            }
+                        })
+                        .show();
+            });
         }
     }
 
-    public static class ViewModel extends AndroidViewModel {
+    private void updateNearbyDevicesUI(Set<Integer> nearbyDevices) {
+        if (nearbyDevices.isEmpty()) {
+            binding.tvNearbyDevices.setVisibility(View.GONE);
+        } else {
+            List<Integer> forPrint = new ArrayList<>(nearbyDevices);
+            Collections.sort(forPrint);
+            binding.tvNearbyDevices.setVisibility(View.VISIBLE);
+            binding.tvNearbyDevices.setText(getString(R.string.ticket_inspection_nearby_devices_format, ListFormat.formatList(this, forPrint)));
+        }
+    }
+
+    public static class ViewModel extends AndroidViewModel implements InspectionSyncTransceiver.Delegate {
 
         private final Executor clientCallExecutor = Executors.newSingleThreadExecutor();
+
+        private TicketInspectionRepository repository;
 
         private LwdnAddress currentAddress;
 
         private LwtAPIClient lwtClient;
         private RazziaHeartbeatKeeper razziaKeeper;
+        private InspectionSyncTransceiver syncTransceiver;
+        private final Duration syncTimeSlice = Duration.ofSeconds(30);
 
-        private final MutableLiveData<RazziaHeartbeatKeeper.State> razziaStateLiveData = new MutableLiveData<>();
+        private final MutableLiveData<RazziaState> razziaStateLiveData = new MutableLiveData<>();
+        private boolean isRazziaSyncActive = false;
+
+        private final BroadcastReceiver screenOnOffReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (intent.getAction() != null) {
+                    // we do not have a wake lock, so we will stop the synchronization when
+                    // screen is off so that we do not get cryptography exceptions because
+                    // the advertisement was not updated for the next time slice.
+                    switch (intent.getAction()) {
+                        case Intent.ACTION_SCREEN_OFF -> syncTransceiver.stop();
+                        case Intent.ACTION_SCREEN_ON -> {
+                            if (isRazziaSyncActive) {
+                                syncTransceiver.start();
+                            }
+                        }
+                    }
+                }
+            }
+        };
 
         public ViewModel(Application application) {
             super(application);
+            repository = TicketInspectionRepository.getInstance(application);
+            syncTransceiver = new InspectionSyncTransceiver(application, this);
+            IntentFilter screenFilter = new IntentFilter();
+            screenFilter.addAction(Intent.ACTION_SCREEN_ON);
+            screenFilter.addAction(Intent.ACTION_SCREEN_OFF);
+            application.registerReceiver(screenOnOffReceiver, screenFilter);
             addCloseable(this::closeClient);
+            addCloseable(syncTransceiver);
+            addCloseable(() -> application.unregisterReceiver(screenOnOffReceiver));
         }
 
-        private final Observer<RazziaHeartbeatKeeper.State> razziaStateObserver = razziaStateLiveData::setValue;
+        public TicketInspectionRepository getRepository() {
+            return repository;
+        }
 
-        public MutableLiveData<RazziaHeartbeatKeeper.State> getRazziaStateLiveData() {
+        private final Observer<RazziaHeartbeatKeeper.State> razziaStateObserver = unused -> publishRazziaState();
+
+        private void publishRazziaState() {
+            RazziaState newState = new RazziaState(razziaKeeper != null ? razziaKeeper.getStateLiveData().getValue() : null, isRazziaSyncActive);
+            LiveDataUtils.setNewValue(razziaStateLiveData, newState);
+        }
+
+        public MutableLiveData<RazziaState> getRazziaStateLiveData() {
             return razziaStateLiveData;
+        }
+
+        public MutableLiveData<Set<Integer>> getNearbyDevicesLiveData() {
+            return syncTransceiver.getNearbyDevicesLiveData();
         }
 
         public void ackRazziaError() {
@@ -362,10 +500,56 @@ public class TicketInspectionHomeActivity extends BaseActivity {
         }
 
         public CompletableFuture<?> setRazzia(boolean isRazzia) {
+            if (isRazzia) {
+                if (repository.isStaffNumberSet()) {
+                    isRazziaSyncActive = true;
+                    syncTransceiver.start();
+                }
+            } else {
+                isRazziaSyncActive = false;
+                syncTransceiver.stop();
+            }
             if (razziaKeeper != null) {
                 return razziaKeeper.setRazzia(isRazzia);
             }
+            publishRazziaState();
             return CompletableFuture.completedFuture(null);
+        }
+
+        private void ackTicket(int ticketIdHash) {
+            syncTransceiver.setLastAdvTicketHash(ticketIdHash);
+        }
+
+        private Integer getTicketHashForSync(LitackaETD etd) {
+            TicketETDParser etdp = new TicketETDParser(etd);
+            Long tid = etdp.getTicketId();
+            if (tid != null) {
+                // we expect that IDs are serial and that between 4 billion issued tickets,
+                // enough time passes that they will never physically co-exist
+                return tid.intValue();
+            }
+            String cicoSID = etdp.getCicoSessionId();
+            if (cicoSID != null) {
+                // https://stackoverflow.com/questions/785091/consistency-of-hashcode-on-a-java-string
+                // string hashCode is guaranteed to be consistent across all JVMs
+                return cicoSID.hashCode();
+            }
+            return null;
+        }
+
+        public void syncTicketAcknowledgement(LitackaETD etd) {
+            Integer hash = getTicketHashForSync(etd);
+            if (hash != null) {
+                ackTicket(hash);
+            }
+        }
+
+        public Set<Integer> getPastScanDevicesForTicket(LitackaETD etd) {
+            Integer hash = getTicketHashForSync(etd);
+            if (hash != null) {
+                return Set.copyOf(syncTransceiver.checkTicketHashAlreadyScanned(hash));
+            }
+            return Set.of();
         }
 
         private void closeClient() {
@@ -384,10 +568,12 @@ public class TicketInspectionHomeActivity extends BaseActivity {
                 return;
             }
             closeClient();
+            setRazzia(false);
             currentAddress = address;
             lwtClient = createLwtClient(address);
             razziaKeeper = new RazziaHeartbeatKeeper(new Handler(getApplication().getMainLooper()), lwtClient, clientCallExecutor);
             razziaKeeper.getStateLiveData().observeForever(razziaStateObserver);
+            publishRazziaState();
         }
 
         private LwtAPIClient createLwtClient(LwdnAddress address) {
@@ -400,6 +586,46 @@ public class TicketInspectionHomeActivity extends BaseActivity {
                             .build()
             );
             return client;
+        }
+
+        @Override
+        public int getDeviceID() {
+            return repository.getStaffNumber();
+        }
+
+        @Override
+        public Duration getTimeSliceSize() {
+            return syncTimeSlice;
+        }
+
+        @Override
+        public byte[] provideKeyForTime(Instant time, int keySize) {
+            byte[] secret = repository.getInspectionSecretForTime(time);
+            if (secret == null) {
+                return null;
+            }
+            byte[] saltedSecret = Arrays.copyOf(secret, secret.length + Long.BYTES);
+            ByteBuffer.wrap(saltedSecret, secret.length, Long.BYTES).putLong(time.toEpochMilli() / syncTimeSlice.toMillis());
+            return switch (keySize) {
+                case 16, 32 -> Arrays.copyOf(DigestUtils.sha256(saltedSecret), keySize);
+                case 64 -> DigestUtils.sha512(saltedSecret);
+                default -> throw new IllegalArgumentException("Unsupported key size: " + keySize);
+            };
+        }
+    }
+
+    public static record RazziaState(RazziaHeartbeatKeeper.State vehicleState, boolean syncState) {
+
+        public boolean isProcessing() {
+            return vehicleState != null && vehicleState.isProcessing();
+        }
+
+        public boolean isActive() {
+            return (vehicleState != null && vehicleState.isRazzia()) || syncState;
+        }
+
+        public Throwable error() {
+            return vehicleState != null ? vehicleState.error() : null;
         }
     }
 }
