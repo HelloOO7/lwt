@@ -127,6 +127,10 @@ public abstract class AbstractScan<R, E extends Exception, THIS extends Abstract
         return wasCancelled;
     }
 
+    public boolean wasFinishedExceptionally() {
+        return failureException != null;
+    }
+
     public synchronized void cancel() {
         if (!isFinished) {
             wasCancelled = true;

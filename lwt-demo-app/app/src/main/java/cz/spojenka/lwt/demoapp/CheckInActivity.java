@@ -14,13 +14,10 @@ import android.os.PersistableBundle;
 import android.view.View;
 
 import com.google.android.material.color.MaterialColors;
-import com.ncorti.slidetoact.SlideToActView;
 
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
-import androidx.activity.result.ActivityResult;
-import androidx.activity.result.ActivityResultCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
@@ -31,7 +28,6 @@ import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModelProvider;
 import cz.spojenka.android.system.livedata.LiveErrorSignal;
 import cz.spojenka.android.ui.dialog.CommonDialogs;
-import cz.spojenka.android.ui.view.LoadingPlaceholderContainer;
 import cz.spojenka.android.util.ViewUtils;
 import cz.spojenka.lwt.FeaturePrerequisite;
 import cz.spojenka.lwt.ICICOService;
@@ -227,6 +223,7 @@ public class CheckInActivity extends CICOActivityBase {
         super.onResume();
         registerReceiver(bluetoothOnReceiver, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
         continueSetup();
+        deviceListViewModel.recheckScanRestartAndUserAction();
     }
 
     @Override

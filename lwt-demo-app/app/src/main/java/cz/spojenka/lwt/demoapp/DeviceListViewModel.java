@@ -1,6 +1,13 @@
 package cz.spojenka.lwt.demoapp;
 
 import android.app.Application;
+import android.bluetooth.BluetoothAdapter;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.net.wifi.WifiManager;
+import android.net.wifi.aware.WifiAwareManager;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -16,8 +23,11 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.Observer;
 import cz.spojenka.android.system.livedata.LiveList;
+import cz.spojenka.lwdn.BluetoothLwdnScanner;
 import cz.spojenka.lwdn.LwdnAddress;
 import cz.spojenka.lwdn.LwdnScanException;
+import cz.spojenka.lwdn.WifiAwareLwdnScanner;
+import cz.spojenka.lwt.FeaturePrerequisite;
 import cz.spojenka.lwt.LwtDevice;
 import cz.spojenka.lwt.LwtDeviceType;
 import cz.spojenka.lwt.LwtScan;
@@ -27,12 +37,15 @@ public class DeviceListViewModel extends AndroidViewModel implements LwtScan.OnR
     private List<LwtDeviceType> deviceTypes;
     private boolean useContinuousScan = false;
     private LwtScan currentScan;
+    private boolean scanStarted = false;
 
     private LiveData<List<LwtDevice>> externalScanResults;
     private Observer<List<LwtDevice>> externalScanObserver = this::onReceivedExternalScanResults;
+    private BroadcastReceiver radioStateReceiver;
 
     private final LiveList<LwtDevice> deviceResults = new LiveList<>();
     private final MutableLiveData<Boolean> isLoading = new MutableLiveData<>(true);
+    private final MutableLiveData<RequiredUserAction> requiredUserAction = new MutableLiveData<>(null);
     private final MutableLiveData<LwdnScanException> scanError = new MutableLiveData<>();
 
     private boolean showInactiveDevices = false;
@@ -42,6 +55,25 @@ public class DeviceListViewModel extends AndroidViewModel implements LwtScan.OnR
     public DeviceListViewModel(@NonNull Application application) {
         super(application);
         addCloseable(this::close);
+        initRadioStateReceiver();
+        recheckScanRestartAndUserAction();
+    }
+
+    private void initRadioStateReceiver() {
+        radioStateReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                recheckScanRestartAndUserAction();
+            }
+        };
+
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
+        filter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
+        filter.addAction(WifiAwareManager.ACTION_WIFI_AWARE_STATE_CHANGED);
+        getApplication().registerReceiver(radioStateReceiver, filter);
+
+        addCloseable(() -> getApplication().unregisterReceiver(radioStateReceiver));
     }
 
     public void close() {
@@ -105,6 +137,56 @@ public class DeviceListViewModel extends AndroidViewModel implements LwtScan.OnR
 
     public LiveData<Boolean> getIsLoading() {
         return isLoading;
+    }
+
+    public boolean hasLWTHardware() {
+        return FeaturePrerequisite.LWT_HARDWARE.check(getApplication());
+    }
+
+    public void recheckScanRestartAndUserAction() {
+        RequiredUserAction action = determineRequiredUserAction();
+        setRequiredUserAction(action);
+        if (scanStarted && action == null && (currentScan == null || currentScan.wasFinishedExceptionally())) {
+            reload();
+        }
+    }
+
+    private RequiredUserAction determineRequiredUserAction() {
+        Context context = getApplication();
+        if (WifiAwareLwdnScanner.isSupported(context)) {
+            if (FeaturePrerequisite.checkLWTOverAwareSatisfiedExceptWifiOn(context)) {
+                WifiManager wm = context.getSystemService(WifiManager.class);
+                if (wm.getWifiState() != WifiManager.WIFI_STATE_ENABLED) {
+                    // if aware is not available despite wifi being on, fall through.
+                    // this is mainly to resolve scenarios such as Xiaomi Redmi Note 8T,
+                    // which acts as if aware is supported, but does not actually have the
+                    // hardware for it.
+                    return RequiredUserAction.WIFI_ON;
+                }
+            }
+        }
+        if (BluetoothLwdnScanner.isSupported(context)) {
+            if (FeaturePrerequisite.checkLWTOverBLESatisfiedExceptBTOn(context)) {
+                return RequiredUserAction.BLUETOOTH_ON;
+            }
+        }
+        if (!FeaturePrerequisite.checkLWTOverAwareSatisfied(context) && !FeaturePrerequisite.checkLWTOverBLESatisfied(context)) {
+            return RequiredUserAction.PERMISSIONS;
+        }
+
+        return null;
+    }
+
+    private void setRequiredUserAction(RequiredUserAction action) {
+        requiredUserAction.setValue(action);
+    }
+
+    public LiveData<RequiredUserAction> getRequiredUserAction() {
+        return requiredUserAction;
+    }
+
+    public boolean isUserActionRequired() {
+        return requiredUserAction.getValue() != null;
     }
 
     public void cancel() {
@@ -186,6 +268,7 @@ public class DeviceListViewModel extends AndroidViewModel implements LwtScan.OnR
     }
 
     public void startScan() {
+        scanStarted = true;
         load();
     }
 
@@ -225,6 +308,9 @@ public class DeviceListViewModel extends AndroidViewModel implements LwtScan.OnR
     }
 
     public void reload() {
+        if (!scanStarted) {
+            throw new IllegalStateException("Scan has not been started yet. Call startScan() first.");
+        }
         cancel();
         // if scan was initiated externally or from a previous activity, local reference will be null,
         // so cancel it here globally to ensure full reload.
@@ -279,5 +365,11 @@ public class DeviceListViewModel extends AndroidViewModel implements LwtScan.OnR
     public void onFinishedExceptionally(LwtScan scan, LwdnScanException e) {
         isLoading.setValue(false);
         scanError.setValue(e);
+    }
+
+    public static enum RequiredUserAction {
+        PERMISSIONS,
+        BLUETOOTH_ON,
+        WIFI_ON
     }
 }

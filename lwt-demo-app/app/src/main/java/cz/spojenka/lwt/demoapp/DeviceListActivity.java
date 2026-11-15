@@ -81,6 +81,12 @@ public class DeviceListActivity extends BaseActivity {
         });
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        viewModel.recheckScanRestartAndUserAction();
+    }
+
     protected void onDeviceSelected(LwtDevice device) {
 
     }

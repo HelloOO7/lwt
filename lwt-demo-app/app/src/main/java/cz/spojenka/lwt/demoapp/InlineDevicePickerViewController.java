@@ -40,6 +40,7 @@ public class InlineDevicePickerViewController {
         if (binding.getRoot().getLayoutParams().height == ViewGroup.LayoutParams.MATCH_PARENT) {
             devListUIController = new CustomListUIController(binding.deviceList.rvDeviceList, viewModel);
             binding.deviceList.loadingPlaceholder.getRoot().setVisibility(View.GONE);
+            binding.deviceList.offlinePlaceholder.getRoot().setVisibility(View.GONE);
         } else {
             devListUIController = new CustomListUIController(binding.deviceList, viewModel);
         }

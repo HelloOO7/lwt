@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="lwt_tech_choice_aware_desc">Communication is faster and more reliable in crowded areas. Power consumption is slightly higher. Location permission is not required.</string>
+</resources>

@@ -12,7 +12,6 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Handler;
@@ -27,6 +26,7 @@ import java.util.Objects;
 
 import androidx.annotation.Nullable;
 import cz.spojenka.lwdn.util.DeviceSpecifics;
+import cz.spojenka.lwdn.util.LocationDisavowal;
 
 public class BluetoothLeScan extends AbstractScan<ScanResult, Exception, BluetoothLeScan> implements AutoCloseable {
 
@@ -116,33 +116,29 @@ public class BluetoothLeScan extends AbstractScan<ScanResult, Exception, Bluetoo
         return context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE);
     }
 
+    public static boolean isLocationPermissionNeeded(Context context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (LocationDisavowal.isAssertedForPermission(context, Manifest.permission.BLUETOOTH_SCAN)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static boolean isBackgroundLocationPermissionExists() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q;
     }
 
     public static boolean isBackgroundLocationPermissionNeeded(Context context) {
-        if (!isBackgroundLocationPermissionExists()) {
-            // no background location permission exists on Android 9 and below
-            return true;
-        }
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                PackageInfo pi = context.getPackageManager().getPackageInfo(context.getPackageName(), PackageManager.GET_PERMISSIONS);
-                if (pi.requestedPermissions != null && pi.requestedPermissionsFlags != null) {
-                    for (int i = 0; i < pi.requestedPermissions.length; i++) {
-                        if (Manifest.permission.BLUETOOTH_SCAN.equals(pi.requestedPermissions[i]) &&
-                                (pi.requestedPermissionsFlags[i] & PackageInfo.REQUESTED_PERMISSION_NEVER_FOR_LOCATION) != 0) {
-                            return false;
-                        }
-                    }
-                }
-            }
+        if (isBackgroundLocationPermissionExists()) {
             // on Android 10, the background location permission does exist,
-            // and is needed to start LE scans in the background
-        } catch (PackageManager.NameNotFoundException e) {
-            Log.e(TAG, "Failed to get package info", e);
+            // and is needed to start LE scans in the background, unless
+            // neverForLocation is asserted (which is what isLocationPermissionNeeded checks for)
+            return isLocationPermissionNeeded(context);
+        } else {
+            // no background location permission exists on Android 9 and below
+            return false;
         }
-        return true;
     }
 
     public static boolean canStartInBackground(Context context) {

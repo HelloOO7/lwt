@@ -1,25 +1,31 @@
 package cz.spojenka.lwt.demoapp;
 
-import android.animation.LayoutTransition;
 import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
+import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
+import androidx.annotation.StringRes;
 import androidx.lifecycle.LifecycleOwner;
 import androidx.recyclerview.widget.ConcatAdapter;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.viewbinding.ViewBinding;
 import cz.spojenka.android.ui.helpers.AdapterListObserver;
 import cz.spojenka.android.ui.helpers.BasicListAdapter;
 import cz.spojenka.android.ui.helpers.SingleViewAdapter;
 import cz.spojenka.android.ui.helpers.VerticalSpaceItemDecoration;
 import cz.spojenka.android.util.ViewUtils;
+import cz.spojenka.lwt.FeaturePrerequisite;
 import cz.spojenka.lwt.LwtDevice;
 import cz.spojenka.lwt.demoapp.databinding.DeviceListItemBinding;
 import cz.spojenka.lwt.demoapp.databinding.DeviceListLoadingBinding;
+import cz.spojenka.lwt.demoapp.databinding.DeviceListOfflineBinding;
 import cz.spojenka.lwt.demoapp.databinding.DeviceListResizeableBinding;
 import cz.spojenka.lwt.util.TextMarkupConverter;
 
@@ -33,14 +39,18 @@ public class DeviceListViewController {
 
     private final BasicListAdapter<LwtDevice, TripAdvertisementViewHolder> itemAdapter;
 
-    private final SingleViewAdapter loadingAdapter;
-    private View loadingView;
+    private SingleViewAdapter loadingAdapter;
+    private SingleViewAdapter offlineAdapter;
+
+    private DeviceListLoadingBinding loadingView;
+    private DeviceListOfflineBinding offlineView;
+    private Consumer<DeviceListOfflineBinding> offlineViewDecorator;
 
     private LoadingSpinnerDisplayRule loadingDisplayRule = LoadingSpinnerDisplayRule.ALWAYS;
     private boolean onClickEffectEnabled = true;
     private boolean enabled = true;
 
-    public DeviceListViewController(RecyclerView recyclerView, DeviceListViewModel viewModel) {
+    private DeviceListViewController(RecyclerView recyclerView, DeviceListViewModel viewModel, Object sentinel) {
         this.recyclerView = recyclerView;
         this.viewModel = viewModel;
         markupConverter = new TextMarkupConverter(recyclerView.getContext().getResources().getFont(R.font.ropid_piktogramy));
@@ -66,16 +76,36 @@ public class DeviceListViewController {
                 return v -> onDeviceSelected(item);
             }
         };
-        loadingAdapter = new SingleViewAdapter(() -> {
-            View v = DeviceListLoadingBinding.inflate(inflater).getRoot();
-            v.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-            return v;
+    }
+
+    public DeviceListViewController(RecyclerView recyclerView, DeviceListViewModel viewModel) {
+        this(recyclerView, viewModel, null);
+        LayoutInflater inflater = LayoutInflater.from(recyclerView.getContext());
+        loadingAdapter = createExtraViewAdapter(() -> {
+            loadingView = DeviceListLoadingBinding.inflate(inflater);
+            return loadingView;
         });
+        offlineAdapter = createExtraViewAdapter(() -> {
+            offlineView = DeviceListOfflineBinding.inflate(inflater);
+            offlineViewDecorator.accept(offlineView);
+            return offlineView;
+        });
+        updateAllUIVisibility();
     }
 
     public DeviceListViewController(DeviceListResizeableBinding binding, DeviceListViewModel viewModel) {
-        this(binding.rvDeviceList, viewModel);
-        loadingView = binding.loadingPlaceholder.getRoot();
+        this(binding.rvDeviceList, viewModel, null);
+        loadingView = binding.loadingPlaceholder;
+        offlineView = binding.offlinePlaceholder;
+        updateAllUIVisibility();
+    }
+
+    private <V extends ViewBinding> SingleViewAdapter createExtraViewAdapter(Supplier<V> bindingSupplier) {
+        return new SingleViewAdapter(() -> {
+            View v = bindingSupplier.get().getRoot();
+            v.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            return v;
+        });
     }
 
     public TextMarkupConverter getMarkupConverter() {
@@ -105,20 +135,20 @@ public class DeviceListViewController {
             @Override
             public void onChanged(List<LwtDevice> list) {
                 super.onChanged(list);
-                updateLoadingSpinnerDisplay();
+                updateAllUIVisibility();
             }
 
             @Override
             public void onInserted(int start, List<LwtDevice> items) {
                 super.onInserted(start, items);
-                updateLoadingSpinnerDisplay();
+                updateAllUIVisibility();
                 notifyVisibleLoadingState(false);
             }
 
             @Override
             public void onRemoved(int start, int count) {
                 super.onRemoved(start, count);
-                updateLoadingSpinnerDisplay();
+                updateAllUIVisibility();
             }
         }.attach(lifecycleOwner, viewModel.getDeviceResults());
 
@@ -136,30 +166,106 @@ public class DeviceListViewController {
             updateLoadingSpinnerDisplay();
             notifyVisibleLoadingState(isLoading);
         });
+
+        viewModel.getRequiredUserAction().observe(lifecycleOwner, action -> {
+            setupUserActionUI(action);
+            updateLoadingSpinnerDisplay();
+        });
+    }
+
+    private void setupUserActionUI(DeviceListViewModel.RequiredUserAction action) {
+        if (action == null) {
+            setUserActionViewVisibility(View.GONE);
+        } else {
+            setUserActionViewVisibility(View.VISIBLE);
+            offlineViewDecorator = view -> {
+                @DrawableRes int icon = R.drawable.ic_sensors_off_24px;
+                @StringRes int text;
+                Runnable onClick;
+                Context context = view.getRoot().getContext();
+
+                switch (action) {
+                    case BLUETOOTH_ON -> {
+                        icon = R.drawable.ic_bluetooth_disabled_24px;
+                        text = R.string.device_list_offline_need_bluetooth;
+                        onClick = () -> FeaturePrerequisite.BLUETOOTH_ON.startRemedyActivity(context);
+                    }
+                    case PERMISSIONS -> {
+                        text = R.string.device_list_offline_need_perms;
+                        onClick = () -> context.startActivity(LWTPrerequisitesActivity.newIntent(context, LWTPrerequisitesActivity.HW_DEFAULT));
+                    }
+                    case WIFI_ON -> {
+                        icon = R.drawable.ic_wifi_tethering_off_24px;
+                        text = R.string.device_list_offline_need_wifi;
+                        onClick = () -> FeaturePrerequisite.AWARE_AVAILABLE.startRemedyActivity(context);
+                    }
+                    default -> throw new AssertionError();
+                }
+
+                view.ivOfflineIcon.setImageResource(icon);
+                view.tvOfflineText.setText(text);
+                view.getRoot().setOnClickListener(v -> onClick.run());
+            };
+            if (offlineView != null) {
+                offlineViewDecorator.accept(offlineView);
+            }
+        }
+    }
+
+    private void setUserActionViewVisibility(int visibility) {
+        if (offlineAdapter != null) {
+            offlineAdapter.setVisibility(visibility);
+        } else {
+            offlineView.getRoot().setVisibility(visibility);
+        }
+    }
+
+    private void setListViewVisibility(int visibility) {
+        recyclerView.setVisibility(visibility);
     }
 
     private void setLoadingViewVisibility(int visibility) {
-        if (loadingView != null) {
-            loadingView.setVisibility(visibility);
-        } else {
+        if (loadingAdapter != null) {
             loadingAdapter.setVisibility(visibility);
+        } else {
+            loadingView.getRoot().setVisibility(visibility);
         }
     }
 
     private void updateLoadingSpinnerDisplay() {
-        if (loadingDisplayRule == LoadingSpinnerDisplayRule.NEVER) {
+        if (!viewModel.isUserActionRequired()) {
+            setLoadingViewVisibility(computeLoadingVisibility());
+        } else {
             setLoadingViewVisibility(View.GONE);
-            return;
+        }
+    }
+
+    private void updateMainListVisibility() {
+        setListViewVisibility(computeMainListVisibility());
+    }
+
+    private void updateAllUIVisibility() {
+        updateMainListVisibility();
+        updateLoadingSpinnerDisplay();
+    }
+
+    private int computeMainListVisibility() {
+        return itemAdapter.getItemCount() > 0 ? View.VISIBLE : View.GONE;
+    }
+
+    private int computeLoadingVisibility() {
+        if (loadingDisplayRule == LoadingSpinnerDisplayRule.NEVER) {
+            return View.GONE;
         }
 
         if (viewModel.isLoading()) {
             if (loadingDisplayRule == LoadingSpinnerDisplayRule.ALWAYS || viewModel.getDeviceResults().isEmpty()) {
-                setLoadingViewVisibility(View.VISIBLE);
+                return View.VISIBLE;
             } else {
-                setLoadingViewVisibility(View.GONE);
+                return View.GONE;
             }
         } else {
-            setLoadingViewVisibility(View.GONE);
+            return View.GONE;
         }
     }
 

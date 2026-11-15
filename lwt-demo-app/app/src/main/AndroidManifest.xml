@@ -62,6 +62,8 @@
         <activity android:name=".CICOFareHistoryActivity" android:exported="false" />
         <activity android:name=".CICOFareSummaryActivity" android:exported="false" />
         <activity android:name=".TicketingHomeActivity" android:exported="false" />
+        <activity android:name=".LWTPrerequisitesActivity" android:exported="false" />
+        <activity android:name=".LWTTechChoiceActivity" android:exported="false" />
 
         <service
             android:name=".BleScanService"

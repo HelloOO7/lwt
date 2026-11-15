@@ -50,6 +50,10 @@ public class BluetoothLwdnScanner implements LwdnScanner {
         return BluetoothLeScan.isSupported(context);
     }
 
+    public static boolean isLocationPermissionNeeded(Context context) {
+        return BluetoothLeScan.isLocationPermissionNeeded(context);
+    }
+
     public static boolean isBackgroundLocationPermissionNeeded(Context context) {
         return BluetoothLeScan.isBackgroundLocationPermissionNeeded(context);
     }

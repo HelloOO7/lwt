@@ -112,6 +112,9 @@ public class TicketActivationActivity extends BaseActivity {
         }
 
         devPickerUIController.bind(this);
+        if (!devicesViewModel.hasLWTHardware()) {
+            binding.tripChoiceSubscreens.getRoot().setVisibility(View.GONE);
+        }
 
         binding.llZoneChoiceType.setOnClickListener(v -> showZoneChoiceTypeDialog());
 
@@ -299,6 +302,12 @@ public class TicketActivationActivity extends BaseActivity {
     protected void onDestroy() {
         super.onDestroy();
         binding.tvFastActivationTimer.removeCallbacks(fastActivationCountdownPillUpdater);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        devicesViewModel.recheckScanRestartAndUserAction();
     }
 
     private final Runnable fastActivationCountdownPillUpdater = new Runnable() {
