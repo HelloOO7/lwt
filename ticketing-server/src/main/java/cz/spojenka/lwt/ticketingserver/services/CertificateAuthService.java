@@ -35,18 +35,27 @@ public class CertificateAuthService implements AuthenticationUserDetailsService<
         if (cert != null) {
             principal = cert.getSubjectX500Principal();
             if (principal != null) {
-                authorities = extractAuthorities(principal);
+                authorities = extractAuthorities(cert, principal);
             }
         }
 
         return User.builder()
-                .username(principal != null ? principal.getName() : "default")
+                .username(principal != null ? extractCommonName(principal) : "")
                 .password("")
                 .authorities(authorities)
                 .build();
     }
 
-    private Collection<GrantedAuthority> extractAuthorities(X500Principal subjectPrincipal) {
+    public static String extractCommonName(X500Principal principal) {
+        X500Name subject = X500Name.getInstance(principal.getEncoded());
+        RDN[] cnRdns = subject.getRDNs(BCStyle.CN);
+        if (cnRdns.length > 0) {
+            return cnRdns[0].getFirst().getValue().toString();
+        }
+        return "";
+    }
+
+    private Collection<GrantedAuthority> extractAuthorities(X509Certificate certificate, X500Principal subjectPrincipal) {
         X500Name subject = X500Name.getInstance(subjectPrincipal.getEncoded());
 
         RDN[] rdns = subject.getRDNs(BCStyle.ROLE);
@@ -55,11 +64,23 @@ public class CertificateAuthService implements AuthenticationUserDetailsService<
 
         for (RDN rdn : rdns) {
             for (AttributeTypeAndValue roleValue : rdn.getTypesAndValues()) {
-                authorities.add(new SimpleGrantedAuthority(roleValue.getValue().toString()));
+                authorities.add(new CertificateGrantedAuthority(roleValue.getValue().toString(), certificate));
             }
         }
 
         return authorities;
+    }
+
+    public static X509Certificate getCertificate(Authentication authentication) {
+        if (authentication == null) {
+            return null;
+        }
+        for (GrantedAuthority authority : authentication.getAuthorities()) {
+            if (authority instanceof CertificateGrantedAuthority certAuthority) {
+                return certAuthority.getCertificate();
+            }
+        }
+        return null;
     }
 
     public static boolean hasRole(@Nullable Authentication authentication, String role) {

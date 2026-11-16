@@ -1,7 +1,14 @@
 package cz.spojenka.lwt.ticketing.api;
 
-import java.io.Serializable;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.util.List;
 
-public record CICOEventBatch(List<CICOEventPush> events, long currentLocalTimestamp) implements Serializable {
+public class CICOEventBatch extends AbstractEventBatch<CICOEventPush> {
+
+    @JsonCreator
+    public CICOEventBatch(@JsonProperty("events") List<CICOEventPush> events, @JsonProperty("currentLocalTimestamp") long currentLocalTimestamp) {
+        super(events, currentLocalTimestamp);
+    }
 }

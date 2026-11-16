@@ -250,4 +250,6 @@
     <string name="lwt_tech_choice_ble_desc">Lepší spotřeba energie a kompatibilita, zato pomalejší komunikace. Pro jízdenky v režimu check-in/check-out se Bluetooth LE používá vždy, bez ohledu na dostupnost Wi-Fi Aware.</string>
     <string name="lwt_tech_choice_aware_desc">Rychlejší a spolehlivější komunikace i v rušných oblastech. Spotřeba energie je o něco vyšší.</string>
     <string name="lwt_tech_choice_recommended">Doporučeno</string>
+    <string name="common_prerequisites_fine_location_desc_none">Pro přístup k poloze je potřeba oprávnění.</string>
+    <string name="inspection_prerequisites_hardware_desc">Kontrola jízdenek vyžaduje podporu Bluetooth 4.0.</string>
 </resources>

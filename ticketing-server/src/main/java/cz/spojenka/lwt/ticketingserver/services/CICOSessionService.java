@@ -20,17 +20,19 @@ public class CICOSessionService {
     private final CICOClearingRepository clearingRepository;
     private final TicketRepository ticketRepository;
     private final TariffCalculationService tariffCalculationService;
+    private final TelemetryService telemetry;
 
     @Value("${tickets.cico.allow-timeout-clearing-after}")
     private Duration allowTimeoutClearingAfter;
     @Value("${tickets.cico.force-session-clearing-after}")
     private Duration forceSessionClearingAfter;
 
-    public CICOSessionService(CICORepository repository, CICOClearingRepository clearingRepository, TicketRepository ticketRepository, TariffCalculationService tariffCalculationService) {
+    public CICOSessionService(CICORepository repository, CICOClearingRepository clearingRepository, TicketRepository ticketRepository, TariffCalculationService tariffCalculationService, TelemetryService telemetry) {
         this.cicoRepository = repository;
         this.clearingRepository = clearingRepository;
         this.ticketRepository = ticketRepository;
         this.tariffCalculationService = tariffCalculationService;
+        this.telemetry = telemetry;
     }
 
     public Page<CICOSessionSegment> getSessionsForAccount(Account account, boolean includeCleared, Pageable pageable) {
@@ -122,6 +124,7 @@ public class CICOSessionService {
                 result = result.add(runClearingForAccount(it.next()));
             }
         }
+        telemetry.ingestLocalEvent(ServerTelemetryEvent.RAN_CLEARING, null, result);
         return result;
     }
 

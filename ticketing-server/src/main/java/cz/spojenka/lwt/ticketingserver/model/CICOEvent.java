@@ -12,7 +12,8 @@ import java.util.UUID;
 @Entity
 @Table(
         indexes = {
-                @Index(name = "idx_session_id_event_time", columnList = "sessionId,eventTime")
+                @Index(name = "idx_session_id_event_time", columnList = "sessionId,eventTime"),
+                @Index(name = "idx_account", columnList = "account_id")
         }
 )
 public class CICOEvent {

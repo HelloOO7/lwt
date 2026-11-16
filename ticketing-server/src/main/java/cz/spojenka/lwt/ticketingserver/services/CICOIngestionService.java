@@ -2,11 +2,13 @@ package cz.spojenka.lwt.ticketingserver.services;
 
 import com.fasterxml.uuid.Generators;
 import com.fasterxml.uuid.impl.TimeBasedEpochRandomGenerator;
+import cz.spojenka.lwt.ticketing.api.CICOEventBatch;
 import cz.spojenka.lwt.ticketing.api.CICOEventPush;
 import cz.spojenka.lwt.ticketing.api.CICOEventType;
 import cz.spojenka.lwt.ticketingserver.model.Account;
 import cz.spojenka.lwt.ticketingserver.model.CICOEvent;
 import cz.spojenka.lwt.ticketingserver.model.CICORepository;
+import cz.spojenka.lwt.ticketingserver.util.TimeShiftUtil;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
@@ -33,17 +35,19 @@ public class CICOIngestionService {
         return eventIdGenerator.generate();
     }
 
+    @Transactional
+    public void ingestEvents(CICOEventBatch events) {
+        ingestEvents(TimeShiftUtil.toGlobalTime(events));
+    }
+
+    @Transactional
     public void ingestEvents(List<CICOEventPush> events) {
         if (events.isEmpty()) {
             return;
         }
 
         List<CICOEventPush> sortedEvents = new ArrayList<>(events);
-        for (CICOEventPush event : sortedEvents) {
-            if (event.absoluteTimestamp() == null) {
-                throw new IllegalArgumentException("Event must have absolute timestamp");
-            }
-        }
+        TimeShiftUtil.assertTimestampsAbsolute(sortedEvents);
         sortedEvents.sort(Comparator.comparing(CICOEventPush::absoluteTimestamp));
 
         List<CICOEvent> newEvents = new ArrayList<>(sortedEvents.size());
@@ -61,7 +65,6 @@ public class CICOIngestionService {
         repository.save(event);
     }
 
-    @Transactional
     private void insertAllEvents(List<CICOEvent> events) {
         repository.saveAll(events);
     }

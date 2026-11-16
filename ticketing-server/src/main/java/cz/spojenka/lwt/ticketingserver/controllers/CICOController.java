@@ -5,6 +5,7 @@ import cz.spojenka.lwt.ticketingserver.api.AccessDeniedException;
 import cz.spojenka.lwt.ticketingserver.api.NotFoundException;
 import cz.spojenka.lwt.ticketingserver.model.*;
 import cz.spojenka.lwt.ticketingserver.services.*;
+import cz.spojenka.lwt.ticketingserver.util.TimeShiftUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -107,18 +108,7 @@ public class CICOController {
             security = {@SecurityRequirement(name = "certificate", scopes = {Privileges.LWT_DEVICE})}
     )
     public void pushEvents(@RequestBody CICOEventBatch events) {
-        ZonedDateTime clientTime = ZonedDateTime.now();
-        List<CICOEventPush> absoluteEvents = new ArrayList<>(events.events().size());
-        for (CICOEventPush event : events.events()) {
-            if (event.absoluteTimestamp() != null) {
-                absoluteEvents.add(event);
-            } else {
-                absoluteEvents.add(event.withAbsoluteTimestamp(
-                        clientTime.plus(Duration.ofMillis(event.localTimestamp() - events.currentLocalTimestamp())).toOffsetDateTime()
-                ));
-            }
-        }
-        ingestionService.ingestEvents(absoluteEvents);
+        ingestionService.ingestEvents(events);
     }
 
     @GetMapping("/cico/evaluate-session")

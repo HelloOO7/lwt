@@ -201,14 +201,16 @@ public interface FeaturePrerequisite {
 
     public static final FeaturePrerequisite LOCATION_FOR_LE_SCAN = new AbstractPermissionPrerequisite(
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
-                    ? Manifest.permission.ACCESS_FINE_LOCATION
-                    : Manifest.permission.ACCESS_COARSE_LOCATION
+                    ? new String[]{Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION}
+                    : new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}
     ) {
         @Override
         public boolean isApplicable(Context context) {
             return BluetoothLwdnScanner.isLocationPermissionNeeded(context);
         }
     };
+
+    public static final FeaturePrerequisite FINE_LOCATION = new AbstractPermissionPrerequisite(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION);
 
     public static final FeaturePrerequisite NEARBY_WIFI_DEVICES = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ?
             new AbstractPermissionPrerequisite(Manifest.permission.NEARBY_WIFI_DEVICES) {
@@ -347,6 +349,12 @@ public interface FeaturePrerequisite {
             BATTERY_EXEMPTION
     };
 
+    public static FeaturePrerequisite[] TICKET_INSPECTION = {
+            BLE_HARDWARE,
+            BLUETOOTH_CLIENT,
+            FINE_LOCATION
+    };
+
     public static int getNumUnsatisfied(Context context, FeaturePrerequisite[] prerequisites) {
         int count = 0;
         for (FeaturePrerequisite prerequisite : prerequisites) {
@@ -383,5 +391,9 @@ public interface FeaturePrerequisite {
 
     public static boolean checkLWTOverBLESatisfiedExceptBTOn(Context context) {
         return getNumUnsatisfied(context, LWT_OVER_BLE) == 1 && !BLUETOOTH_ON.check(context);
+    }
+
+    public static boolean checkInspectionSatisfied(Context context) {
+        return checkAllSatisfied(context, TICKET_INSPECTION);
     }
 }

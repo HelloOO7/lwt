@@ -15,7 +15,7 @@ public record CICOEventPush(
         OffsetDateTime absoluteTimestamp,
         @NotNull CICOEventType eventType,
         String lwtMetadata
-) implements Serializable {
+) implements IEventPush, Serializable {
 
     public CICOEventPush withAbsoluteTimestamp(@NotNull OffsetDateTime absoluteTimestamp) {
         return new CICOEventPush(eventId, previousEventId, sessionId, accountId, localTimestamp, absoluteTimestamp, eventType, lwtMetadata);

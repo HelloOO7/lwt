@@ -6,10 +6,7 @@ import cz.spojenka.lwt.ticketing.api.TicketResponse;
 import cz.spojenka.lwt.ticketingserver.api.AccessDeniedException;
 import cz.spojenka.lwt.ticketingserver.api.NotFoundException;
 import cz.spojenka.lwt.ticketingserver.model.*;
-import cz.spojenka.lwt.ticketingserver.services.AccountService;
-import cz.spojenka.lwt.ticketingserver.services.CertificateAuthService;
-import cz.spojenka.lwt.ticketingserver.services.TicketActivationService;
-import cz.spojenka.lwt.ticketingserver.services.TicketFacade;
+import cz.spojenka.lwt.ticketingserver.services.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,12 +28,14 @@ public class TicketsController {
     private final TicketActivationService activationService;
     private final AccountService accountService;
     private final TicketFacade facade;
+    private final TelemetryService telemetry;
 
-    public TicketsController(TicketRepository repository, TicketActivationService activationService, AccountService accountService, TicketFacade facade) {
+    public TicketsController(TicketRepository repository, TicketActivationService activationService, AccountService accountService, TicketFacade facade, TelemetryService telemetry) {
         this.repository = repository;
         this.activationService = activationService;
         this.accountService = accountService;
         this.facade = facade;
+        this.telemetry = telemetry;
     }
 
     @PostMapping("/tickets/new")
@@ -50,6 +49,7 @@ public class TicketsController {
         Ticket ticket = new Ticket(productId, accountService.findByIdOrThrow(holderAccountId));
         activationService.generateActivationToken(ticket, 0);
         ticket = repository.save(ticket);
+        telemetry.ingestLocalEvent(ServerTelemetryEvent.ISSUED_TICKET, ticket.getId(), null);
         return facade.exportTicket(ticket, true, true);
     }
 

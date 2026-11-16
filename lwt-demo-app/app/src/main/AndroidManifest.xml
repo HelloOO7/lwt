@@ -64,6 +64,7 @@
         <activity android:name=".TicketingHomeActivity" android:exported="false" />
         <activity android:name=".LWTPrerequisitesActivity" android:exported="false" />
         <activity android:name=".LWTTechChoiceActivity" android:exported="false" />
+        <activity android:name=".InspectionPrerequisitesActivity" android:exported="false" />
 
         <service
             android:name=".BleScanService"

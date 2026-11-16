@@ -29,6 +29,7 @@ public class TicketingClient {
     private InspectionAPI inspectionAPI;
     private AccountsAPI accountsAPI;
     private CicoAPI cicoAPI;
+    private TelemetryAPI telemetryAPI;
 
     public TicketingClient(String baseUrl, OkHttpClient okHttpClient) {
         this(baseUrl, okHttpClient, null);
@@ -78,5 +79,12 @@ public class TicketingClient {
             cicoAPI = retrofit.create(CicoAPI.class);
         }
         return cicoAPI;
+    }
+
+    public TelemetryAPI getTelemetryAPI() {
+        if (telemetryAPI == null) {
+            telemetryAPI = retrofit.create(TelemetryAPI.class);
+        }
+        return telemetryAPI;
     }
 }

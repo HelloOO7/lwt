@@ -251,4 +251,6 @@
     <string name="lwt_tech_choice_ble_desc">Excellent power efficiency and better compatibility, but slower communication. Bluetooth is always used for CI/CO ticketing, regardless of availability of Wi-Fi Aware.</string>
     <string name="lwt_tech_choice_aware_desc">Communication is faster and more reliable in crowded areas. Power consumption is slightly higher.</string>
     <string name="lwt_tech_choice_recommended">Recommended</string>
+    <string name="common_prerequisites_fine_location_desc_none">Permission is needed to obtain access to device location.</string>
+    <string name="inspection_prerequisites_hardware_desc">Ticket inspection needs Bluetooth 4.0 support.</string>
 </resources>

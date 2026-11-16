@@ -42,6 +42,7 @@ public class PrerequisitesActivityBase extends BaseActivity {
         registerPrerequisite(FeaturePrerequisite.NEARBY_WIFI_DEVICES, R.string.common_prerequisites_wifi_devices_title, R.string.common_prerequisites_wifi_devices_desc_none, R.string.common_prerequisites_wifi_devices_desc_granted);
         registerPrerequisite(FeaturePrerequisite.AWARE_AVAILABLE, R.string.common_prerequisites_aware, R.string.common_prerequisites_aware_desc_none, R.string.common_prerequisites_aware_desc_granted);
         registerPrerequisite(FeaturePrerequisite.LOCATION_FOR_AWARE_SCAN, R.string.common_prerequisites_location_title, R.string.common_prerequisites_location_desc_none, R.string.common_prerequisites_location_desc_granted);
+        registerPrerequisite(FeaturePrerequisite.FINE_LOCATION, R.string.common_prerequisites_location_title, R.string.common_prerequisites_fine_location_desc_none, R.string.common_prerequisites_location_desc_granted);
     }
 
     private ActivityPrerequisitesBinding binding;

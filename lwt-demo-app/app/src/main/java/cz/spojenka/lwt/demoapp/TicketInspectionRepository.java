@@ -2,6 +2,7 @@ package cz.spojenka.lwt.demoapp;
 
 import android.app.Application;
 import android.content.SharedPreferences;
+import android.location.Location;
 import android.util.Log;
 
 import java.io.IOException;
@@ -14,6 +15,7 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -21,16 +23,25 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
+import androidx.annotation.NonNull;
 import cz.dpp.praguepublictransport.etd.ETDUtils;
 import cz.dpp.praguepublictransport.etd.LitackaETD;
 import cz.spojenka.android.settings.SharedPrefsHelper;
+import cz.spojenka.android.system.GlobalLocationObserver;
 import cz.spojenka.android.util.AsyncUtils;
 import cz.spojenka.lwt.LwtTicketMetadata;
+import cz.spojenka.lwt.ticketing.api.InspectionEventData;
 import cz.spojenka.lwt.ticketing.api.InspectionSecretResponse;
+import cz.spojenka.lwt.ticketing.api.TelemetryEventBatch;
+import cz.spojenka.lwt.ticketing.api.TelemetryEventClass;
+import cz.spojenka.lwt.ticketing.api.TelemetryEventPush;
 import cz.spojenka.lwt.ticketing.client.InspectionAPI;
+import cz.spojenka.lwt.ticketing.client.TelemetryAPI;
 import cz.spojenka.lwt.ticketing.client.TicketingClient;
 import cz.spojenka.lwt.util.PIDTicketTOTP;
+import okhttp3.ResponseBody;
 import retrofit2.Call;
+import retrofit2.Callback;
 import retrofit2.HttpException;
 import retrofit2.Response;
 
@@ -47,14 +58,20 @@ public class TicketInspectionRepository {
     private final SharedPreferences prefs;
 
     private InspectionAPI remote;
+    private TelemetryAPI telemetryAPI;
 
     private List<InspectionSecretResponse> inspectionSecrets;
     private List<byte[]> publicKeys;
     private List<PublicKey> decodedPublicKeys;
 
+    private GlobalLocationObserver locationObserver;
+
     private TicketInspectionRepository(Application appContext) {
         prefs = appContext.getSharedPreferences("ticket_inspection", Application.MODE_PRIVATE);
-        remote = new TicketingClient(BuildConfig.TICKETING_SERVER_URL, GlobalTrustManager.createMosNetworkClient(appContext)).getInspectionAPI();
+        TicketingClient client = new TicketingClient(BuildConfig.TICKETING_SERVER_URL, GlobalTrustManager.createMosNetworkClient(appContext));
+        remote = client.getInspectionAPI();
+        telemetryAPI = client.getTelemetryAPI();
+        locationObserver = new GlobalLocationObserver(appContext, 1000, 10);
     }
 
     public static TicketInspectionRepository getInstance(Application appContext) {
@@ -214,18 +231,18 @@ public class TicketInspectionRepository {
         }
     }
 
-    public boolean verifyTicketAuthenticity(LitackaETD ticketData, Instant totpInstant) {
+    public TicketInspectionResult verifyTicketAuthenticity(LitackaETD ticketData, Instant totpInstant) {
         return verifyTicketAuthenticity(ticketData, totpInstant, null, null);
     }
 
-    public boolean verifyTicketAuthenticity(LitackaETD ticketData, Instant totpInstant, PublicKey key, byte[] derivationSecret) {
+    public TicketInspectionResult verifyTicketAuthenticity(LitackaETD ticketData, Instant totpInstant, PublicKey key, byte[] derivationSecret) {
         if (!checkTicketSignature(ticketData, key)) {
-            return false;
+            return TicketInspectionResult.INVALID_SIGNATURE;
         }
         if (!checkTicketRotationData(ticketData, derivationSecret, totpInstant)) {
-            return false;
+            return TicketInspectionResult.INVALID_TOTP;
         }
-        return true;
+        return TicketInspectionResult.OK;
     }
 
     private boolean checkTicketSignature(LitackaETD ticketData, PublicKey key) {
@@ -339,6 +356,17 @@ public class TicketInspectionRepository {
         return bindEtd(etd).getLwtMetadata() == null;
     }
 
+    public TicketInspectionResult verifyTicketTimeValidity(Instant time, LitackaETD etd) {
+        TicketETDParser parser = bindEtd(etd);
+        if (parser.getValidSince() != null && time.isBefore(parser.getValidSince().toInstant())) {
+            return TicketInspectionResult.BEFORE_VALIDITY;
+        }
+        if (parser.getValidUntil() != null && time.isAfter(parser.getValidUntil().toInstant())) {
+            return TicketInspectionResult.PAST_VALIDITY;
+        }
+        return TicketInspectionResult.OK;
+    }
+
     public boolean isCicoCheckedOut(LitackaETD etd, Set<UUID> blacklist) {
         // this should only be called on a trusted ticket, so data absence is not checked
         UUID uuid = UUID.fromString(bindEtd(etd).getCicoSessionId());
@@ -365,5 +393,43 @@ public class TicketInspectionRepository {
     public void clearStaffNumber() {
         prefs.edit().remove(PK_STAFF_NUMBER)
                 .apply();
+    }
+
+    public void logTicketScanEvent(Instant time, LitackaETD etd, TicketInspectionResult result) {
+        Location location = locationObserver.getLastLocation().getValue();
+        TicketETDParser parser = bindEtd(etd);
+        String tid = parser.getTicketId() != null ? parser.getTicketId().toString() : parser.getCicoSessionId();
+        TelemetryEventPush event = new TelemetryEventPush(
+                TelemetryEventClass.INSPECTION,
+                isStaffNumberSet() ? String.valueOf(getStaffNumber()) : null,
+                time.toEpochMilli(),
+                time.atZone(ZoneId.systemDefault()).toOffsetDateTime(),
+                "TICKET_INSPECTED",
+                tid,
+                new InspectionEventData(result.name(), location != null ? location.getLatitude() : 0, location != null ? location.getLongitude() : 0)
+        );
+        uploadTelemetryEvent(event);
+    }
+
+    private void uploadTelemetryEvent(TelemetryEventPush event) {
+        telemetryAPI.pushEvents(new TelemetryEventBatch(List.of(event), Instant.now().toEpochMilli())).enqueue(new Callback<ResponseBody>() {
+            @Override
+            public void onResponse(@NonNull Call<ResponseBody> call, @NonNull Response<ResponseBody> response) {
+
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<ResponseBody> call, @NonNull Throwable t) {
+                Log.e(TAG, "Failed to upload telemetry event", t);
+            }
+        });
+    }
+
+    public void startLocationObserver() {
+        locationObserver.wake();
+    }
+
+    public void stopLocationObserver() {
+        locationObserver.sleep();
     }
 }

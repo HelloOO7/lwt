@@ -30,6 +30,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.widget.AppCompatEditText;
@@ -49,6 +50,7 @@ import cz.spojenka.android.util.AsyncUtils;
 import cz.spojenka.android.util.LiveDataUtils;
 import cz.spojenka.android.util.ViewUtils;
 import cz.spojenka.lwdn.LwdnAddress;
+import cz.spojenka.lwt.FeaturePrerequisite;
 import cz.spojenka.lwt.InspectionSyncTransceiver;
 import cz.spojenka.lwt.LocalCICOInspectionData;
 import cz.spojenka.lwt.LwtAPIClient;
@@ -78,6 +80,7 @@ public class TicketInspectionHomeActivity extends BaseActivity {
 
     private TicketInspectionRepository repository;
 
+    private ActivityResultLauncher<Intent> requestPrerequisitesLauncher;
     private ActivityResultLauncher<BarcodeFormat> scanQRLauncher;
     private ActivityResultLauncher<LwtDeviceType[]> pickDeviceLauncher;
 
@@ -112,6 +115,13 @@ public class TicketInspectionHomeActivity extends BaseActivity {
             }
         }
 
+        requestPrerequisitesLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+            if (result.getResultCode() == RESULT_OK) {
+                repository.startLocationObserver();
+            } else {
+                finish();
+            }
+        });
         scanQRLauncher = registerForActivityResult(ZxingScanActivity.SCAN_STRING, result -> {
             if (result != null) {
                 try {
@@ -202,6 +212,18 @@ public class TicketInspectionHomeActivity extends BaseActivity {
 
         updateVehicleInfoUI();
         updateLoginUI();
+
+        if (!FeaturePrerequisite.checkInspectionSatisfied(this)) {
+            requestPrerequisitesLauncher.launch(new Intent(this, InspectionPrerequisitesActivity.class));
+        } else {
+            repository.startLocationObserver();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        repository.stopLocationObserver();
     }
 
     private boolean checkNoCicoData(LitackaETD etd) {
@@ -216,6 +238,7 @@ public class TicketInspectionHomeActivity extends BaseActivity {
 
     private boolean checkNotCheckedOut(Instant time, LitackaETD etd) {
         if (repository.isCicoTicket(etd) && repository.isCicoCheckedOut(etd, currentCicoData.sessionBlacklist())) {
+            logTicketScanEvent(time, etd, TicketInspectionResult.CHECKED_OUT);
             CommonDialogs
                     .newYesNoDialog(
                             this,
@@ -251,9 +274,12 @@ public class TicketInspectionHomeActivity extends BaseActivity {
         boolean isCico = repository.isCicoTicket(etd);
         PublicKey forcedKey = isCico ? currentCicoData.deviceCertificate().getPublicKey() : null;
         byte[] forcedSecret = isCico ? currentCicoData.seedDerivationSecrets().get(0).token() : null;
-        if (!ignoreAuthenticity && !repository.verifyTicketAuthenticity(etd, time, forcedKey, forcedSecret)) {
+        TicketInspectionResult authResult = repository.verifyTicketAuthenticity(etd, time, forcedKey, forcedSecret);
+        if (!ignoreAuthenticity && authResult != TicketInspectionResult.OK) {
+            logTicketScanEvent(time, etd, authResult);
             showUntrustedTicketDialog(time, etd);
         } else {
+            logTicketScanEvent(time, etd, repository.verifyTicketTimeValidity(time, etd));
             Set<Integer> alreadySeenBy = viewModel.getPastScanDevicesForTicket(etd);
             viewModel.syncTicketAcknowledgement(etd);
             startActivity(
@@ -266,6 +292,10 @@ public class TicketInspectionHomeActivity extends BaseActivity {
                             .putExtra(TicketInspectionDetailActivity.EXTRA_MY_STAFF_NUMBER, repository.getStaffNumber())
             );
         }
+    }
+
+    private void logTicketScanEvent(Instant time, LitackaETD etd, TicketInspectionResult result) {
+        repository.logTicketScanEvent(time, etd, result);
     }
 
     private void inspectTicket(Instant time, LitackaETD etd, boolean ignoreCheckedOut) {
