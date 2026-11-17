@@ -5,6 +5,8 @@
 
 class SystemTime {
 public:
+    static void Init();
+
     inline static int64_t EpochMillis() {
         struct timeval tv;
         gettimeofday(&tv, nullptr);
@@ -26,4 +28,6 @@ public:
     inline static int64_t UptimeSeconds() {
         return UptimeMillis() / 1000;
     }
+
+    static bool IsSynchronized();
 };

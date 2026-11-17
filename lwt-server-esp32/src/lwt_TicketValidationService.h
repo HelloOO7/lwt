@@ -15,6 +15,7 @@
 #include "PSRAMAllocator.h"
 #include "esp_timer.h"
 #include "TimerProc.h"
+#include "lwt_TelemetryClient.h"
 
 namespace lwt {
 
@@ -38,7 +39,7 @@ namespace lwt {
 
         size_t m_Capacity;
         int64_t m_MaxAgeMs;
-        std::deque<Entry, psram_allocator<Entry>> m_Entries;
+        psram_deque<Entry> m_Entries;
 
     public:
         TicketPreauthRateLimiter(size_t capacity, int64_t maxAgeMs);
@@ -92,6 +93,7 @@ namespace lwt {
         TicketPreauthRateLimiter m_PreauthRateLimiter;
         TicketSignatureVerifier& m_TicketVerifier;
         MOSClient& m_MOSClient;
+        TelemetryClient& m_TelemetryClient;
         TripInformationService& m_TripInfoService;
         vdv301::SubscriberTVS* m_TVS;
         vdv301::PublisherRCS* m_RCS;
@@ -125,6 +127,7 @@ namespace lwt {
             const TicketValidationConfig& config,
             PreauthorizationTokenManager& tokenManager, TicketSignatureVerifier& ticketVerifier,
             MOSClient& mosClient,
+            TelemetryClient& telemetryClient,
             TripInformationService& tripInfoService, vdv301::SubscriberTVS* tvsOpt = nullptr,
             vdv301::PublisherRCS* rcsOpt = nullptr
         );

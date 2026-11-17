@@ -117,8 +117,16 @@ namespace lwt {
         case MOSCICOEventType::CHECK_OUT: return "CHECK_OUT";
         case MOSCICOEventType::REFRESH: return "REFRESH";
         case MOSCICOEventType::BE_OUT: return "BE_OUT";
-        default: return "UNKNOWN";
+        default: return "";
         }
+    }
+
+    template<typename E>
+    psram_json EventBatchJson(const MOSEventBatch<E>& eventBatch, psram_json&& eventsArray) {
+        return psram_json{
+            { "events", std::move(eventsArray) },
+            { "currentLocalTimestamp", eventBatch.CurrentLocalTimestamp }
+        };
     }
 
     int MOSClient::CICOPushEvents(const MOSCICOEventBatch& eventBatch) {
@@ -137,14 +145,63 @@ namespace lwt {
             eventsArray.push_back(std::move(eventJson));
         }
 
-        psram_json requestJson = {
-            { "events", std::move(eventsArray) },
-            { "currentLocalTimestamp", eventBatch.CurrentLocalTimestamp }
-        };
+        psram_json requestJson = EventBatchJson(eventBatch, std::move(eventsArray));
 
         psram_json& responseJson = requestJson; // reuse
 
         int status = PerformJsonHttpRequest(HTTP_METHOD_POST, "/cico/events", requestJson, &responseJson);
+
+        // no response for now
+        (void)responseJson;
+
+        return status;
+    }
+
+    const char* TelemetryEventClassToString(MOSTelemetryEventClass eventClass) {
+        switch (eventClass) {
+        case MOSTelemetryEventClass::LWT: return "LWT";
+        case MOSTelemetryEventClass::INSPECTION: return "INSPECTION";
+        case MOSTelemetryEventClass::MOS: return "MOS";
+        default: return "";
+        }
+    }
+
+    const char* TelemetryEventTypeToString(MOSTelemetryEventType eventType) {
+        switch (eventType) {
+        case MOSTelemetryEventType::BOOT_COMPLETED: return "BOOT_COMPLETED";
+        case MOSTelemetryEventType::PREAUTH_REQUESTED: return "PREAUTH_REQUESTED";
+        case MOSTelemetryEventType::TICKET_ACTIVATED: return "TICKET_ACTIVATED";
+        default: return "";
+        }
+    }
+
+    int MOSClient::TelemetryPushEvents(const MOSTelemetryEventBatch& eventBatch) {
+        psram_json eventsArray = psram_json::array();
+        for (const auto& event : eventBatch.Events) {
+            psram_json eventJson{
+                { "eventClass", TelemetryEventClassToString(event.EventClass) },
+                { "senderId", event.SenderId },
+                { "localTimestamp", event.LocalTimestamp },
+                { "absoluteTimestamp", event.AbsoluteTimestamp ? psram_json(event.AbsoluteTimestamp->to_string()) : psram_json(nullptr) },
+                { "eventType", TelemetryEventTypeToString(event.EventType) },
+                { "eventParameter", event.EventParameter ? psram_json(*event.EventParameter) : psram_json(nullptr) },
+                {
+                    "extraData",
+                    std::visit(overloaded{
+                        [](std::monostate) -> psram_json { return nullptr; },
+                        [](const psram_string& str) -> psram_json { return str; },
+                        [](const psram_json& json) -> psram_json { return json.dump(); },
+                    }, event.ExtraData)
+                }
+            };
+            eventsArray.push_back(std::move(eventJson));
+        }
+
+        psram_json requestJson = EventBatchJson(eventBatch, std::move(eventsArray));
+
+        psram_json& responseJson = requestJson; // reuse
+
+        int status = PerformJsonHttpRequest(HTTP_METHOD_POST, "/telemetry/events", requestJson, &responseJson);
 
         // no response for now
         (void)responseJson;
@@ -236,7 +293,8 @@ namespace lwt {
             if (pResponseJson) {
                 if (responseBody.empty()) {
                     *pResponseJson = psram_json::object();
-                } else {
+                }
+                else {
                     *pResponseJson = psram_json::parse(responseBody);
                 }
             }

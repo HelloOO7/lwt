@@ -33,7 +33,7 @@ private:
 private:
     size_t m_Capacity;
 
-    std::deque<EventRegistration, psram_allocator<EventRegistration>> m_Queue;
+    psram_deque<EventRegistration> m_Queue;
 
 public:
     EventQueue(const std::string& name, size_t capacity, size_t stackSize = 4096, int priority = DEFAULT_TASK_PRIORITY);

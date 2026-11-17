@@ -87,3 +87,7 @@ void TimerProc::Restart(uint64_t newPeriodWhen) {
         ESP_ERROR_CHECK(err);
     }
 }
+
+void TimerProc::RestartIn(uint64_t delayUs) {
+    Restart(esp_timer_get_time() + delayUs);
+}

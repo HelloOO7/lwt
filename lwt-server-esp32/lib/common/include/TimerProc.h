@@ -30,4 +30,5 @@ public:
     bool Start();
     void Stop();
     void Restart(uint64_t newPeriodWhen = 0);
+    void RestartIn(uint64_t delayUs);
 };

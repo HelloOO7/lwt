@@ -5,5 +5,5 @@ file(GLOB COMMON_SRCS
 idf_component_register(
     SRCS ${COMMON_SRCS}
     INCLUDE_DIRS "include"
-    REQUIRES mbedtls esp_timer
+    REQUIRES mbedtls esp_timer esp_event esp_netif
 )

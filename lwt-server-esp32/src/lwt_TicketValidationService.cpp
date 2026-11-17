@@ -28,6 +28,7 @@ namespace lwt {
         const TicketValidationConfig& config,
         PreauthorizationTokenManager& tokenManager, TicketSignatureVerifier& ticketVerifier,
         MOSClient& mosClient,
+        TelemetryClient& telemetryClient,
         TripInformationService& tripInfoService, SubscriberTVS* tvsOpt,
         PublisherRCS* rcsOpt
     ) :
@@ -36,6 +37,7 @@ namespace lwt {
         m_PreauthRateLimiter(1000, 45LL * 60 * 1000), // 1000 entries, 45 minutes max age
         m_TicketVerifier{ ticketVerifier },
         m_MOSClient{ mosClient },
+        m_TelemetryClient{ telemetryClient },
         m_TripInfoService{ tripInfoService },
         m_TVS{ tvsOpt },
         m_RCS{ rcsOpt },
@@ -104,6 +106,8 @@ namespace lwt {
                             ESP_LOGW(TAG, "Activation token explicitly disallows preauthorization");
                             return 403;
                         }
+
+                        m_TelemetryClient.LogEvent(MOSTelemetryEventType::PREAUTH_REQUESTED, std::to_string(parsedToken.TicketId));
 
                         tokenHashes.push_back(tokenHash);
                     }
@@ -223,6 +227,8 @@ namespace lwt {
                         ESP_LOGW(TAG, "MOS ticket activation failed with HTTP status %d", mosResult);
                         return mosResult;
                     }
+
+                    m_TelemetryClient.LogEvent(MOSTelemetryEventType::TICKET_ACTIVATED, std::to_string(parsedToken.TicketId));
 
                     LwtOffsetDateTime validSince = IsoToFlatLwt(activatedTicket.ValidSince);
                     LwtOffsetDateTime validUntil = IsoToFlatLwt(activatedTicket.ValidUntil);

@@ -38,7 +38,7 @@ namespace lwt {
         PresenceTracker& presenceTracker,
         int syncTaskPriority
     ) :
-        PubSubTask("CicoSync", 4096, syncTaskPriority),
+        EventSenderTask("CicoSync", 6144, syncTaskPriority),
         m_Config(config),
         m_TrustRoot(trustRoot),
         m_DeviceCert(deviceCert),
@@ -50,10 +50,18 @@ namespace lwt {
         m_PresenceTracker{ presenceTracker }
     {
         m_SeedDerivationSecret.resize(SEED_DERIVATION_SECRET_SIZE);
-        ESP_ERROR_CHECK(esp_event_handler_instance_register(NETIF_SNTP_EVENT, NETIF_SNTP_TIME_SYNC, [](void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
-            CicoService* service = static_cast<CicoService*>(arg);
-            service->OnTimeSyncDone();
-            }, this, &m_TimeSyncEventInstance));
+        ESP_ERROR_CHECK(
+            esp_event_handler_instance_register(
+                NETIF_SNTP_EVENT,
+                NETIF_SNTP_TIME_SYNC,
+                [](void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
+                    CicoService* service = static_cast<CicoService*>(arg);
+                    service->OnTimeSyncDone();
+                },
+                this,
+                &m_TimeSyncEventInstance
+            )
+        );
         m_TicketValidationService.ObserveServiceState(*this);
         m_PresenceTracker.ObserveClientVanished(*this);
     }
@@ -125,21 +133,16 @@ namespace lwt {
         Observable<CicoState>::RemoveObserver(observer);
     }
 
-    void CicoService::ProcessData() {
-        SendEventsToServer();
-    }
-
     bool CicoService::SendEventsToServer() {
 #ifndef CICO_WITHOUT_MOS
         if (!m_EventBuffer.empty()) {
             MOSCICOEventBatch eventBatch{
-                .Events = std::move(m_EventBuffer),
+                .Events = m_EventBuffer,
                 .CurrentLocalTimestamp = SystemTime::UptimeMillis()
             };
             int statusCode = m_MOSClient.CICOPushEvents(eventBatch);
-            if (statusCode != 200) {
-                // move data back, retry later
-                m_EventBuffer = std::move(eventBatch.Events);
+            if (!MOSClient::IsStatusOK(statusCode)) {
+                // retry later
                 return false;
             }
             m_EventBuffer.clear();
@@ -149,11 +152,6 @@ namespace lwt {
         m_EventBuffer.clear();
 #endif
         return true;
-    }
-
-    void CicoService::SyncEventsTaskFunc(void* arg) {
-        CicoService* service = static_cast<CicoService*>(arg);
-        service->SyncEventsLoop();
     }
 
     void CicoService::Register(ServiceRegistry& registry) {

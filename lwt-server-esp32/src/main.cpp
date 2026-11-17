@@ -49,6 +49,8 @@
 #include "lwt_CicoService.h"
 #include <atomic>
 #include "lwdn_BleScanner.h"
+#include "lwt_TelemetryClient.h"
+#include "SystemTime.h"
 
 static constexpr uint16_t BLE_PSM = 0xD7; // 0x80 + 'W'
 static constexpr lwdn::BleAdvertiser::UUID32 BLE_SERVICE_UUID_VEHICLE = 0x4C575456; // 'LWTV'
@@ -58,8 +60,8 @@ static constexpr lwdn::BleAdvertiser::UUID32 BLE_SERVICE_UUID_STOP_EXTENDED = BL
 static constexpr lwdn::BleAdvertiser::UUID32 BLE_SERVICE_UUID_CICO_KEEPALIVE = 0xC1C0AA11;
 
 static constexpr in_port_t WIFI_NAN_PORT = 26001;
-static const std::vector<ByteVector> WIFI_NAN_MATCHING_FILTERS_VEHICLE = { {'V'}, {'*'} };
-static const std::vector<ByteVector> WIFI_NAN_MATCHING_FILTERS_STOP = { {'*'}, {'S'} };
+static const std::vector<ByteVector> WIFI_NAN_MATCHING_FILTERS_VEHICLE = { { 'V' },{ '*' } };
+static const std::vector<ByteVector> WIFI_NAN_MATCHING_FILTERS_STOP = { { '*' },{ 'S' } };
 
 static const lwt::TicketValidationConfig TICKETING_CONFIG = {
     .TariffSystemID = "PID",
@@ -97,6 +99,7 @@ private:
     lwt::PreauthorizationTokenManager m_PreauthTokenManager;
     lwt::TicketSignatureVerifier m_TicketVerifier;
     lwt::MOSClient m_MOSClient;
+    lwt::TelemetryClient m_TelemetryClient;
     lwt::TicketValidationService m_TicketService;
     lwt::PresenceTracker m_PresenceTracker;
     lwt::CicoService m_CicoService;
@@ -145,7 +148,8 @@ public:
         m_PreauthTokenManager(m_HMAC),
         m_TicketVerifier(),
         m_MOSClient("https://ticketing.mos.ropid:8080", m_DeviceCert, { TLS_LWT_SERVER_KEY_DEBUG_START, TLS_LWT_SERVER_KEY_DEBUG_END }),
-        m_TicketService(TICKETING_CONFIG, m_PreauthTokenManager, m_TicketVerifier, m_MOSClient, m_TripInfoService, &m_TVSSubscriber, &m_RCSPublisher),
+        m_TelemetryClient(m_MOSClient, TASK_PRIORITY_BACKGROUND_SYNC),
+        m_TicketService(TICKETING_CONFIG, m_PreauthTokenManager, m_TicketVerifier, m_MOSClient, m_TelemetryClient, m_TripInfoService, &m_TVSSubscriber, &m_RCSPublisher),
         m_PresenceTracker(m_BLEScanner, BLE_SERVICE_UUID_CICO_KEEPALIVE, TICKETING_CONFIG.MaxCicoClients, TICKETING_CONFIG.BeOutVanishTimeMs),
         m_CicoService(TICKETING_CONFIG, m_TrustRootCert, m_DeviceCert, m_SigningKey, m_HMAC, m_TicketService, m_MOSClient, m_PresenceTracker, TASK_PRIORITY_BACKGROUND_SYNC),
         m_BLETripAdvertiserLegacy(0, BLE_SERVICE_UUID_VEHICLE, lwdn::BleAdvertiser::Flags::INCLUDE_DEVICE_NAME | lwdn::BleAdvertiser::Flags::USE_LEGACY_ADVERTISING),
@@ -176,6 +180,8 @@ public:
         m_AppServer.AddInterceptor(std::make_unique<lwt::CertRoleInterceptor>());
 
         StartClientServer();
+
+        m_TelemetryClient.LogEvent(lwt::MOSTelemetryEventType::BOOT_COMPLETED);
     }
 
     void StartClientServer() {
@@ -272,6 +278,7 @@ extern "C" void app_main() {
     init_nimble();
     std::cout << "Hello, VDV301!" << std::endl;
     esp_netif_init();
+    SystemTime::Init();
 
     wifi_init_default();
     wifi_init_nan();

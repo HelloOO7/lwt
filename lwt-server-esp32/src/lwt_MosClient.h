@@ -73,10 +73,13 @@ namespace lwt {
         psram_string LwtMetadata;
     };
 
-    struct MOSCICOEventBatch {
-        psram_vector<MOSCICOEvent> Events;
+    template<typename E>
+    struct MOSEventBatch {
+        std::span<const E> Events;
         int64_t CurrentLocalTimestamp;
     };
+
+    using MOSCICOEventBatch = MOSEventBatch<MOSCICOEvent>;
 
     struct MOSCheckInRequest {
         ByteVector CheckInToken;
@@ -86,6 +89,30 @@ namespace lwt {
         uint32_t AccountId;
         UUID SessionId;
     };
+
+    enum class MOSTelemetryEventClass {
+        LWT,
+        INSPECTION,
+        MOS
+    };
+
+    enum class MOSTelemetryEventType {
+        BOOT_COMPLETED,
+        PREAUTH_REQUESTED,
+        TICKET_ACTIVATED,
+    };
+
+    struct MOSTelemetryEvent {
+        MOSTelemetryEventClass EventClass;
+        psram_string SenderId;
+        int64_t LocalTimestamp;
+        std::optional<OffsetDateTime> AbsoluteTimestamp;
+        MOSTelemetryEventType EventType;
+        std::optional<psram_string> EventParameter;
+        std::variant<std::monostate, psram_string, psram_json> ExtraData;
+    };
+
+    using MOSTelemetryEventBatch = MOSEventBatch<MOSTelemetryEvent>;
 
     class MOSClient {
     private:
@@ -99,6 +126,8 @@ namespace lwt {
 
         int CICOPushEvents(const MOSCICOEventBatch& eventBatch);
         int CICOCheckIn(const MOSCheckInRequest& request, MOSCheckInResponse* pResponse);
+
+        int TelemetryPushEvents(const MOSTelemetryEventBatch& eventBatch);
 
         static bool IsStatusOK(int statusCode);
 

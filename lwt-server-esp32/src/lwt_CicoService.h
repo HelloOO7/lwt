@@ -12,7 +12,7 @@
 #include "lwdn_generated.h"
 #include "cico_generated.h"
 #include "esp_event.h"
-#include "PubSubTask.h"
+#include "lwt_EventSenderTask.h"
 #include "lwt_PresenceTracker.h"
 
 namespace lwt {
@@ -51,7 +51,7 @@ namespace lwt {
         Observer<TicketValidationState>,
         Observer<UUID>,
         public Observable<CicoState>,
-        protected PubSubTask
+        protected EventSenderTask
     {
     private:
         struct ParsedRefreshToken {
@@ -63,8 +63,6 @@ namespace lwt {
 
     private:
         TicketValidationConfig m_Config;
-
-        PSRAMTask m_SyncTask;
 
         Certificate& m_TrustRoot;
         Certificate& m_DeviceCert;
@@ -107,7 +105,7 @@ namespace lwt {
         void ObserveServiceState(Observer<CicoState>& observer);
         void RemoveObserver(Observer<CicoState>& observer);
 
-        virtual void ProcessData() override;
+        virtual bool SendEventsToServer() override;
 
     private:
         bool IsCicoReady();
@@ -139,9 +137,5 @@ namespace lwt {
         static bool IsRefreshSelfCertificate(const CICOFragmentRefreshRequest& request);
 
         void ProcessCicoRequest(MOSCICOEvent&& event, flatbuffers::FlatBufferBuilder& responseFbb);
-
-        void SyncEventsLoop();
-        bool SendEventsToServer();
-        static void SyncEventsTaskFunc(void* arg);
     };
 }

@@ -3,7 +3,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <functional>
-#include <deque>
 #include <mutex>
 #include <condition_variable>
 #include <string>
