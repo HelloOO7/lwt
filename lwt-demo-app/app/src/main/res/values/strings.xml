@@ -253,4 +253,13 @@
     <string name="lwt_tech_choice_recommended">Recommended</string>
     <string name="common_prerequisites_fine_location_desc_none">Permission is needed to obtain access to device location.</string>
     <string name="inspection_prerequisites_hardware_desc">Ticket inspection needs Bluetooth 4.0 support.</string>
+    <string name="ticket_offers_title">Ticket offers</string>
+    <string name="ticket_offer_network_all">network-wide</string>
+    <string name="ticket_offer_zone_range" translatable="false">%1$s–%2$s</string>
+    <string name="ticket_offer_panel_prague">Prague</string>
+    <string name="ticket_offer_panel_pid_single">Prague integrated transport (PID)</string>
+    <string name="ticket_offer_panel_network">Network tickets</string>
+    <string name="ticket_offer_panel_other">Other tickets</string>
+    <string name="ticket_offer_panel_extra">Additional services</string>
+    <string name="ticket_offer_network_symbol" translatable="false">∞</string>
 </resources>

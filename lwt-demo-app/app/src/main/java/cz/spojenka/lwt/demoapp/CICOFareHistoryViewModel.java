@@ -2,7 +2,6 @@ package cz.spojenka.lwt.demoapp;
 
 import android.app.Application;
 
-import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 
@@ -17,9 +16,6 @@ import cz.spojenka.lwt.ticketing.api.CICOSessionInfo;
 import cz.spojenka.lwt.ticketing.api.PagedResponse;
 import cz.spojenka.lwt.ticketing.client.TicketingClient;
 import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.HttpException;
-import retrofit2.Response;
 
 public class CICOFareHistoryViewModel extends AndroidViewModel {
 
@@ -124,27 +120,17 @@ public class CICOFareHistoryViewModel extends AndroidViewModel {
     private <T> Call<PagedResponse<T>> tryLoadNextPage(LiveList<T> dest, MutableLiveData<Boolean> hasMoreDest, Function<Integer, Call<PagedResponse<T>>> loader) {
         if (Boolean.TRUE.equals(hasMoreDest.getValue())) {
             var call = loader.apply(dest.size() / PAGING_SIZE);
-            call.enqueue(new Callback<>() {
-                @Override
-                public void onResponse(@NonNull Call<PagedResponse<T>> call, @NonNull Response<PagedResponse<T>> response) {
-                    if (!response.isSuccessful()) {
-                        onFailure(call, new HttpException(response));
-                        return;
-                    }
-                    PagedResponse<T> data = Objects.requireNonNull(response.body());
-                    dest.addAll(data.content());
-                    if (data.page().number() >= data.page().totalPages() - 1) {
-                        hasMoreDest.setValue(false);
-                    }
-                    updateIsLoadingLiveData();
-                }
-
-                @Override
-                public void onFailure(@NonNull Call<PagedResponse<T>> call, @NonNull Throwable t) {
-                    loadError.setValue(t);
-                    updateIsLoadingLiveData();
-                }
-            });
+            RetrofitUtils.handleWithErrorSignal(
+                    call,
+                    loadError,
+                    data -> {
+                        dest.addAll(data.content());
+                        if (data.page().number() >= data.page().totalPages() - 1) {
+                            hasMoreDest.setValue(false);
+                        }
+                    },
+                    this::updateIsLoadingLiveData
+            );
             return call;
         }
         return null;
@@ -160,21 +146,7 @@ public class CICOFareHistoryViewModel extends AndroidViewModel {
     public void evaluateSession(UUID sessionId) {
         cancelEvaluateSession();
         evaluateSessionCall = ticketingClient.getCicoAPI().evaluateSession(sessionId);
-        evaluateSessionCall.enqueue(new Callback<>() {
-            @Override
-            public void onResponse(@NonNull Call<CICOClearedFare> call, @NonNull Response<CICOClearedFare> response) {
-                if (!response.isSuccessful()) {
-                    onFailure(call, new HttpException(response));
-                } else {
-                    evaluatedSessionResult.setValue(Objects.requireNonNull(response.body()));
-                }
-            }
-
-            @Override
-            public void onFailure(@NonNull Call<CICOClearedFare> call, @NonNull Throwable t) {
-                evaluateSessionError.setValue(t);
-            }
-        });
+        RetrofitUtils.handleWithErrorSignal(evaluateSessionCall, evaluateSessionError, evaluatedSessionResult::setValue);
     }
 
     public LiveData<CICOClearedFare> getEvaluatedSessionResult() {

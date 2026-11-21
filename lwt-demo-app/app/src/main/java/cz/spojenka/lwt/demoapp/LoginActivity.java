@@ -167,22 +167,14 @@ public class LoginActivity extends BaseActivity {
                 clientConfigIsNew = true;
             }
             if (!clientConfig.isDone()) {
-                accountsAPI.getOAuthConfig().enqueue(new Callback<ClientOAuthConfig>() {
-                    @Override
-                    public void onResponse(@NonNull Call<ClientOAuthConfig> call, @NonNull Response<ClientOAuthConfig> response) {
-                        if (response.isSuccessful()) {
-                            clientConfig.complete(response.body());
-                        } else {
-                            onFailure(call, new HttpException(response));
+                RetrofitUtils.handle(
+                        accountsAPI.getOAuthConfig(),
+                        clientConfig::complete,
+                        t -> {
+                            setError(t);
+                            clientConfig.completeExceptionally(t);
                         }
-                    }
-
-                    @Override
-                    public void onFailure(@NonNull Call<ClientOAuthConfig> call, @NonNull Throwable t) {
-                        setError(t);
-                        clientConfig.completeExceptionally(t);
-                    }
-                });
+                );
             }
             if (authConfig == null || authConfig.isCompletedExceptionally()) {
                 authConfig = new CompletableFuture<>();
@@ -272,22 +264,14 @@ public class LoginActivity extends BaseActivity {
 
         private void loadAccountData() {
             loadingState.setValue(LoadingState.ACCOUNT_DATA);
-            accountsAPI.getOrCreateAccountByOAuth(true).enqueue(new Callback<AccountResponse>() {
-                @Override
-                public void onResponse(@NonNull Call<AccountResponse> call, @NonNull Response<AccountResponse> response) {
-                    if (response.isSuccessful()) {
-                        accountRepository.setAccountData(response.body());
+            RetrofitUtils.handle(
+                    accountsAPI.getOrCreateAccountByOAuth(true),
+                    data -> {
+                        accountRepository.setAccountData(data);
                         loadingState.setValue(LoadingState.ALL_DONE);
-                    } else {
-                        setError(new HttpException(response));
-                    }
-                }
-
-                @Override
-                public void onFailure(@NonNull Call<AccountResponse> call, @NonNull Throwable t) {
-                    setError(t);
-                }
-            });
+                    },
+                    this::setError
+            );
         }
 
         private void setError(Throwable t) {

@@ -45,6 +45,8 @@ public class CICOTariffCalculation {
 
     @Autowired
     private AccountService accountService;
+    @Autowired
+    private ProductRepository productRepository;
 
     @Autowired
     private TimetableDatabase tt;
@@ -374,7 +376,10 @@ public class CICOTariffCalculation {
 
     private Ticket ticketFromJni(JourneyTicket journeyTicket, Journey srcJourney) {
         cz.spojenka.engine.jni.Ticket jniTicket = journeyTicket.ticket;
-        Ticket ticket = new Ticket(Integer.parseInt(jniTicket.optionUid), account);
+        Ticket ticket = new Ticket(
+                productRepository.findById(Integer.parseInt(jniTicket.optionUid)).orElseThrow(() -> new IllegalStateException("Engine returned product not present in DB!")),
+                account
+        );
         if (jniTicket instanceof TicketZoned zoned) {
             ticket.activate(
                     jniTicket.validFrom.toOffsetDateTime(),

@@ -25,4 +25,7 @@ public interface AccountsAPI {
 
     @GET("/accounts/me/cico-fare-history")
     public Call<PagedResponse<CICOClearedFare>> getCicoFareHistory(@Query("page") int page, @Query("size") int size);
+
+    @GET("/accounts/me/tickets")
+    public Call<PagedResponse<TicketResponse>> getMyTickets(@Query("appId") String appId, @Query("includePastValidity") boolean includePastValidity, @Query("page") Integer page, @Query("size") Integer size);
 }

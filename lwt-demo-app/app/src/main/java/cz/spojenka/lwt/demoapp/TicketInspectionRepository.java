@@ -23,7 +23,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-import androidx.annotation.NonNull;
 import cz.dpp.praguepublictransport.etd.ETDUtils;
 import cz.dpp.praguepublictransport.etd.LitackaETD;
 import cz.spojenka.android.settings.SharedPrefsHelper;
@@ -39,9 +38,7 @@ import cz.spojenka.lwt.ticketing.client.InspectionAPI;
 import cz.spojenka.lwt.ticketing.client.TelemetryAPI;
 import cz.spojenka.lwt.ticketing.client.TicketingClient;
 import cz.spojenka.lwt.util.PIDTicketTOTP;
-import okhttp3.ResponseBody;
 import retrofit2.Call;
-import retrofit2.Callback;
 import retrofit2.HttpException;
 import retrofit2.Response;
 
@@ -412,16 +409,9 @@ public class TicketInspectionRepository {
     }
 
     private void uploadTelemetryEvent(TelemetryEventPush event) {
-        telemetryAPI.pushEvents(new TelemetryEventBatch(List.of(event), Instant.now().toEpochMilli())).enqueue(new Callback<ResponseBody>() {
-            @Override
-            public void onResponse(@NonNull Call<ResponseBody> call, @NonNull Response<ResponseBody> response) {
-
-            }
-
-            @Override
-            public void onFailure(@NonNull Call<ResponseBody> call, @NonNull Throwable t) {
-                Log.e(TAG, "Failed to upload telemetry event", t);
-            }
+        RetrofitUtils.toCompletableFuture(telemetryAPI.pushEvents(new TelemetryEventBatch(List.of(event), Instant.now().toEpochMilli()))).exceptionally(t -> {
+            Log.e(TAG, "Failed to upload telemetry event", t);
+            return null;
         });
     }
 

@@ -252,4 +252,11 @@
     <string name="lwt_tech_choice_recommended">Doporučeno</string>
     <string name="common_prerequisites_fine_location_desc_none">Pro přístup k poloze je potřeba oprávnění.</string>
     <string name="inspection_prerequisites_hardware_desc">Kontrola jízdenek vyžaduje podporu Bluetooth 4.0.</string>
+    <string name="ticket_offers_title">Nabídka jízdenek</string>
+    <string name="ticket_offer_network_all">celá síť</string>
+    <string name="ticket_offer_panel_prague">Praha</string>
+    <string name="ticket_offer_panel_pid_single">Pražská integrovaná doprava</string>
+    <string name="ticket_offer_panel_network">Síťové jízdenky</string>
+    <string name="ticket_offer_panel_other">Další jízdenky</string>
+    <string name="ticket_offer_panel_extra">Doplňkové služby</string>
 </resources>

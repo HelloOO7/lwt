@@ -1,5 +1,6 @@
 package cz.spojenka.lwt.demoapp;
 
+import android.content.Intent;
 import android.os.Bundle;
 
 import androidx.annotation.Nullable;
@@ -16,6 +17,8 @@ public class TicketListFragment extends BaseViewBindingFragment<FragmentTicketLi
         super.onSetupView(savedInstanceState);
         noResultsSwitcher = new SubscreenSwitcher(binding.rvTicketList, binding.noResults);
         noResultsSwitcher.setSubscreen(binding.noResults);
+
+        binding.fabBuyTicket.setOnClickListener(v -> startActivity(new Intent(requireContext(), TicketOffersActivity.class)));
     }
 
     @Nullable

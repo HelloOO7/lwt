@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    app:cardElevation="6dp">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingVertical="@dimen/item_margin_normal"
+        android:paddingHorizontal="@dimen/section_margin_normal">
+
+        <TextView
+            android:id="@+id/tvZonesTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            tools:text="4"
+            android:textAppearance="@style/TextAppearance.AppCompat.Title"
+            android:textSize="@dimen/text_title_l"
+            app:layout_constraintEnd_toEndOf="@+id/tvZonesSubtitle"
+            app:layout_constraintStart_toStartOf="@id/tvZonesSubtitle"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/tvZonesSubtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/tvTimeSubtitle"
+            app:layout_constraintTop_toBottomOf="@+id/tvZonesTitle"
+            tools:text="pásma" />
+
+        <TextView
+            android:id="@+id/tvTimeTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            tools:text="60"
+            android:textAppearance="@style/TextAppearance.AppCompat.Title"
+            android:textSize="@dimen/text_title_l"
+            app:layout_constraintEnd_toEndOf="@+id/tvTimeSubtitle"
+            app:layout_constraintStart_toStartOf="@id/tvTimeSubtitle"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/tvTimeSubtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/tvZonesSubtitle"
+            app:layout_constraintTop_toBottomOf="@+id/tvTimeTitle"
+            tools:text="minut" />
+
+        <com.google.android.flexbox.FlexboxLayout
+            android:id="@+id/fblCustomerProfiles"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            app:flexDirection="row"
+            app:flexWrap="wrap"
+            app:justifyContent="center"
+            android:layout_marginTop="@dimen/item_margin_normal"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:showDividerHorizontal="middle"
+            app:showDividerVertical="middle"
+            app:layout_constraintTop_toBottomOf="@+id/tvZonesSubtitle">
+
+        </com.google.android.flexbox.FlexboxLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</androidx.cardview.widget.CardView>

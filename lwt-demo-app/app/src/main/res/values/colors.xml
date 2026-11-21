@@ -25,4 +25,8 @@
     <color name="cico_notification_alerts_light_color">#ff0000</color>
     <color name="cico_notification_service_color">#43b02a</color>
     <color name="ticket_inspection_status_informative">#2196F3</color>
+    <color name="customer_profile_adult">#FF5722</color>
+    <color name="customer_profile_reduced">#FF9800</color>
+    <color name="customer_profile_disabled">#2196F3</color>
+    <color name="customer_profile_elderly">#E91E63</color>
 </resources>

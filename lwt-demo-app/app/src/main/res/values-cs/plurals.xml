@@ -54,10 +54,40 @@
         <item quantity="many">pásma</item>
         <item quantity="other">pásma</item>
     </plurals>
+    <plurals name="zones_pid_genitive">
+        <item quantity="one">pásmo</item>
+        <item quantity="few">pásma</item>
+        <item quantity="many">pásem</item>
+        <item quantity="other">pásem</item>
+    </plurals>
     <plurals name="second_short">
         <item quantity="one">%1$d s</item>
         <item quantity="few">%1$d s</item>
         <item quantity="many">%1$d s</item>
         <item quantity="other">%1$d s</item>
+    </plurals>
+    <plurals name="product_validity_days">
+        <item quantity="one">den</item>
+        <item quantity="few">dny</item>
+        <item quantity="many">dní</item>
+        <item quantity="other">dní</item>
+    </plurals>
+    <plurals name="product_validity_hours">
+        <item quantity="one">hodina</item>
+        <item quantity="few">hodiny</item>
+        <item quantity="many">hodin</item>
+        <item quantity="other">hodin</item>
+    </plurals>
+    <plurals name="product_validity_hours_fractional">
+        <item quantity="one">hodiny</item>
+        <item quantity="few">hodiny</item>
+        <item quantity="many">hodiny</item>
+        <item quantity="other">hodiny</item>
+    </plurals>
+    <plurals name="product_validity_minutes">
+        <item quantity="one">minuta</item>
+        <item quantity="few">minuty</item>
+        <item quantity="many">minut</item>
+        <item quantity="other">minut</item>
     </plurals>
 </resources>

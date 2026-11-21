@@ -2,11 +2,11 @@ package cz.spojenka.lwt.ticketingserver.controllers;
 
 import cz.spojenka.lwt.ticketing.api.*;
 import cz.spojenka.lwt.ticketingserver.model.*;
-import cz.spojenka.lwt.ticketingserver.services.AccountService;
-import cz.spojenka.lwt.ticketingserver.services.CICOFacade;
-import cz.spojenka.lwt.ticketingserver.services.CICOSessionService;
+import cz.spojenka.lwt.ticketingserver.services.*;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PagedModel;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Objects;
 
 @RestController
 @Tag(name = "User accounts", description = "User account information and management API")
@@ -27,11 +28,15 @@ public class AccountsController {
     private final AccountService accountService;
     private final CICOSessionService cicoSessionService;
     private final CICOFacade cicoFacade;
+    private final TicketIssuanceService ticketService;
+    private final TicketFacade ticketFacade;
 
-    public AccountsController(AccountService accountService, CICOSessionService cicoSessionService, CICOFacade cicoFacade) {
+    public AccountsController(AccountService accountService, CICOSessionService cicoSessionService, CICOFacade cicoFacade, TicketIssuanceService ticketService, TicketFacade ticketFacade) {
         this.accountService = accountService;
         this.cicoSessionService = cicoSessionService;
         this.cicoFacade = cicoFacade;
+        this.ticketService = ticketService;
+        this.ticketFacade = ticketFacade;
     }
 
     @GetMapping("/accounts/oauth-config")
@@ -94,5 +99,32 @@ public class AccountsController {
                 cicoSessionService.getClearingsForAccount(principal.requireAccount(), includeCancelled, pageable)
                         .map(clearing -> cicoFacade.exportClearedFare(clearing, cicoSessionService.findSessionIDsInClearing(clearing)))
         );
+    }
+
+    @GetMapping("/accounts/me/tickets")
+    @Operation(
+            summary = "Get all tickets",
+            description = "Returns all tickets of the authenticated account. "
+                    + "To return payloads for activate tickets, an app ID must be provided and match the tickets' activation records."
+    )
+    public PagedModel<TicketResponse> getMyTickets(
+            @RequestParam(value = "appId", required = false) String appId,
+            @RequestParam(value = "includePastValidity", required = false) boolean includePastValidity,
+            @AuthenticationPrincipal AccountPrincipal accountPrincipal,
+            Pageable pageable
+    ) {
+        if (accountPrincipal == null || !accountPrincipal.accountExists()) {
+            return new PagedModel<>(Page.empty());
+        } else {
+            return new PagedModel<>(ticketService.findByHolderAccount(accountPrincipal.requireAccount(), includePastValidity, pageable)
+                    .map(ticket -> {
+                        boolean canShowPayloads = false;
+                        if (appId != null) {
+                            canShowPayloads = Objects.equals(appId, ticket.getActivationRecord() != null ? ticket.getActivationRecord().getAppId() : null);
+                        }
+                        return ticketFacade.exportTicket(ticket, false, canShowPayloads);
+                    })
+            );
+        }
     }
 }

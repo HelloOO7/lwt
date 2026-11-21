@@ -26,10 +26,12 @@ public class TicketingClient {
 
     private final Retrofit retrofit;
 
-    private InspectionAPI inspectionAPI;
-    private AccountsAPI accountsAPI;
-    private CicoAPI cicoAPI;
-    private TelemetryAPI telemetryAPI;
+    private final LazyAPIRef<InspectionAPI> inspectionAPI;
+    private final LazyAPIRef<AccountsAPI> accountsAPI;
+    private final LazyAPIRef<CicoAPI> cicoAPI;
+    private final LazyAPIRef<TelemetryAPI> telemetryAPI;
+    private final LazyAPIRef<TicketsAPI> ticketsAPI;
+    private final LazyAPIRef<OrderingAPI> orderingAPI;
 
     public TicketingClient(String baseUrl, OkHttpClient okHttpClient) {
         this(baseUrl, okHttpClient, null);
@@ -58,33 +60,53 @@ public class TicketingClient {
                         .build())
                 .addConverterFactory(JacksonConverterFactory.create(OBJECT_MAPPER))
                 .build();
+
+        inspectionAPI = new LazyAPIRef<>(InspectionAPI.class);
+        accountsAPI = new LazyAPIRef<>(AccountsAPI.class);
+        cicoAPI = new LazyAPIRef<>(CicoAPI.class);
+        telemetryAPI = new LazyAPIRef<>(TelemetryAPI.class);
+        ticketsAPI = new LazyAPIRef<>(TicketsAPI.class);
+        orderingAPI = new LazyAPIRef<>(OrderingAPI.class);
     }
 
     public InspectionAPI getInspectionAPI() {
-        if (inspectionAPI == null) {
-            inspectionAPI = retrofit.create(InspectionAPI.class);
-        }
-        return inspectionAPI;
+        return inspectionAPI.get();
     }
 
     public AccountsAPI getAccountsAPI() {
-        if (accountsAPI == null) {
-            accountsAPI = retrofit.create(AccountsAPI.class);
-        }
-        return accountsAPI;
+        return accountsAPI.get();
     }
 
     public CicoAPI getCicoAPI() {
-        if (cicoAPI == null) {
-            cicoAPI = retrofit.create(CicoAPI.class);
-        }
-        return cicoAPI;
+        return cicoAPI.get();
     }
 
     public TelemetryAPI getTelemetryAPI() {
-        if (telemetryAPI == null) {
-            telemetryAPI = retrofit.create(TelemetryAPI.class);
+        return telemetryAPI.get();
+    }
+
+    public OrderingAPI getOrderingAPI() {
+        return orderingAPI.get();
+    }
+
+    public TicketsAPI getTicketsAPI() {
+        return ticketsAPI.get();
+    }
+
+    private class LazyAPIRef<T> {
+
+        private final Class<T> clazz;
+        private T instance;
+
+        public LazyAPIRef(Class<T> clazz) {
+            this.clazz = clazz;
         }
-        return telemetryAPI;
+
+        public T get() {
+            if (instance == null) {
+                instance = retrofit.create(clazz);
+            }
+            return instance;
+        }
     }
 }

@@ -20,6 +20,10 @@
         <item quantity="one">zone</item>
         <item quantity="other">zones</item>
     </plurals>
+    <plurals name="zones_pid_genitive">
+        <item quantity="one">zone</item>
+        <item quantity="other">zones</item>
+    </plurals>
     <plurals name="day_short">
         <item quantity="one">%1$d day</item>
         <item quantity="other">%1$d days</item>
@@ -39,5 +43,21 @@
     <plurals name="hour_short_fractional">
         <item quantity="one">%1$s hr</item>
         <item quantity="other">%1$s hrs</item>
+    </plurals>
+    <plurals name="product_validity_days">
+        <item quantity="one">day</item>
+        <item quantity="other">days</item>
+    </plurals>
+    <plurals name="product_validity_hours">
+        <item quantity="one">hour</item>
+        <item quantity="other">hours</item>
+    </plurals>
+    <plurals name="product_validity_hours_fractional">
+        <item quantity="one">hours</item>
+        <item quantity="other">hours</item>
+    </plurals>
+    <plurals name="product_validity_minutes">
+        <item quantity="one">minute</item>
+        <item quantity="other">minutes</item>
     </plurals>
 </resources>

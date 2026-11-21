@@ -5,8 +5,9 @@ import java.time.OffsetDateTime;
 
 public record TicketResponse(
     long id,
-    int productId,
+    ProductResponse product,
     long holderAccountId,
+    Long orderId,
     OffsetDateTime validSince,
     OffsetDateTime validUntil,
     String validZones,

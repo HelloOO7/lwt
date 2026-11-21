@@ -6,6 +6,7 @@ import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
+import java.time.Instant;
 import java.time.OffsetDateTime;
 
 @Entity
@@ -15,9 +16,13 @@ public class Ticket implements ITransportEntitlement {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
 
-    private int productId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    private Product product;
     @ManyToOne(fetch = FetchType.LAZY)
     private Account holderAccount;
+    @OneToOne(optional = true, orphanRemoval = false, cascade = CascadeType.PERSIST)
+    @Nullable
+    private OrderItem orderedBy;
 
     @Embedded
     private TicketActivationToken activationToken;
@@ -26,6 +31,7 @@ public class Ticket implements ITransportEntitlement {
     @Nullable
     private TicketPayload payload;
 
+    private Instant issuedAt;
     @Nullable
     private OffsetDateTime validSince;
     @Nullable
@@ -44,17 +50,23 @@ public class Ticket implements ITransportEntitlement {
 
     }
 
-    public Ticket(int productId, Account holderAccount) {
-        this.productId = productId;
+    public Ticket(Product product, Account holderAccount) {
+        this(product, holderAccount, null);
+    }
+
+    public Ticket(Product product, Account holderAccount, @Nullable OrderItem orderedBy) {
+        this.product = product;
         this.holderAccount = holderAccount;
+        this.orderedBy = orderedBy;
+        this.issuedAt = Instant.now();
     }
 
     public long getId() {
         return id;
     }
 
-    public int getProductId() {
-        return productId;
+    public Product getProduct() {
+        return product;
     }
 
     @Override
@@ -65,6 +77,10 @@ public class Ticket implements ITransportEntitlement {
 
     public long getHolderAccountId() {
         return holderAccount.getId();
+    }
+
+    public @Nullable OrderItem getOrderedBy() {
+        return orderedBy;
     }
 
     @Nullable
@@ -82,6 +98,10 @@ public class Ticket implements ITransportEntitlement {
 
     public void setPayload(@Nullable TicketPayload payload) {
         this.payload = payload;
+    }
+
+    public Instant getIssuedAt() {
+        return issuedAt;
     }
 
     @Override
@@ -138,8 +158,9 @@ public class Ticket implements ITransportEntitlement {
     public String toString() {
         return new ToStringBuilder(this)
                 .append("id", id)
-                .append("productId", productId)
+                .append("product", product)
                 .append("holderAccount", holderAccount.getId())
+                .append("orderedBy", orderedBy)
                 .append("activationToken", activationToken)
                 .append("payload", payload)
                 .append("validSince", validSince)

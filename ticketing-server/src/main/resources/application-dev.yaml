@@ -17,6 +17,7 @@ spring:
           issuer-uri: http://iam.mos.ropid:8180/realms/mos
 
 tickets:
+  products-import-path: "data/PIDLítačka_products_20261119.csv"
   signing-key-path:
     pub: "../pki/Ticket_signing_key_pub.pem"
     priv: "../pki/Ticket_signing_key_priv.key"
